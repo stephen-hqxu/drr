@@ -1,17 +1,15 @@
-#include "BruteForceFilter.hpp"
+#include <DisRegRep/Filter/BruteForceFilter.hpp>
+#include <DisRegRep/Maths/Arithmetic.hpp>
 
 #include <memory>
 
-#include <execution>
 #include <algorithm>
 #include <ranges>
-#include <numeric>
 
 using std::any, std::any_cast;
 using std::shared_ptr, std::make_shared;
-using std::ranges::transform, std::ranges::fill,
-	std::views::iota,
-	std::reduce;
+using std::ranges::fill,
+	std::views::iota;
 
 using namespace DisRegRep;
 using namespace Format;
@@ -45,21 +43,25 @@ any BruteForceFilter::allocateHistogram(const RegionMapFilter::LaunchDescription
 const DenseNormSingleHistogram& BruteForceFilter::filter(const RegionMapFilter::LaunchDescription& desc, any& memory) const {
 	const auto& [map, offset, extent, radius] = desc;
 	
-	const auto [ext_x, ext_y] = Indexer::toSigned(extent);
-	const auto sradius = Indexer::toSigned(radius);
+	const auto [off_x, off_y] = Arithmetic::toSigned(offset);
+	const auto [ext_x, ext_y] = Arithmetic::toSigned(extent);
+	const auto sradius = Arithmetic::toSigned(radius);
 
 	auto& [histogram, cache] = *any_cast<::BFHistogram_t&>(memory);
 	
-	const auto indexer = RegionMapFilter::Indexer(desc);
-	const auto& region_map = map->Map;
-	for (const auto y : iota(Indexer::SignedSize_t { 0 }, ext_y)) {
-		for (const auto x : iota(Indexer::SignedSize_t { 0 }, ext_x)) {
+	const auto& [region_map, dim, region_count] = *map;
+	const auto [dim_x, dim_y] = dim;
+	const auto map_indexer = DefaultRegionMapIndexer(dim_x, dim_y);
+	const auto hist_indexer = DefaultDenseHistogramIndexer(ext_x, ext_y, region_count);
+
+	for (const auto y : iota(Arithmetic::ssize_t { 0 }, ext_y)) {
+		for (const auto x : iota(Arithmetic::ssize_t { 0 }, ext_x)) {
 			//clear bin cache for every pixel
 			fill(cache, DenseBin_t { });
 
-			for (const auto ry : iota(-sradius, sradius)) {
-				for (const auto rx : iota(-sradius, sradius)) {
-					const RegionMap_t region = region_map[indexer.region(x + rx, y + ry)];
+			for (const auto ry : iota(off_y - sradius, off_y + sradius)) {
+				for (const auto rx : iota(off_x - sradius, off_x + sradius)) {
+					const Region_t region = region_map[map_indexer(x + rx, y + ry)];
 					cache[region]++;
 				}
 			}
@@ -67,9 +69,7 @@ const DenseNormSingleHistogram& BruteForceFilter::filter(const RegionMapFilter::
 			//normalise bin and copy to output
 #pragma warning(push)
 #pragma warning(disable: 4244)//type conversion
-			const double sum = reduce(std::execution::unseq, cache.cbegin(), cache.cend());
-			transform(cache, histogram.begin() + indexer.histogram(x, y, 0),
-				[sum](const auto count) constexpr noexcept { return static_cast<float>(static_cast<double>(count) / sum); });
+			Arithmetic::normalise(cache, histogram.begin() + hist_indexer(x, y, 0));
 #pragma warning(pop)
 		}
 	}

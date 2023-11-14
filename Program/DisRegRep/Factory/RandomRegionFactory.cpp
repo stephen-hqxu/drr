@@ -1,4 +1,4 @@
-#include "RandomRegionFactory.hpp"
+#include <DisRegRep/Factory/RandomRegionFactory.hpp>
 
 #include <random>
 #include <algorithm>
@@ -13,14 +13,14 @@ RegionMap RandomRegionFactory::operator()(const RegionMapFactory::CreateDescript
 	const auto& [dimension, region_count] = desc;
 	const auto [x, y] = dimension;
 	RegionMap map {
-		.Map = FixedHeapArray<RegionMap_t>(x * y),
+		.Map = FixedHeapArray<Region_t>(x * y),
 		.Dimension = dimension,
 		.RegionCount = region_count
 	};
 
 	generate(map.Map, [rng = ranlux24(static_cast<std::uint_fast32_t>(this->RandomSeed)),
 		dist = uniform_int_distribution<std::uint64_t>(0u, region_count - 1u)]() mutable {
-		return static_cast<RegionMap_t>(dist(rng));
+		return static_cast<Region_t>(dist(rng));
 	});
 	return map;
 }

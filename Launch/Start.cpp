@@ -28,9 +28,9 @@ using chrono::steady_clock, chrono::duration, chrono::duration_cast, std::milli;
 namespace {
 
 constexpr uint32_t Seed = 0b00111101100100101010000100100010u;
-constexpr array<size_t, 2u> Extent = { 1024u, 1024u };
+constexpr array<size_t, 2u> Extent = { 128u, 128u };
 constexpr size_t RegionCount = 15u,
-	KernelRadius = 128u;
+	KernelRadius = 8u;
 
 constexpr auto Offset = []() consteval {
 	auto offset = Extent;
