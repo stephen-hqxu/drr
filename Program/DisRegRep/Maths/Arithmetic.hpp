@@ -37,25 +37,6 @@ constexpr auto toUnsigned(const I num) noexcept {
 }
 
 /**
- * @brief Normalise `input` and store results to `output`.
- * 
- * @tparam RI Input range.
- * @tparam RO Output iterator.
- * 
- * @param input The input range to be normalised.
- * @param output The output iterator.
-*/
-template<std::ranges::input_range RI, std::weakly_incrementable O>
-inline void normalise(RI&& input, O&& output) {
-	using std::ranges::cbegin, std::ranges::cend, std::ranges::range_value_t, std::execution::unseq;
-	
-	const double sum = std::reduce(unseq, cbegin(input), cend(input));
-	std::transform(unseq, cbegin(input), cend(input), output,
-		[sum](const auto val) constexpr noexcept
-			{ return static_cast<typename std::iterator_traits<O>::value_type>(val / sum); });
-}
-
-/**
  * @brief Perform `output` = `a` `op` `b`.
  * 
  * @tparam Op The type of operator.
@@ -74,6 +55,25 @@ inline void addRange(R1&& a, Op&& op, R2&& b, O&& output) {
 	using std::ranges::cbegin, std::ranges::cend;
 	
 	std::transform(std::execution::unseq, cbegin(a), cend(a), cbegin(b), output, std::forward<Op>(op));
+}
+
+/**
+ * @brief Scale each value in the range.
+ * 
+ * @tparam R The input range type.
+ * @tparam O The output range type.
+ * @tparam T The scalar type.
+ * @param input The input range.
+ * @param output The output range.
+ * @param scalar The scalar.
+*/
+template<std::floating_point T, std::ranges::input_range R, std::weakly_incrementable O>
+inline void scaleRange(R&& input, O&& output, const T scalar) {
+	using std::ranges::cbegin, std::ranges::cend;
+
+	std::transform(std::execution::unseq, cbegin(input), cend(input), output,
+		[scalar](const auto v) constexpr noexcept
+			{ return static_cast<std::iterator_traits<O>::value_type>(v / scalar); });
 }
 
 }

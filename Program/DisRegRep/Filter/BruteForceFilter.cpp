@@ -46,6 +46,7 @@ const DenseNormSingleHistogram& BruteForceFilter::filter(const RegionMapFilter::
 	const auto [off_x, off_y] = Arithmetic::toSigned(offset);
 	const auto [ext_x, ext_y] = Arithmetic::toSigned(extent);
 	const auto sradius = Arithmetic::toSigned(radius);
+	const double ext_area = 1.0 * ext_x * ext_y;
 
 	auto& [histogram, cache] = *any_cast<::BFHistogram_t&>(memory);
 	
@@ -59,8 +60,8 @@ const DenseNormSingleHistogram& BruteForceFilter::filter(const RegionMapFilter::
 			//clear bin cache for every pixel
 			fill(cache, DenseBin_t { });
 
-			for (const auto ry : iota(off_y - sradius, off_y + sradius)) {
-				for (const auto rx : iota(off_x - sradius, off_x + sradius)) {
+			for (const auto ry : iota(off_y - sradius, off_y + sradius + 1)) {
+				for (const auto rx : iota(off_x - sradius, off_x + sradius + 1)) {
 					const Region_t region = region_map[map_indexer(x + rx, y + ry)];
 					cache[region]++;
 				}
@@ -69,7 +70,7 @@ const DenseNormSingleHistogram& BruteForceFilter::filter(const RegionMapFilter::
 			//normalise bin and copy to output
 #pragma warning(push)
 #pragma warning(disable: 4244)//type conversion
-			Arithmetic::normalise(cache, histogram.begin() + hist_indexer(x, y, 0));
+			Arithmetic::scaleRange(cache, histogram.begin() + hist_indexer(x, y, 0), ext_area);
 #pragma warning(pop)
 		}
 	}

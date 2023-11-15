@@ -1,6 +1,8 @@
 #include "FilterRunner.hpp"
 #include "Utility.hpp"
 
+#include <nb/nanobench.h>
+
 #include <string>
 #include <array>
 
@@ -30,8 +32,8 @@ using namespace DisRegRep::Launch;
 
 namespace {
 
-constexpr char RenderResultTemplate[] = R"DELIM(x,t_median,t_mean,t_mdape
-{{#result}}{{name}},{{median(elapsed)}},{{average(elapsed)}},{{medianAbsolutePercentError(elapsed)}}
+constexpr char RenderResultTemplate[] = R"DELIM(x,iter,t_median,t_mean,t_mdape,t_total
+{{#result}}{{name}},{{sum(iterations)}},{{median(elapsed)}},{{average(elapsed)}},{{medianAbsolutePercentError(elapsed)}},{{sumProduct(elapsed,iterations)}}
 {{/result}})DELIM";
 
 string formatSize(const SizeVec2& size) {
@@ -55,7 +57,8 @@ auto toString(const T input) {
 
 }
 
-FilterRunner::FilterRunner(const string_view test_report_dir) : ReportRoot(test_report_dir) {
+FilterRunner::FilterRunner(const string_view test_report_dir) :
+	ReportRoot(test_report_dir), Filter(nullptr) {
 	//canonical path will remove potential trailing slash
 	this->ReportRoot = fs::weakly_canonical(this->ReportRoot);
 	{
@@ -72,24 +75,32 @@ FilterRunner::FilterRunner(const string_view test_report_dir) : ReportRoot(test_
 		print(err, "Unable use directory \'{}\'.", this->ReportRoot.string());
 		throw runtime_error(err.str());
 	}
-
-	using namespace std::chrono_literals;
-	this->Benchmark.timeUnit(1ms, "ms").unit("run")
-		.epochs(15u).minEpochTime(5ms).maxEpochTime(10s)
-		.performanceCounters(false);
 }
 
-void FilterRunner::renderReport() {
+auto FilterRunner::createBenchmark() {
+	using namespace std::chrono_literals;
+
+	nb::Bench bench;
+	bench.timeUnit(1ms, "ms").unit("run")
+		.epochs(15u).minEpochTime(5ms).maxEpochTime(10s)
+		.performanceCounters(false)
+		//need to disable console output because we are running with multiple threads.
+		.output(nullptr);
+	return bench;
+}
+
+void FilterRunner::renderReport(auto& bench) {
 	ostringstream filename;
-	print(filename, "{}({}).csv", this->Benchmark.title(), this->Filter->name());
+	print(filename, "{}({}).csv", bench.title(), this->Filter->name());
 	const fs::path report_file = (this->ReportRoot / filename.str());
 
 	auto csv = ofstream(report_file.string());
-	this->Benchmark.render(::RenderResultTemplate, csv);
+	bench.render(::RenderResultTemplate, csv);
 }
 
 void FilterRunner::sweepRadius(const RegionMap& region_map, const SizeVec2& extent, const span<const Radius_t> radius_arr) {
-	this->Benchmark.title("Time-Radius")
+	nb::Bench bench = FilterRunner::createBenchmark();
+	bench.title("Time-Radius")
 		.context("RegionCount", ::toString(region_map.RegionCount).data())
 		.context("Extent", ::formatSize(extent));
 
@@ -112,17 +123,18 @@ void FilterRunner::sweepRadius(const RegionMap& region_map, const SizeVec2& exte
 	for (const auto r : radius_arr) {
 		fill_desc(r);
 		
-		this->Benchmark.run(::toString(r).data(), [&desc, &histogram, &filter = *this->Filter]() {
+		bench.run(::toString(r).data(), [&desc, &histogram, &filter = *this->Filter]() {
 			nb::doNotOptimizeAway(filter.filter(desc, histogram));
 		});
 	}
 
-	this->renderReport();
+	this->renderReport(bench);
 }
 
 void FilterRunner::sweepRegionCount(const RegionMapFactory& map_factory, const SizeVec2& extent,
 	const Radius_t radius, const span<const size_t> region_count_arr) {
-	this->Benchmark.title("Time-RegionCount")
+	nb::Bench bench = FilterRunner::createBenchmark();
+	bench.title("Time-RegionCount")
 		.context("Extent", ::formatSize(extent))
 		.context("Radius", ::toString(radius).data());
 
@@ -150,10 +162,10 @@ void FilterRunner::sweepRegionCount(const RegionMapFactory& map_factory, const S
 		}, region_map);
 		fill_desc(region_map);
 
-		this->Benchmark.run(::toString(rc).data(), [&desc, &histogram, &filter = *this->Filter]() {
+		bench.run(::toString(rc).data(), [&desc, &histogram, &filter = *this->Filter]() {
 			nb::doNotOptimizeAway(filter.filter(desc, histogram));
 		});
 	}
 
-	this->renderReport();
+	this->renderReport(bench);
 }

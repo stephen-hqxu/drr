@@ -48,6 +48,16 @@ public:
 	*/
 	virtual void operator()(const RegionMapFactory::CreateDescription& desc, Format::RegionMap& output) const = 0;
 
+	/**
+	 * @brief This is a shortcut function. Allocate a new region map, and fill region map with content.
+	 * 
+	 * @param desc The generation description.
+	 * @param dimension The dimension of region map.
+	 * 
+	 * @return The created region map.
+	*/
+	Format::RegionMap operator()(const RegionMapFactory::CreateDescription& desc, const Format::SizeVec2& dimension) const;
+
 };
 
 }

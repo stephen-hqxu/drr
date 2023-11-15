@@ -51,10 +51,10 @@ public:
 	constexpr Indexer(const TExt... extent) noexcept : Extent { Arithmetic::toUnsigned(extent)... } {
 		assert((std::cmp_greater(extent, 0) && ...));
 
-		size_t cum_ext = 0u;
+		size_t cum_ext = 1u;
 		this->CumSumExtent[Indexer::AxisOrder.front()] = 1u;
 		for (const auto [prev, curr] : Indexer::AxisOrder | std::views::adjacent<2u>) {
-			cum_ext += this->Extent[prev];
+			cum_ext *= this->Extent[prev];
 			this->CumSumExtent[curr] = cum_ext;
 		}
 	}

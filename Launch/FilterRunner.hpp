@@ -4,8 +4,6 @@
 #include <DisRegRep/Factory/RegionMapFactory.hpp>
 #include <DisRegRep/Filter/RegionMapFilter.hpp>
 
-#include <nb/nanobench.h>
-
 #include <string_view>
 #include <span>
 
@@ -21,10 +19,12 @@ class FilterRunner {
 private:
 
 	std::filesystem::path ReportRoot;
-	ankerl::nanobench::Bench Benchmark;
+
+	//Create a new benchmark.
+	static auto createBenchmark();
 
 	//Create a new report file from benchmark.
-	void renderReport();
+	void renderReport(auto& bench);
 
 public:
 

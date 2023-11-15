@@ -17,6 +17,12 @@ RegionMap RegionMapFactory::allocateRegionMap(const SizeVec2& dimension) const {
 	};
 }
 
+RegionMap RegionMapFactory::operator()(const RegionMapFactory::CreateDescription& desc, const SizeVec2& dimension) const {
+	RegionMap map = this->allocateRegionMap(dimension);
+	(*this)(desc, map);
+	return map;
+}
+
 void RandomRegionFactory::operator()(const RegionMapFactory::CreateDescription& desc, RegionMap& output) const {
 	const auto [region_count] = desc;
 	output.RegionCount = region_count;
