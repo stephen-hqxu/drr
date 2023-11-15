@@ -5,98 +5,68 @@
 #include <DisRegRep/Filter/BruteForceFilter.hpp>
 #include <DisRegRep/Filter/SingleHistogramFilter.hpp>
 
-#include <nb/nanobench.h>
+#include "FilterRunner.hpp"
+#include "Utility.hpp"
 
+#include <span>
 #include <array>
 #include <algorithm>
 #include <ranges>
 
-#include <memory>
-#include <any>
-
 #include <print>
-#include <chrono>
-#include <ratio>
+#include <thread>
 
-#include <cstdint>
+using std::span, std::array;
+using std::ranges::copy,
+	std::views::iota, std::views::stride, std::views::take;
+
+using std::print, std::println;
+using std::jthread;
 
 using namespace DisRegRep;
-namespace nb = ankerl::nanobench;
-using namespace std;
-using chrono::steady_clock, chrono::duration, chrono::duration_cast, std::milli;
+namespace F = Format;
+namespace Lnc = Launch;
 
 namespace {
 
-constexpr uint32_t Seed = 0b00111101100100101010000100100010u;
-constexpr array<size_t, 2u> Extent = { 128u, 128u };
-constexpr size_t RegionCount = 15u,
-	KernelRadius = 8u;
+namespace DefaultSetting {
 
-constexpr auto Offset = []() consteval {
-	auto offset = Extent;
-	offset.fill(KernelRadius);
-	return offset;
-}();
-constexpr auto MapDimension = []() consteval {
-	auto dim = Extent;
-	ranges::transform(dim, dim.begin(), [](const auto i) constexpr { return i + KernelRadius * 2u; });
-	return dim;
-}();
+constexpr F::SizeVec2 Extent = { 256u, 256u };
+constexpr size_t RegionCount = 15u;
+constexpr F::Radius_t Radius = 32u;
 
-using Timer = steady_clock;
-using Timestamp = Timer::time_point;
-
-constexpr uint32_t calcElapsed(const Timestamp start, const Timestamp stop) {
-	return duration_cast<duration<uint32_t, milli>>(stop - start).count();
 }
 
-Format::RegionMap createRegionMap(const RegionMapFactory& factory) {
-	return factory({
-		.Dimension = ::MapDimension,
-		.RegionCount = ::RegionCount
-	});
+void runRadius(const RegionMapFactory& map_factory, const span<const RegionMapFilter* const> filter_arr) {
+	constexpr static F::Radius_t RadiusCount = 15u,
+		MaxRadius = 256u;
+
+	array<F::Radius_t, RadiusCount> sweep_radius { };
+	copy(iota(F::Radius_t { 0 }) | stride(RadiusCount / MaxRadius) | take(RadiusCount), sweep_radius.begin());
+	auto radius_runner = Lnc::FilterRunner("bench-radius");
+
+	//we create a region map that is large enough to hold the biggest filter kernel
+	F::RegionMap region_map = map_factory.allocateRegionMap(
+		Lnc::Utility::calcMinimumDimension(::DefaultSetting::Extent, sweep_radius.back()));
+	map_factory({
+		.RegionCount = ::DefaultSetting::RegionCount
+	}, region_map);
+
+	for (const auto filter : filter_arr) {
+		radius_runner.Filter = filter;
+		radius_runner.sweepRadius(region_map, ::DefaultSetting::Extent, sweep_radius);
+	}
+}
+
+void run() {
+	print("Benchmark complete, cleaning up...");
 }
 
 }
 
 int main() {
-	print("Discrete Region Representation benchmark program :)\n");
-	print("Please note that time measured in this program are all in ms\n\n");
-
-	/*********************
-	 * Create region map
-	 *********************/
-	print("Region map initialisation\n");
-	const auto factory = RandomRegionFactory(::Seed);
-	auto start = Timer::now();
-	const Format::RegionMap region_map = ::createRegionMap(factory);
-	auto end = Timer::now();
-	print("Region map initialisation successful, time elapsed {}\n", ::calcElapsed(start, end));
-
-	/**********************
-	 * Allocate histogram
-	 *********************/
-	print("Allocate single histogram\n");
-	const SingleHistogramFilter filter;
-	const RegionMapFilter::LaunchDescription filter_desc {
-		.Map = &region_map,
-		.Offset = ::Offset,
-		.Extent = ::Extent,
-		.Radius = ::KernelRadius
-	};
-	any histogram = filter.allocateHistogram(filter_desc);
-	print("Single histogram allocation done\n");
-
-	/********************
-	 * Filter
-	 *******************/
-	print("Running single histogram filter\n");
-	print("Now running: brute-force kernel... ");
-	start = Timer::now();
-	filter.filter(filter_desc, histogram);
-	end = Timer::now();
-	print("Done, time elapsed: {}\n", ::calcElapsed(start, end));
-
-	print("\nFinish workflow successfully, cleaning up and exit...");
+	println("Welcome to Discrete Region Representation filter benchmark system\n");
+	::run();
+	print("Program exit normally :)");
 	return 0;
 }

@@ -9,7 +9,7 @@ namespace DisRegRep {
 /**
  * @brief Create a region map with random number generator.
 */
-class RandomRegionFactory : public RegionMapFactory {
+class DRR_API RandomRegionFactory : public RegionMapFactory {
 public:
 
 	std::uint32_t RandomSeed;/**< Set random seed to be effected in the next generation call. */
@@ -20,7 +20,7 @@ public:
 
 	constexpr ~RandomRegionFactory() override = default;
 
-	Format::RegionMap operator()(const RegionMapFactory::CreateDescription& desc) const override;
+	void operator()(const RegionMapFactory::CreateDescription& desc, Format::RegionMap& output) const override;
 
 };
 

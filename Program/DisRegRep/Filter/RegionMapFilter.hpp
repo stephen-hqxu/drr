@@ -1,21 +1,37 @@
 #pragma once
 
+#include <DisRegRep/ProgramExport.hpp>
 #include "../Format.hpp"
 
-#include <array>
 #include <any>
+#include <string_view>
 
 #include <algorithm>
 #include <type_traits>
 #include <concepts>
+
+#include <cstdint>
 
 namespace DisRegRep {
 
 /**
  * @brief A fundamental class for different implementation of region map filters.
 */
-class RegionMapFilter {
+class DRR_API RegionMapFilter {
 public:
+
+	/**
+	 * @brief Determines the related context a filter launch description.
+	*/
+	struct DescriptionContext {
+
+		using Type = std::uint8_t;
+
+		constexpr static DescriptionContext::Type RegionCount = 1u << 0u,
+			Extent = 1u << 2u,
+			Radius = 1u << 3u;
+
+	};
 
 	/**
 	 * @brief The configuration for filter launch.
@@ -23,17 +39,37 @@ public:
 	struct LaunchDescription {
 
 		const Format::RegionMap* Map;/**< The region map. */
-		std::array<size_t, 2u> Offset,/**< Start offset. */
+		Format::SizeVec2 Offset,/**< Start offset. */
 			Extent;/**< The extent of covered area to be filtered. */
-		size_t Radius;/**< Radius of filter. */
+		Format::Radius_t Radius;/**< Radius of filter. */
 
 	};
 
-public:
-
 	constexpr RegionMapFilter() noexcept = default;
 
+	RegionMapFilter(const RegionMapFilter&) = delete;
+
+	RegionMapFilter(RegionMapFilter&&) = delete;
+
 	constexpr virtual ~RegionMapFilter() = default;
+
+	/**
+	 * @brief Determines the relevant context of the implemented filter.
+	 * This is useful to determine the compatible histogram allocation with a particular description,
+	 * and so if histogram should be reallocated.
+	 * Any bits appear in the context are bounded to allocated histogram,
+	 * so description settings of those fields must not be changed if histogram is to be reused.
+	 * 
+	 * @return The description context.
+	*/
+	constexpr virtual RegionMapFilter::DescriptionContext::Type context() const noexcept = 0;
+
+	/**
+	 * @brief Get a descriptive name of the filter implementation.
+	 * 
+	 * @return The filter name.
+	*/
+	constexpr virtual std::string_view name() const noexcept = 0;
 
 	/**
 	 * @brief Allocate histogram memory for launch.

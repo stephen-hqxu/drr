@@ -41,6 +41,7 @@ public:
 
 	/**
 	 * @brief Initialise indexer with extent length for each axis: x, y, z, w, ...
+	 * The behaviour is undefined if any extent is not positive.
 	 * 
 	 * @tparam TExt... Type of extent length.
 	 * @param extent... Extent length. Must be strictly positive.

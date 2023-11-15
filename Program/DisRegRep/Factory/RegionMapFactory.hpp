@@ -1,5 +1,6 @@
 #pragma once
 
+#include <DisRegRep/ProgramExport.hpp>
 #include "../Format.hpp"
 
 #include <array>
@@ -9,7 +10,7 @@ namespace DisRegRep {
 /**
  * @brief A base class for implementation to create a region map.
 */
-class RegionMapFactory {
+class DRR_API RegionMapFactory {
 public:
 
 	/**
@@ -17,23 +18,35 @@ public:
 	*/
 	struct CreateDescription {
 
-		std::array<size_t, 2u> Dimension;/**< Dimension of region map. */
 		size_t RegionCount;/**< The number of region to be used. */
 
 	};
 
 	constexpr RegionMapFactory() noexcept = default;
 
+	RegionMapFactory(const RegionMapFactory&) = delete;
+
+	RegionMapFactory(RegionMapFactory&&) = delete;
+
 	constexpr virtual ~RegionMapFactory() = default;
+
+	/**
+	 * @brief Allocate a region map with given dimension.
+	 * REMINDER: Implementation of this function resides in RandomRegionFactory.cpp
+	 * 
+	 * @param dimension The dimension of region map.
+	 * 
+	 * @return The allocated region map. The content of this map is undefined.
+	*/
+	Format::RegionMap allocateRegionMap(const Format::SizeVec2& dimension) const;
 
 	/**
 	 * @brief Create a region map.
 	 * 
 	 * @param desc The generation description.
-	 * 
-	 * @return Created region map.
+	 * @param output Created region map.
 	*/
-	virtual Format::RegionMap operator()(const RegionMapFactory::CreateDescription& desc) const = 0;
+	virtual void operator()(const RegionMapFactory::CreateDescription& desc, Format::RegionMap& output) const = 0;
 
 };
 
