@@ -7,7 +7,6 @@
 #include <DisRegRep/Filter/SingleHistogramFilter.hpp>
 
 #include "FilterRunner.hpp"
-#include "Utility.hpp"
 
 #include <span>
 #include <array>
@@ -40,13 +39,14 @@ namespace DefaultSetting {
 
 constexpr F::SizeVec2 Extent = { 128u, 128u };
 constexpr size_t RegionCount = 8u;
-constexpr F::Radius_t Radius = 16u;
+constexpr F::Radius_t Radius = 8u;
 
 constexpr uint64_t Seed = 0x1CD4C39A662BF9CAull;
 constexpr size_t Centroid = 30u;
 
 }
 
+using FactoryCollection = span<const RegionMapFactory* const>;
 using FilterCollection = span<const RegionMapFilter* const>;
 
 struct TestDescription {
@@ -64,7 +64,7 @@ struct TestDescription {
 
 struct RunDescription {
 
-	const RegionMapFactory& RegionMapFactory;
+	const FactoryCollection Factory;
 	const FilterCollection Filter;
 
 };
@@ -84,10 +84,12 @@ bool selfTest(const TestDescription& desc) {
 		.Radius = 2u
 	};
 
-	any hist_gt_mem = ground_truth.allocateHistogram(launch_desc);
+	any hist_gt_mem;
+	ground_truth.tryAllocateHistogram(launch_desc, hist_gt_mem);
 	const F::DenseNormSingleHistogram& hist_gt = ground_truth.filter(launch_desc, hist_gt_mem);
 	for (const auto cmp_filter : verifying) {
-		any hist_cmp_mem = cmp_filter->allocateHistogram(launch_desc);
+		any hist_cmp_mem;
+		cmp_filter->tryAllocateHistogram(launch_desc, hist_cmp_mem);
 		const F::DenseNormSingleHistogram& hist_cmp = cmp_filter->filter(launch_desc, hist_cmp_mem);
 
 		if (!std::equal(std::execution::unseq, hist_cmp.cbegin(), hist_cmp.cend(), hist_gt.cbegin())) {
@@ -104,37 +106,53 @@ auto generateSweepVariable() {
 	return sweep;
 }
 
-void runRadius(const ::RunDescription& desc) {
+void runRadius(const ::RunDescription& regular_desc, const ::RunDescription& stress_desc) {
 	constexpr static F::Radius_t RadiusSweep = 15u,
-		MaxRadius = 64u;
+		MinRadius = 2u,
+		MaxRadius = 64u,
+		RadiusSweepStress = 30u,
+		MinRadiusStress = 8u,
+		MaxRadiusStress = 256u;
+	const size_t RegionCountStress = 15u;
+	constexpr static F::SizeVec2 ExtentStress = { 512u, 512u };
 
-	const auto sweep_radius = ::generateSweepVariable<F::Radius_t, 2u, MaxRadius, RadiusSweep>();
-	auto radius_runner = Lnc::FilterRunner("bench-radius");
+	const auto run = [](const ::RunDescription& desc, const auto sweep_radius, const char* const name,
+		const size_t region_count, const F::SizeVec2& extent) -> void {
+		const auto& [factory_arr, filter_arr] = desc;
+		auto radius_runner = Lnc::FilterRunner(name);
+		radius_runner.setRegionCount(region_count);
 
-	const auto& [map_factory, filter_arr] = desc;
-	//we create a region map that is large enough to hold the biggest filter kernel
-	const F::RegionMap region_map = map_factory({
-		.RegionCount = ::DefaultSetting::RegionCount
-	}, Lnc::Utility::calcMinimumDimension(::DefaultSetting::Extent, sweep_radius.back()));
-
-	for (const auto filter : filter_arr) {
-		radius_runner.Filter = filter;
-		radius_runner.sweepRadius(region_map, ::DefaultSetting::Extent, sweep_radius);
-	}
+		for (const auto factory : factory_arr) {
+			radius_runner.setFactory(*factory);
+			for (const auto filter : filter_arr) {
+				radius_runner.Filter = filter;
+				radius_runner.sweepRadius(extent, sweep_radius);
+			}
+		}	
+	};
+	run(regular_desc, ::generateSweepVariable<F::Radius_t, MinRadius, MaxRadius, RadiusSweep>(),
+		"bench-radius", ::DefaultSetting::RegionCount, ::DefaultSetting::Extent);
+	run(stress_desc, ::generateSweepVariable<F::Radius_t, MinRadiusStress, MaxRadiusStress, RadiusSweepStress>(),
+		"bench-radius_stress", RegionCountStress, ExtentStress);
 }
 
 void runRegionCount(const ::RunDescription& desc) {
 	constexpr static size_t RegionSweep = 15u,
+		MinRegion = 2u,
 		MaxRegion = 30u;
 
-	const auto sweep_region_count = ::generateSweepVariable<size_t, 2u, MaxRegion, RegionSweep>();
+	const auto& [factory_arr, filter_arr] = desc;
+
+	const auto sweep_region_count = ::generateSweepVariable<size_t, MinRegion, MaxRegion, RegionSweep>();
 	auto region_count_runner = Lnc::FilterRunner("bench-region_count");
 
-	const auto& [map_factory, filter_arr] = desc;
-	for (const auto filter : filter_arr) {
-		region_count_runner.Filter = filter;
-		region_count_runner.sweepRegionCount(map_factory, ::DefaultSetting::Extent,
-			::DefaultSetting::Radius, sweep_region_count);
+	for (const auto factory : factory_arr) {
+		region_count_runner.setFactory(*factory);
+		for (const auto filter : filter_arr) {
+			region_count_runner.Filter = filter;
+			region_count_runner.sweepRegionCount(::DefaultSetting::Extent,
+				::DefaultSetting::Radius, sweep_region_count);
+		}
 	}
 }
 
@@ -170,15 +188,17 @@ void run() {
 
 	println("Running benchmark, please wait...");
 	{
-		//CONSIDER: Add more region map factory for testing in the future.
 		const ::RunDescription desc {
-			.RegionMapFactory = *factory[0],
+			.Factory = factory,
 			.Filter = filter
 		};
 
 		using std::cref;
 		const array<jthread, 2u> worker {
-			jthread(::runRadius, cref(desc)),
+			jthread(::runRadius, cref(desc), ::RunDescription {
+				.Factory = span(factory).subspan(0u, 1u),
+				.Filter = span(filter).subspan(1u, 1u)
+			}),
 			jthread(::runRegionCount, cref(desc))
 		};
 	}

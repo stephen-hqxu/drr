@@ -16,16 +16,11 @@ public:
 
 	constexpr ~SingleHistogramFilter() override = default;
 
-	constexpr DescriptionContext::Type context() const noexcept override {
-		using DC = DescriptionContext;
-		return DC::Radius | DC::Extent | DC::RegionCount;
-	}
-
 	constexpr std::string_view name() const noexcept override {
 		return "SHF";
 	}
 
-	std::any allocateHistogram(const LaunchDescription& desc) const override;
+	void tryAllocateHistogram(const LaunchDescription& desc, std::any& output) const override;
 
 	const Format::DenseNormSingleHistogram& filter(const LaunchDescription& desc, std::any& memory) const override;
 

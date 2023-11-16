@@ -22,22 +22,29 @@ struct BFHistogram {
 	DenseSingleHistogram Cache;
 
 };
+//shame on you `std::any` for only taking copyable type!!!
 using BFHistogram_t = shared_ptr<BFHistogram>;
 
 }
 
-any BruteForceFilter::allocateHistogram(const LaunchDescription& desc) const {
+void BruteForceFilter::tryAllocateHistogram(const LaunchDescription& desc, any& output) const {
 	const RegionMap& map = *desc.Map;
-	const auto [ext_x, ext_y] = desc.Extent;
 	const size_t region_count = map.RegionCount;
 
-	const size_t histogram_size = ext_x * ext_y * region_count;
+	const size_t histogram_size = Arithmetic::horizontalProduct(desc.Extent) * region_count;
 
-	//shame on you `std::any` for only taking copyable type!!!
-	return make_shared<::BFHistogram>(::BFHistogram {
-		.Histogram = histogram_size,
-		.Cache = region_count
-	});
+	//compatibility check
+	if (const auto* const bf = any_cast<::BFHistogram_t>(&output);
+		bf) {
+		auto& [hist, cache] = **bf;
+		hist.resize(histogram_size);
+		cache.resize(region_count);
+	} else {
+		output = make_shared<::BFHistogram>(::BFHistogram {
+			.Histogram = DenseNormSingleHistogram(histogram_size),
+			.Cache = DenseSingleHistogram(region_count)
+		});
+	}
 }
 
 const DenseNormSingleHistogram& BruteForceFilter::filter(const LaunchDescription& desc, any& memory) const {
@@ -46,7 +53,7 @@ const DenseNormSingleHistogram& BruteForceFilter::filter(const LaunchDescription
 	const auto [off_x, off_y] = Arithmetic::toSigned(offset);
 	const auto [ext_x, ext_y] = Arithmetic::toSigned(extent);
 	const auto sradius = Arithmetic::toSigned(radius);
-	const double ext_area = 1.0 * ext_x * ext_y;
+	const double ext_area = 1.0 * Arithmetic::horizontalProduct(extent);
 
 	auto& [histogram, cache] = *any_cast<::BFHistogram_t&>(memory);
 	

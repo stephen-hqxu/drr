@@ -22,6 +22,10 @@ public:
 
 	constexpr ~VoronoiRegionFactory() = default;
 
+	constexpr std::string_view name() const noexcept override {
+		return "Voronoi";
+	}
+
 	void operator()(const CreateDescription& desc, Format::RegionMap& output) const override;
 
 };

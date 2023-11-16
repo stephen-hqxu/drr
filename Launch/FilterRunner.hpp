@@ -6,6 +6,7 @@
 
 #include <string_view>
 #include <span>
+#include <any>
 
 #include <filesystem>
 
@@ -19,15 +20,25 @@ private:
 
 	std::filesystem::path ReportRoot;
 
+	const RegionMapFactory* Factory;
+	size_t RegionCount;
+
+	bool DirtyMap;/**< If true, region map will be regenerated in the next execution. */
+	Format::RegionMap Map;
+	std::any Histogram;
+
 	//Create a new benchmark.
 	static auto createBenchmark();
 
 	//Create a new report file from benchmark.
 	void renderReport(auto& bench);
 
+	//Refresh map dimension and content.
+	void refreshMap(const Format::SizeVec2& new_extent, const Format::Radius_t radius);
+
 public:
 
-	//Set filter to be used by the next run.
+	//Set them to be used in the next filter execution.
 	const RegionMapFilter* Filter;
 
 	/**
@@ -44,6 +55,20 @@ public:
 	~FilterRunner() = default;
 
 	/**
+	 * @brief Set the region count of the internal region map.
+	 * 
+	 * @param region_count The new region count.
+	*/
+	void setRegionCount(const size_t region_count) noexcept;
+
+	/**
+	 * @brief Set the factory used for generating region map.
+	 * 
+	 * @param factory The factory.
+	*/
+	void setFactory(const RegionMapFactory& factory) noexcept;
+
+	/**
 	 * @brief Profile impact of runtime by varying radius.
 	 * 
 	 * @param region_map The region map to be used.
@@ -51,19 +76,19 @@ public:
 	 * @param extent The extent of filter run area.
 	 * @param radius_arr An array of radii to be run in order.
 	*/
-	void sweepRadius(const Format::RegionMap& region_map, const Format::SizeVec2& extent,
-		std::span<const Format::Radius_t> radius_arr);
+	void sweepRadius(const Format::SizeVec2& extent, std::span<const Format::Radius_t> radius_arr);
 
 	/**
 	 * @brief Profile impact of runtime by varying region count.
+	 * Region map will be automatically regenerated using different region count.
 	 * 
 	 * @param map_factory The region map factory to be used.
 	 * @param extent The size of the filter area.
 	 * @param radius The radius of filter kernel.
 	 * @param region_count_arr An array of region count.
 	*/
-	void sweepRegionCount(const RegionMapFactory& map_factory, const Format::SizeVec2& extent,
-		Format::Radius_t radius, std::span<const size_t> region_count_arr);
+	void sweepRegionCount(const Format::SizeVec2& extent, Format::Radius_t radius,
+		std::span<const size_t> region_count_arr);
 
 };
 

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "Container/FixedHeapArray.hpp"
 #include "Maths/Indexer.hpp"
 
 #include <array>
+#include <vector>
 #include <cstdint>
 
 namespace DisRegRep {
@@ -20,15 +20,15 @@ using Region_t = std::uint8_t;/**< Type of region, which is also the pixel forma
 using DenseBin_t = std::uint16_t;/**< Format of bin that stores region count. */
 using DenseNormBin_t = float;/**< Format of bin that stores normalised weight. */
 
-using DenseSingleHistogram = FixedHeapArray<DenseBin_t>;/**< Unnormalised bins */
-using DenseNormSingleHistogram = FixedHeapArray<DenseNormBin_t>;/**< Normalised bins. */
+using DenseSingleHistogram = std::vector<DenseBin_t>;/**< Unnormalised bins */
+using DenseNormSingleHistogram = std::vector<DenseNormBin_t>;/**< Normalised bins. */
 
 /**
  * @brief A region map.
 */
 struct RegionMap {
 
-	FixedHeapArray<Region_t> Map;/**< Region map data. */
+	std::vector<Region_t> Map;/**< Region map data. */
 
 	SizeVec2 Dimension;/**< The dimension of region map. */
 	size_t RegionCount;/**< The total number of contiguous region presented on region map. */

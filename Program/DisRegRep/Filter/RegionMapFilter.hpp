@@ -10,8 +10,6 @@
 #include <type_traits>
 #include <concepts>
 
-#include <cstdint>
-
 namespace DisRegRep {
 
 /**
@@ -19,19 +17,6 @@ namespace DisRegRep {
 */
 class DRR_API RegionMapFilter {
 public:
-
-	/**
-	 * @brief Determines the related context a filter launch description.
-	*/
-	struct DescriptionContext {
-
-		using Type = std::uint8_t;
-
-		constexpr static DescriptionContext::Type RegionCount = 1u << 0u,
-			Extent = 1u << 2u,
-			Radius = 1u << 3u;
-
-	};
 
 	/**
 	 * @brief The configuration for filter launch.
@@ -54,17 +39,6 @@ public:
 	constexpr virtual ~RegionMapFilter() = default;
 
 	/**
-	 * @brief Determines the relevant context of the implemented filter.
-	 * This is useful to determine the compatible histogram allocation with a particular description,
-	 * and so if histogram should be reallocated.
-	 * Any bits appear in the context are bounded to allocated histogram,
-	 * so description settings of those fields must not be changed if histogram is to be reused.
-	 * 
-	 * @return The description context.
-	*/
-	constexpr virtual DescriptionContext::Type context() const noexcept = 0;
-
-	/**
 	 * @brief Get a descriptive name of the filter implementation.
 	 * 
 	 * @return The filter name.
@@ -72,13 +46,15 @@ public:
 	constexpr virtual std::string_view name() const noexcept = 0;
 
 	/**
-	 * @brief Allocate histogram memory for launch.
+	 * @brief Try to allocate histogram memory for launch.
+	 * This function first detects if the given `output` is sufficient to hold result for filtering using `desc`.
+	 * If so, this function is a no-op; otherwise, memory will be allocated and placed to `output`.
+	 * This can help minimising the number of reallocation.
 	 * 
 	 * @param desc The filter launch description.
-	 * 
-	 * @return Allocated memory.
+	 * @param output The allocated memory.
 	*/
-	virtual std::any allocateHistogram(const LaunchDescription& desc) const = 0;
+	virtual void tryAllocateHistogram(const LaunchDescription& desc, std::any& output) const = 0;
 
 	/**
 	 * @brief Perform filter on region map.
@@ -92,8 +68,8 @@ public:
 	 * @return The generated normalised single histogram for this region map.
 	 * The memory is held by the `memory` input.
 	*/
-	virtual const Format::DenseNormSingleHistogram& filter(const LaunchDescription& desc,
-		std::any& memory) const = 0;
+	virtual const Format::DenseNormSingleHistogram& filter(
+		const LaunchDescription& desc, std::any& memory) const = 0;
 
 };
 

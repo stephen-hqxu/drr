@@ -8,6 +8,7 @@
 #include <ranges>
 #include <numeric>
 
+#include <utility>
 #include <type_traits>
 #include <concepts>
 
@@ -69,11 +70,26 @@ inline void addRange(R1&& a, Op&& op, R2&& b, O&& output) {
 */
 template<std::floating_point T, std::ranges::input_range R, std::weakly_incrementable O>
 inline void scaleRange(R&& input, O&& output, const T scalar) {
-	using std::ranges::cbegin, std::ranges::cend;
+	using std::ranges::cbegin, std::ranges::cend, std::iterator_traits;
 
 	std::transform(std::execution::unseq, cbegin(input), cend(input), output,
 		[scalar](const auto v) constexpr noexcept
-			{ return static_cast<std::iterator_traits<O>::value_type>(v / scalar); });
+			{ return static_cast<iterator_traits<O>::value_type>(v / scalar); });
+}
+
+/**
+ * @brief Calculate product of all numbers in an array.
+ * 
+ * @tparam T Type of number.
+ * @tparam S The size of array.
+ * @param r The range whose horizontal product is calculated.
+*/
+template<typename T, size_t S>
+constexpr T horizontalProduct(const std::array<T, S>& num) noexcept {
+	const auto product = [&num]<size_t... Idx>(std::index_sequence<Idx...>) noexcept -> T {
+		return (T { 1 } * ... * num[Idx]);
+	};
+	return product(std::make_index_sequence<S> { });
 }
 
 }

@@ -33,7 +33,7 @@ using SHFHistogram_t = shared_ptr<SHFHistogram>;
 
 }
 
-any SingleHistogramFilter::allocateHistogram(const LaunchDescription& desc) const {
+void SingleHistogramFilter::tryAllocateHistogram(const LaunchDescription& desc, any& output) const {
 	const RegionMap& map = *desc.Map;
 	const auto [ext_x, ext_y] = desc.Extent;
 	const size_t region_count = map.RegionCount;
@@ -42,13 +42,23 @@ any SingleHistogramFilter::allocateHistogram(const LaunchDescription& desc) cons
 		histogram_size = row_length * ext_y,
 		//horizontal pass requires padding above and below
 		histogram_h_size = row_length * (ext_y + 2u * desc.Radius);
-	return make_shared<::SHFHistogram>(::SHFHistogram {
-		.Histogram = {
-			.Horizontal = histogram_h_size,
-			.Final = histogram_size
-		},
-		.Cache = region_count
-	});
+
+	if (const auto* const shf = any_cast<::SHFHistogram_t>(&output);
+		shf) {
+		auto& [hist, cache] = **shf;
+		auto& [hori, final] = hist;
+		hori.resize(histogram_h_size);
+		final.resize(histogram_size);
+		cache.resize(region_count);
+	} else {
+		output = make_shared<::SHFHistogram>(::SHFHistogram {
+			.Histogram = {
+				.Horizontal = DenseSingleHistogram(histogram_h_size),
+				.Final = DenseNormSingleHistogram(histogram_size)
+			},
+			.Cache = DenseSingleHistogram(region_count)
+		});
+	}
 }
 
 const DenseNormSingleHistogram& SingleHistogramFilter::filter(const LaunchDescription& desc, any& memory) const {
@@ -58,7 +68,7 @@ const DenseNormSingleHistogram& SingleHistogramFilter::filter(const LaunchDescri
 	const auto [ext_x, ext_y] = Arithmetic::toSigned(extent);
 	const auto sradius = Arithmetic::toSigned(radius);
 	const auto sradius_2 = 2 * sradius;
-	const double ext_area = 1.0 * ext_x * ext_y;
+	const double ext_area = 1.0 * Arithmetic::horizontalProduct(extent);
 
 	auto& [histogram, cache] = *any_cast<::SHFHistogram_t&>(memory);
 	auto& [histogram_h, histogram_full] = histogram;

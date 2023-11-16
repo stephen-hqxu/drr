@@ -19,11 +19,9 @@
 
 using std::ranges::max_element;
 
-using std::string, std::string_view, std::span, std::any, std::array;
+using std::string, std::string_view, std::span, std::array;
 using std::to_chars;
 using std::ofstream, std::runtime_error, std::format;
-
-using DC = DisRegRep::RegionMapFilter::DescriptionContext;
 
 namespace fs = std::filesystem;
 namespace nb = ankerl::nanobench;
@@ -56,7 +54,7 @@ auto toString(const T input) {
 }
 
 FilterRunner::FilterRunner(const string_view test_report_dir) :
-	ReportRoot(test_report_dir), Filter(nullptr) {
+	ReportRoot(test_report_dir), Factory(nullptr), RegionCount { }, DirtyMap(true), Filter(nullptr) {
 	//canonical path will remove potential trailing slash
 	this->ReportRoot = fs::weakly_canonical(this->ReportRoot);
 	{
@@ -84,79 +82,88 @@ auto FilterRunner::createBenchmark() {
 }
 
 void FilterRunner::renderReport(auto& bench) {
-	const fs::path report_file = (this->ReportRoot / format("{}({}).csv", bench.title(), this->Filter->name()));
+	const fs::path report_file = (this->ReportRoot / format("{0}({2},{1}).csv", bench.title(),
+		this->Filter->name(), this->Factory->name()));
 
 	auto csv = ofstream(report_file.string());
 	bench.render(::RenderResultTemplate, csv);
 }
 
-void FilterRunner::sweepRadius(const RegionMap& region_map, const SizeVec2& extent, const span<const Radius_t> radius_arr) {
+inline void FilterRunner::refreshMap(const SizeVec2& new_extent, const Radius_t radius) {
+	const SizeVec2 new_dimension = Utility::calcMinimumDimension(new_extent, radius);
+	if (RegionMapFactory::reshape(this->Map, new_dimension)) {
+		this->DirtyMap = true;
+	}
+
+	//need to regenerate it if region map is dirty
+	if (this->DirtyMap) {
+		(*this->Factory)({
+			.RegionCount = this->RegionCount
+		}, this->Map);
+		this->DirtyMap = { };
+	}
+}
+
+void FilterRunner::setRegionCount(const size_t region_count) noexcept {
+	this->RegionCount = region_count;
+	this->DirtyMap = true;
+}
+
+void FilterRunner::setFactory(const RegionMapFactory& factory) noexcept {
+	this->Factory = &factory;
+	this->DirtyMap = true;
+}
+
+void FilterRunner::sweepRadius(const SizeVec2& extent, const span<const Radius_t> radius_arr) {
+	this->refreshMap(extent, *max_element(radius_arr));
+
 	nb::Bench bench = FilterRunner::createBenchmark();
 	bench.title("Time-Radius")
-		.context("RegionCount", ::toString(region_map.RegionCount).data())
+		.context("RegionCount", ::toString(this->Map.RegionCount).data())
 		.context("Extent", ::formatSize(extent));
 
 	RegionMapFilter::LaunchDescription desc {
-		.Map = &region_map,
+		.Map = &this->Map,
 		.Extent = extent
 	};
-	const auto fill_desc = [&desc](const Radius_t r) -> void {
+	const auto run = [&desc, &histogram = this->Histogram, &filter = *this->Filter]() -> void {
+		nb::doNotOptimizeAway(filter.filter(desc, histogram));
+	};
+	for (const auto r : radius_arr) {
 		desc.Radius = r;
 		desc.Offset = Utility::calcMinimumOffset(r);
-	};
-	
-	//try to reuse histogram if possible, we allocate histogram that is big enough to do all benchmark
-	//need to determine if radius impacts histogram size
-	if (this->Filter->context() & DC::Radius) {
-		fill_desc(*max_element(radius_arr));
-	}
-	any histogram = this->Filter->allocateHistogram(desc);
-	
-	for (const auto r : radius_arr) {
-		fill_desc(r);
-		
-		bench.run(::toString(r).data(), [&desc, &histogram, &filter = *this->Filter]() {
-			nb::doNotOptimizeAway(filter.filter(desc, histogram));
-		});
+		this->Filter->tryAllocateHistogram(desc, this->Histogram);
+
+		bench.run(::toString(r).data(), run);
 	}
 
 	this->renderReport(bench);
 }
 
-void FilterRunner::sweepRegionCount(const RegionMapFactory& map_factory, const SizeVec2& extent,
-	const Radius_t radius, const span<const size_t> region_count_arr) {
+void FilterRunner::sweepRegionCount(const SizeVec2& extent, const Radius_t radius,
+	const span<const size_t> region_count_arr) {
+
 	nb::Bench bench = FilterRunner::createBenchmark();
 	bench.title("Time-RegionCount")
 		.context("Extent", ::formatSize(extent))
 		.context("Radius", ::toString(radius).data());
 
-	RegionMapFilter::LaunchDescription desc {
+	const RegionMapFilter::LaunchDescription desc {
+		.Map = &this->Map,
 		.Offset = Utility::calcMinimumOffset(radius),
 		.Extent = extent,
 		.Radius = radius
 	};
-	const auto fill_desc = [&desc](const RegionMap& map) -> void {
-		desc.Map = &map;
+	const auto run = [&desc, &histogram = this->Histogram, &filter = *this->Filter]() -> void {
+		nb::doNotOptimizeAway(filter.filter(desc, histogram));
 	};
-	
-	if (this->Filter->context() & DC::RegionCount) {
-		//create a fake region map to preallocate memory
-		fill_desc({
-			.RegionCount = *max_element(region_count_arr)
-		});
-	}
-	RegionMap region_map = map_factory.allocateRegionMap(Utility::calcMinimumDimension(extent, radius));
-	any histogram = this->Filter->allocateHistogram(desc);
-
 	for (const auto rc : region_count_arr) {
-		map_factory(RegionMapFactory::CreateDescription {
-			.RegionCount = rc
-		}, region_map);
-		fill_desc(region_map);
+		this->setRegionCount(rc);
+		//shouldn't trigger reallocation because size does not change
+		this->refreshMap(extent, radius);
+		this->Filter->tryAllocateHistogram(desc, this->Histogram);
 
-		bench.run(::toString(rc).data(), [&desc, &histogram, &filter = *this->Filter]() {
-			nb::doNotOptimizeAway(filter.filter(desc, histogram));
-		});
+		bench.run(::toString(rc).data(), run);
 	}
 
 	this->renderReport(bench);
