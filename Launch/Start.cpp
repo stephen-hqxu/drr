@@ -1,5 +1,6 @@
 #include <DisRegRep/Factory/RegionMapFactory.hpp>
 #include <DisRegRep/Factory/RandomRegionFactory.hpp>
+#include <DisRegRep/Factory/VoronoiRegionFactory.hpp>
 
 #include <DisRegRep/Filter/RegionMapFilter.hpp>
 #include <DisRegRep/Filter/BruteForceFilter.hpp>
@@ -41,7 +42,8 @@ constexpr F::SizeVec2 Extent = { 128u, 128u };
 constexpr size_t RegionCount = 8u;
 constexpr F::Radius_t Radius = 16u;
 
-constexpr uint32_t Seed = 0b11111001011000010100101110110111u;
+constexpr uint64_t Seed = 0x1CD4C39A662BF9CAull;
+constexpr size_t Centroid = 30u;
 
 }
 
@@ -139,14 +141,14 @@ void runRegionCount(const ::RunDescription& desc) {
 void run() {
 	println("Initialising test environment...");
 	//factory
-	RandomRegionFactory random_factory;
-	random_factory.RandomSeed = ::DefaultSetting::Seed;
+	const auto random_factory = RandomRegionFactory(::DefaultSetting::Seed);
+	const auto voronoi_factory = VoronoiRegionFactory(::DefaultSetting::Seed, ::DefaultSetting::Centroid);
 	//filter
-	BruteForceFilter bf;
-	SingleHistogramFilter shf;
+	const BruteForceFilter bf;
+	const SingleHistogramFilter shf;
 
-	const array<const RegionMapFactory*, 1u> factory {
-		&random_factory
+	const array<const RegionMapFactory*, 2u> factory {
+		&random_factory, &voronoi_factory
 	};
 	const array<const RegionMapFilter*, 2u> filter {
 		&bf, &shf
@@ -155,7 +157,7 @@ void run() {
 
 	println("Performing self test, this should only take a fractional of a second...");
 	const bool test_result = ::selfTest({
-		.RegionMapFactory = random_factory,
+		.RegionMapFactory = voronoi_factory,
 		.Filter = {
 			.GroundTruth = bf,
 			.Verifying = filter | drop(1u)

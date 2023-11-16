@@ -16,8 +16,8 @@ public:
 
 	constexpr ~BruteForceFilter() override = default;
 
-	constexpr RegionMapFilter::DescriptionContext::Type context() const noexcept override {
-		using DC = RegionMapFilter::DescriptionContext;
+	constexpr DescriptionContext::Type context() const noexcept override {
+		using DC = DescriptionContext;
 		return DC::Extent | DC::RegionCount;
 	}
 
@@ -25,9 +25,9 @@ public:
 		return "BF";
 	}
 
-	std::any allocateHistogram(const RegionMapFilter::LaunchDescription& desc) const override;
+	std::any allocateHistogram(const LaunchDescription& desc) const override;
 
-	const Format::DenseNormSingleHistogram& filter(const RegionMapFilter::LaunchDescription& desc, std::any& memory) const override;
+	const Format::DenseNormSingleHistogram& filter(const LaunchDescription& desc, std::any& memory) const override;
 
 };
 

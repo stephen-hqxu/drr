@@ -26,7 +26,7 @@ using BFHistogram_t = shared_ptr<BFHistogram>;
 
 }
 
-any BruteForceFilter::allocateHistogram(const RegionMapFilter::LaunchDescription& desc) const {
+any BruteForceFilter::allocateHistogram(const LaunchDescription& desc) const {
 	const RegionMap& map = *desc.Map;
 	const auto [ext_x, ext_y] = desc.Extent;
 	const size_t region_count = map.RegionCount;
@@ -40,7 +40,7 @@ any BruteForceFilter::allocateHistogram(const RegionMapFilter::LaunchDescription
 	});
 }
 
-const DenseNormSingleHistogram& BruteForceFilter::filter(const RegionMapFilter::LaunchDescription& desc, any& memory) const {
+const DenseNormSingleHistogram& BruteForceFilter::filter(const LaunchDescription& desc, any& memory) const {
 	const auto& [map, offset, extent, radius] = desc;
 	
 	const auto [off_x, off_y] = Arithmetic::toSigned(offset);

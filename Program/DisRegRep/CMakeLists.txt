@@ -3,6 +3,8 @@ include(GenerateExportHeader)
 add_library(${DRR_PROGRAM} SHARED
 	# Factory/
 	Factory/RandomRegionFactory.cpp
+	Factory/RegionMapFactory.cpp
+	Factory/VoronoiRegionFactory.cpp
 	# Filter/
 	Filter/BruteForceFilter.cpp
 	Filter/SingleHistogramFilter.cpp
@@ -14,6 +16,7 @@ target_sources(${DRR_PROGRAM} PRIVATE
 	# Factory/
 	Factory/RandomRegionFactory.hpp
 	Factory/RegionMapFactory.hpp
+	Factory/VoronoiRegionFactory.hpp
 	# Filter/
 	Filter/BruteForceFilter.hpp
 	Filter/RegionMapFilter.hpp
@@ -36,6 +39,11 @@ generate_export_header(${DRR_PROGRAM}
 cmake_path(GET CMAKE_CURRENT_SOURCE_DIR PARENT_PATH inc)
 target_include_directories(${DRR_PROGRAM}
 	PUBLIC ${inc} ${generated_include_dir}
+)
+
+target_link_libraries(${DRR_PROGRAM}
+	# we are only using it in source file
+	PRIVATE ${DRR_EXTERNAL}
 )
 
 get_target_property(src ${DRR_PROGRAM} SOURCES)

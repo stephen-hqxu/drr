@@ -27,15 +27,15 @@ private:
 	constexpr static std::array AxisPrecedence = { Prec... },
 		//This array basically tells which axis has the highest precedence, and so on.
 		AxisOrder = []() consteval noexcept -> auto {
-			std::array<size_t, Indexer::AxisCount> order { };
-			for (const auto axis : std::views::iota(0u, Indexer::AxisCount)) {
-				order[Indexer::AxisPrecedence[axis]] = axis;
+			std::array<size_t, AxisCount> order { };
+			for (const auto axis : std::views::iota(0u, AxisCount)) {
+				order[AxisPrecedence[axis]] = axis;
 			}
 			return order;
 		}();
 	
 	//Stride of each axis based on precedence.
-	std::array<size_t, Indexer::AxisCount> Extent, CumSumExtent;
+	std::array<size_t, AxisCount> Extent, CumSumExtent;
 
 public:
 
@@ -47,13 +47,13 @@ public:
 	 * @param extent... Extent length. Must be strictly positive.
 	*/
 	template<std::integral... TExt>
-	requires(sizeof...(TExt) == Indexer::AxisCount)
+	requires(sizeof...(TExt) == AxisCount)
 	constexpr Indexer(const TExt... extent) noexcept : Extent { Arithmetic::toUnsigned(extent)... } {
 		assert((std::cmp_greater(extent, 0) && ...));
 
 		size_t cum_ext = 1u;
-		this->CumSumExtent[Indexer::AxisOrder.front()] = 1u;
-		for (const auto [prev, curr] : Indexer::AxisOrder | std::views::adjacent<2u>) {
+		this->CumSumExtent[AxisOrder.front()] = 1u;
+		for (const auto [prev, curr] : AxisOrder | std::views::adjacent<2u>) {
 			cum_ext *= this->Extent[prev];
 			this->CumSumExtent[curr] = cum_ext;
 		}
@@ -68,9 +68,9 @@ public:
 	 * @param idx... Index into each axis.
 	*/
 	template<std::integral... TIdx>
-	requires(sizeof...(TIdx) == Indexer::AxisCount)
+	requires(sizeof...(TIdx) == AxisCount)
 	constexpr size_t operator()(const TIdx... idx) const noexcept {
-		constexpr static auto axis_idx = std::make_index_sequence<Indexer::AxisCount> { };
+		constexpr static auto axis_idx = std::make_index_sequence<AxisCount> { };
 
 		//extent range check
 		assert((std::cmp_greater_equal(idx, 0) && ...));

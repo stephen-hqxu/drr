@@ -62,7 +62,7 @@ public:
 	 * 
 	 * @return The description context.
 	*/
-	constexpr virtual RegionMapFilter::DescriptionContext::Type context() const noexcept = 0;
+	constexpr virtual DescriptionContext::Type context() const noexcept = 0;
 
 	/**
 	 * @brief Get a descriptive name of the filter implementation.
@@ -78,7 +78,7 @@ public:
 	 * 
 	 * @return Allocated memory.
 	*/
-	virtual std::any allocateHistogram(const RegionMapFilter::LaunchDescription& desc) const = 0;
+	virtual std::any allocateHistogram(const LaunchDescription& desc) const = 0;
 
 	/**
 	 * @brief Perform filter on region map.
@@ -92,7 +92,7 @@ public:
 	 * @return The generated normalised single histogram for this region map.
 	 * The memory is held by the `memory` input.
 	*/
-	virtual const Format::DenseNormSingleHistogram& filter(const RegionMapFilter::LaunchDescription& desc,
+	virtual const Format::DenseNormSingleHistogram& filter(const LaunchDescription& desc,
 		std::any& memory) const = 0;
 
 };

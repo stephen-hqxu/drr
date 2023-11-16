@@ -33,7 +33,7 @@ using SHFHistogram_t = shared_ptr<SHFHistogram>;
 
 }
 
-any SingleHistogramFilter::allocateHistogram(const RegionMapFilter::LaunchDescription& desc) const {
+any SingleHistogramFilter::allocateHistogram(const LaunchDescription& desc) const {
 	const RegionMap& map = *desc.Map;
 	const auto [ext_x, ext_y] = desc.Extent;
 	const size_t region_count = map.RegionCount;
@@ -51,7 +51,7 @@ any SingleHistogramFilter::allocateHistogram(const RegionMapFilter::LaunchDescri
 	});
 }
 
-const DenseNormSingleHistogram& SingleHistogramFilter::filter(const RegionMapFilter::LaunchDescription& desc, any& memory) const {
+const DenseNormSingleHistogram& SingleHistogramFilter::filter(const LaunchDescription& desc, any& memory) const {
 	const auto& [map, offset, extent, radius] = desc;
 
 	const auto [off_x, off_y] = Arithmetic::toSigned(offset);

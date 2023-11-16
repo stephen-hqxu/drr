@@ -12,15 +12,15 @@ namespace DisRegRep {
 class DRR_API RandomRegionFactory : public RegionMapFactory {
 public:
 
-	std::uint32_t RandomSeed;/**< Set random seed to be effected in the next generation call. */
+	std::uint64_t RandomSeed;/**< Set random seed to be effected in the next generation call. */
 
-	constexpr RandomRegionFactory(const std::uint32_t seed = 0u) noexcept : RandomSeed(seed) {
+	constexpr RandomRegionFactory(const std::uint64_t seed = 0u) noexcept : RandomSeed(seed) {
 
 	}
 
 	constexpr ~RandomRegionFactory() override = default;
 
-	void operator()(const RegionMapFactory::CreateDescription& desc, Format::RegionMap& output) const override;
+	void operator()(const CreateDescription& desc, Format::RegionMap& output) const override;
 
 };
 

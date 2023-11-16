@@ -32,7 +32,6 @@ public:
 
 	/**
 	 * @brief Allocate a region map with given dimension.
-	 * REMINDER: Implementation of this function resides in RandomRegionFactory.cpp
 	 * 
 	 * @param dimension The dimension of region map.
 	 * 
@@ -46,7 +45,7 @@ public:
 	 * @param desc The generation description.
 	 * @param output Created region map.
 	*/
-	virtual void operator()(const RegionMapFactory::CreateDescription& desc, Format::RegionMap& output) const = 0;
+	virtual void operator()(const CreateDescription& desc, Format::RegionMap& output) const = 0;
 
 	/**
 	 * @brief This is a shortcut function. Allocate a new region map, and fill region map with content.
@@ -56,7 +55,7 @@ public:
 	 * 
 	 * @return The created region map.
 	*/
-	Format::RegionMap operator()(const RegionMapFactory::CreateDescription& desc, const Format::SizeVec2& dimension) const;
+	Format::RegionMap operator()(const CreateDescription& desc, const Format::SizeVec2& dimension) const;
 
 };
 

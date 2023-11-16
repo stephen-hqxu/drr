@@ -8,9 +8,9 @@
 
 #include <algorithm>
 
-#include <print>
+#include <format>
+#include <fstream>
 #include <chrono>
-#include <sstream>
 #include <stdexcept>
 
 #include <charconv>
@@ -21,7 +21,7 @@ using std::ranges::max_element;
 
 using std::string, std::string_view, std::span, std::any, std::array;
 using std::to_chars;
-using std::ofstream, std::ostringstream, std::runtime_error, std::print;
+using std::ofstream, std::runtime_error, std::format;
 
 using DC = DisRegRep::RegionMapFilter::DescriptionContext;
 
@@ -37,10 +37,8 @@ constexpr char RenderResultTemplate[] = R"DELIM(x,iter,t_median,t_mean,t_mdape,t
 {{/result}})DELIM";
 
 string formatSize(const SizeVec2& size) {
-	ostringstream msg;
 	const auto [x, y] = size;
-	print(msg, "({}, {})", x, y);
-	return msg.str();
+	return format("({}, {})", x, y);
 }
 
 template<std::integral T>
@@ -66,14 +64,10 @@ FilterRunner::FilterRunner(const string_view test_report_dir) :
 		const auto now = zoned_time(current_zone(), system_clock::now()).get_local_time();
 
 		//add a timestamp to the output directory
-		ostringstream timed_dir;
-		print(timed_dir, "{}-{:%Y-%m-%d_%H-%M}", this->ReportRoot.filename().string(), now);
-		this->ReportRoot.replace_filename(timed_dir.str());
+		this->ReportRoot.replace_filename(format("{}-{:%Y-%m-%d_%H-%M}", this->ReportRoot.filename().string(), now));
 	}
 	if (!fs::create_directory(this->ReportRoot)) {
-		ostringstream err;
-		print(err, "Unable use directory \'{}\'.", this->ReportRoot.string());
-		throw runtime_error(err.str());
+		throw runtime_error(format("Unable use directory \'{}\'.", this->ReportRoot.string()));
 	}
 }
 
@@ -90,9 +84,7 @@ auto FilterRunner::createBenchmark() {
 }
 
 void FilterRunner::renderReport(auto& bench) {
-	ostringstream filename;
-	print(filename, "{}({}).csv", bench.title(), this->Filter->name());
-	const fs::path report_file = (this->ReportRoot / filename.str());
+	const fs::path report_file = (this->ReportRoot / format("{}({}).csv", bench.title(), this->Filter->name()));
 
 	auto csv = ofstream(report_file.string());
 	bench.render(::RenderResultTemplate, csv);
