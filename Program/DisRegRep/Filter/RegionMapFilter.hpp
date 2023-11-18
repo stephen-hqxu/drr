@@ -19,6 +19,16 @@ class DRR_API RegionMapFilter {
 public:
 
 	/**
+	 * @brief Tag to specify filter type.
+	*/
+	struct LaunchTag {
+
+		struct Dense { };/**< Dense matrix. */
+		struct Sparse { };/**< Sparse matrix. */
+
+	};
+
+	/**
 	 * @brief The configuration for filter launch.
 	*/
 	struct LaunchDescription {
@@ -60,6 +70,7 @@ public:
 	 * @brief Perform filter on region map.
 	 * This filter does no boundary checking, application should adjust offset to handle padding.
 	 * 
+	 * @param tag_dense Specify the dense launch tag.
 	 * @param desc The filter launch description.
 	 * @param memory The memory allocated for this launch.
 	 * The behaviour is undefined if this memory is not allocated with compatible launch description.
@@ -68,7 +79,7 @@ public:
 	 * @return The generated normalised single histogram for this region map.
 	 * The memory is held by the `memory` input.
 	*/
-	virtual const Format::DenseNormSingleHistogram& filter(
+	virtual const Format::DenseNormSingleHistogram& operator()(LaunchTag::Dense tag_dense,
 		const LaunchDescription& desc, std::any& memory) const = 0;
 
 };

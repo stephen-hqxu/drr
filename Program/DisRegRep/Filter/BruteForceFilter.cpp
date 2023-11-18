@@ -47,8 +47,10 @@ void BruteForceFilter::tryAllocateHistogram(const LaunchDescription& desc, any& 
 	}
 }
 
-const DenseNormSingleHistogram& BruteForceFilter::filter(const LaunchDescription& desc, any& memory) const {
-	const auto& [map, offset, extent, radius] = desc;
+const DenseNormSingleHistogram& BruteForceFilter::operator()(LaunchTag::Dense,
+	const LaunchDescription& desc, any& memory) const {
+	const auto& [map_ptr, offset, extent, radius] = desc;
+	const RegionMap& map = *map_ptr;
 	
 	const auto [off_x, off_y] = Arithmetic::toSigned(offset);
 	const auto [ext_x, ext_y] = Arithmetic::toSigned(extent);
@@ -57,19 +59,16 @@ const DenseNormSingleHistogram& BruteForceFilter::filter(const LaunchDescription
 
 	auto& [histogram, cache] = *any_cast<::BFHistogram_t&>(memory);
 	
-	const auto& [region_map, dim, region_count] = *map;
-	const auto [dim_x, dim_y] = dim;
-	const auto map_indexer = DefaultRegionMapIndexer(dim_x, dim_y);
-	const auto hist_indexer = DefaultDenseHistogramIndexer(ext_x, ext_y, region_count);
+	const auto hist_indexer = DefaultDenseHistogramIndexer(ext_x, ext_y, map.RegionCount);
 
 	for (const auto y : iota(Arithmetic::ssize_t { 0 }, ext_y)) {
 		for (const auto x : iota(Arithmetic::ssize_t { 0 }, ext_x)) {
 			//clear bin cache for every pixel
-			fill(cache, DenseBin_t { });
+			fill(cache, Bin_t { });
 
 			for (const auto ry : iota(off_y - sradius, off_y + sradius + 1)) {
 				for (const auto rx : iota(off_x - sradius, off_x + sradius + 1)) {
-					const Region_t region = region_map[map_indexer(x + rx, y + ry)];
+					const Region_t region = map(x + rx, y + ry);
 					cache[region]++;
 				}
 			}

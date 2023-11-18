@@ -17,12 +17,13 @@ public:
 	constexpr ~BruteForceFilter() override = default;
 
 	constexpr std::string_view name() const noexcept override {
-		return "BF";
+		return "BFF";
 	}
 
 	void tryAllocateHistogram(const LaunchDescription& desc, std::any& output) const override;
 
-	const Format::DenseNormSingleHistogram& filter(const LaunchDescription& desc, std::any& memory) const override;
+	const Format::DenseNormSingleHistogram& operator()(LaunchTag::Dense tag_dense,
+		const LaunchDescription& desc, std::any& memory) const override;
 
 };
 

@@ -3,7 +3,6 @@
 
 #include <nb/nanobench.h>
 
-#include <string>
 #include <array>
 
 #include <algorithm>
@@ -27,6 +26,10 @@ namespace fs = std::filesystem;
 namespace nb = ankerl::nanobench;
 using namespace DisRegRep::Format;
 using namespace DisRegRep::Launch;
+
+using RMFT = DisRegRep::RegionMapFilter::LaunchTag;
+using RunDense = RMFT::Dense;
+using RunSparse = RMFT::Sparse;
 
 namespace {
 
@@ -82,8 +85,15 @@ auto FilterRunner::createBenchmark() {
 }
 
 void FilterRunner::renderReport(auto& bench) {
-	const fs::path report_file = (this->ReportRoot / format("{0}({2},{1}).csv", bench.title(),
-		this->Filter->name(), this->Factory->name()));
+	string_view tag;
+	if (this->UserTag.empty()) {
+		tag = "-";
+	} else {
+		tag = this->UserTag;
+	}
+
+	const fs::path report_file = this->ReportRoot / format("{0}({2},{1},{3}).csv", bench.title(),
+		this->Filter->name(), this->Factory->name(), tag);
 
 	auto csv = ofstream(report_file.string());
 	bench.render(::RenderResultTemplate, csv);
@@ -127,7 +137,7 @@ void FilterRunner::sweepRadius(const SizeVec2& extent, const span<const Radius_t
 		.Extent = extent
 	};
 	const auto run = [&desc, &histogram = this->Histogram, &filter = *this->Filter]() -> void {
-		nb::doNotOptimizeAway(filter.filter(desc, histogram));
+		nb::doNotOptimizeAway(filter(RunDense { }, desc, histogram));
 	};
 	for (const auto r : radius_arr) {
 		desc.Radius = r;
@@ -155,7 +165,7 @@ void FilterRunner::sweepRegionCount(const SizeVec2& extent, const Radius_t radiu
 		.Radius = radius
 	};
 	const auto run = [&desc, &histogram = this->Histogram, &filter = *this->Filter]() -> void {
-		nb::doNotOptimizeAway(filter.filter(desc, histogram));
+		nb::doNotOptimizeAway(filter(RunDense { }, desc, histogram));
 	};
 	for (const auto rc : region_count_arr) {
 		this->setRegionCount(rc);

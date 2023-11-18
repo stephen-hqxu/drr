@@ -4,6 +4,7 @@
 #include <DisRegRep/Factory/RegionMapFactory.hpp>
 #include <DisRegRep/Filter/RegionMapFilter.hpp>
 
+#include <string>
 #include <string_view>
 #include <span>
 #include <any>
@@ -40,6 +41,8 @@ public:
 
 	//Set them to be used in the next filter execution.
 	const RegionMapFilter* Filter;
+	//Tag given by user to be added to the test report.
+	std::string UserTag;
 
 	/**
 	 * @brief Initialise a filter runner.

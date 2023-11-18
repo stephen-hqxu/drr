@@ -16,7 +16,7 @@ void RandomRegionFactory::operator()(const CreateDescription& desc, RegionMap& o
 	output.RegionCount = region_count;
 
 	auto rng = Rng(this->RandomSeed);
-	generate(output.Map, [&rng, rc = static_cast<uint32_t>(region_count)]() noexcept {
+	generate(output, [&rng, rc = static_cast<uint32_t>(region_count)]() noexcept {
 		return static_cast<Region_t>(rng.bounded(rc));
 	});
 }

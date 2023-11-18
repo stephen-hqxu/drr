@@ -39,6 +39,10 @@ private:
 
 public:
 
+	constexpr Indexer() noexcept : Extent { }, CumSumExtent { } {
+
+	}
+
 	/**
 	 * @brief Initialise indexer with extent length for each axis: x, y, z, w, ...
 	 * The behaviour is undefined if any extent is not positive.

@@ -33,6 +33,10 @@ using namespace DisRegRep;
 namespace F = Format;
 namespace Lnc = Launch;
 
+using RMFT = DisRegRep::RegionMapFilter::LaunchTag;
+using RunDense = RMFT::Dense;
+using RunSparse = RMFT::Sparse;
+
 namespace {
 
 namespace DefaultSetting {
@@ -86,11 +90,11 @@ bool selfTest(const TestDescription& desc) {
 
 	any hist_gt_mem;
 	ground_truth.tryAllocateHistogram(launch_desc, hist_gt_mem);
-	const F::DenseNormSingleHistogram& hist_gt = ground_truth.filter(launch_desc, hist_gt_mem);
+	const F::DenseNormSingleHistogram& hist_gt = ground_truth(RunDense { }, launch_desc, hist_gt_mem);
 	for (const auto cmp_filter : verifying) {
 		any hist_cmp_mem;
 		cmp_filter->tryAllocateHistogram(launch_desc, hist_cmp_mem);
-		const F::DenseNormSingleHistogram& hist_cmp = cmp_filter->filter(launch_desc, hist_cmp_mem);
+		const F::DenseNormSingleHistogram& hist_cmp = (*cmp_filter)(RunDense { }, launch_desc, hist_cmp_mem);
 
 		if (!std::equal(std::execution::unseq, hist_cmp.cbegin(), hist_cmp.cend(), hist_gt.cbegin())) {
 			return false;
@@ -116,10 +120,10 @@ void runRadius(const ::RunDescription& regular_desc, const ::RunDescription& str
 	const size_t RegionCountStress = 15u;
 	constexpr static F::SizeVec2 ExtentStress = { 512u, 512u };
 
-	const auto run = [](const ::RunDescription& desc, const auto sweep_radius, const char* const name,
-		const size_t region_count, const F::SizeVec2& extent) -> void {
+	auto run = [radius_runner = Lnc::FilterRunner("bench-radius")](const ::RunDescription& desc, const auto sweep_radius,
+		const char* const tag, const size_t region_count, const F::SizeVec2& extent) mutable -> void {
 		const auto& [factory_arr, filter_arr] = desc;
-		auto radius_runner = Lnc::FilterRunner(name);
+		radius_runner.UserTag = tag;
 		radius_runner.setRegionCount(region_count);
 
 		for (const auto factory : factory_arr) {
@@ -131,9 +135,9 @@ void runRadius(const ::RunDescription& regular_desc, const ::RunDescription& str
 		}	
 	};
 	run(regular_desc, ::generateSweepVariable<F::Radius_t, MinRadius, MaxRadius, RadiusSweep>(),
-		"bench-radius", ::DefaultSetting::RegionCount, ::DefaultSetting::Extent);
+		"Compare", ::DefaultSetting::RegionCount, ::DefaultSetting::Extent);
 	run(stress_desc, ::generateSweepVariable<F::Radius_t, MinRadiusStress, MaxRadiusStress, RadiusSweepStress>(),
-		"bench-radius_stress", RegionCountStress, ExtentStress);
+		"Stress", RegionCountStress, ExtentStress);
 }
 
 void runRegionCount(const ::RunDescription& desc) {

@@ -61,8 +61,11 @@ void SingleHistogramFilter::tryAllocateHistogram(const LaunchDescription& desc, 
 	}
 }
 
-const DenseNormSingleHistogram& SingleHistogramFilter::filter(const LaunchDescription& desc, any& memory) const {
-	const auto& [map, offset, extent, radius] = desc;
+const DenseNormSingleHistogram& SingleHistogramFilter::operator()(LaunchTag::Dense,
+	const LaunchDescription& desc, any& memory) const {
+	const auto& [map_ptr, offset, extent, radius] = desc;
+	const RegionMap& map = *map_ptr;
+	const size_t region_count = map.RegionCount;
 
 	const auto [off_x, off_y] = Arithmetic::toSigned(offset);
 	const auto [ext_x, ext_y] = Arithmetic::toSigned(extent);
@@ -73,16 +76,13 @@ const DenseNormSingleHistogram& SingleHistogramFilter::filter(const LaunchDescri
 	auto& [histogram, cache] = *any_cast<::SHFHistogram_t&>(memory);
 	auto& [histogram_h, histogram_full] = histogram;
 	
-	const auto& [region_map, dim, region_count] = *map;
-	const auto [dim_x, dim_y] = dim;
-	const auto map_indexer = DefaultRegionMapIndexer(dim_x, dim_y);
 	//now we swap x and y axes of horizontal histogram to improve cache locality during read back in vertical pass
 	//it does improve performance by around 10%, which is pretty decent :)
 	const auto hist_h_indexer = DefaultDenseHistogramIndexer(ext_y + sradius_2, ext_x, region_count),
 		hist_full_indexer = DefaultDenseHistogramIndexer(ext_x, ext_y, region_count);
 
 	const auto empty_cache = [&cache]() constexpr -> void {
-		fill(cache, DenseBin_t { });
+		fill(cache, Bin_t { });
 	};
 	const auto copy_to_histogram_h = [&cache, &hist_h_indexer, &histogram_h](const auto x, const auto y) constexpr -> void {
 		//axes swapped
@@ -98,7 +98,7 @@ const DenseNormSingleHistogram& SingleHistogramFilter::filter(const LaunchDescri
 		empty_cache();
 		//compute initialise bin for the current row
 		for (const auto rx : iota(off_x - sradius, off_x + sradius + 1)) {
-			const Region_t region = region_map[map_indexer(rx, rg_y)];
+			const Region_t region = map(rx, rg_y);
 			cache[region]++;
 		}
 		copy_to_histogram_h(0, y);
@@ -107,8 +107,8 @@ const DenseNormSingleHistogram& SingleHistogramFilter::filter(const LaunchDescri
 		for (const auto x : iota(Arithmetic::ssize_t { 1 }, ext_x)) {
 			const auto rg_x = off_x + x;
 
-			const Region_t removing_region = region_map[map_indexer(rg_x - sradius - 1, rg_y)],
-				adding_region = region_map[map_indexer(rg_x + sradius, rg_y)];
+			const Region_t removing_region = map(rg_x - sradius - 1, rg_y),
+				adding_region = map(rg_x + sradius, rg_y);
 			cache[removing_region]--;
 			cache[adding_region]++;
 
