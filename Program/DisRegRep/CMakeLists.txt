@@ -1,6 +1,9 @@
 include(GenerateExportHeader)
 
 add_library(${DRR_PROGRAM} SHARED
+	# Container/
+	Container/RegionMap.cpp
+	Container/SingleHistogram.cpp
 	# Factory/
 	Factory/RandomRegionFactory.cpp
 	Factory/RegionMapFactory.cpp
@@ -13,6 +16,8 @@ add_library(${DRR_PROGRAM} SHARED
 target_sources(${DRR_PROGRAM} PRIVATE
 	# Container/
 	Container/FixedHeapArray.hpp
+	Container/RegionMap.hpp
+	Container/SingleHistogram.hpp
 	# Factory/
 	Factory/RandomRegionFactory.hpp
 	Factory/RegionMapFactory.hpp

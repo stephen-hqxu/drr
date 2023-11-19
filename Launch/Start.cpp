@@ -1,3 +1,5 @@
+#include <DisRegRep/Container/SingleHistogram.hpp>
+
 #include <DisRegRep/Factory/RegionMapFactory.hpp>
 #include <DisRegRep/Factory/RandomRegionFactory.hpp>
 #include <DisRegRep/Factory/VoronoiRegionFactory.hpp>
@@ -30,14 +32,15 @@ using std::print, std::println;
 using std::jthread;
 
 using namespace DisRegRep;
+namespace SH = SingleHistogram;
 namespace F = Format;
 namespace Lnc = Launch;
 
-using RMFT = DisRegRep::RegionMapFilter::LaunchTag;
-using RunDense = RMFT::Dense;
-using RunSparse = RMFT::Sparse;
-
 namespace {
+
+using RMFT = DisRegRep::RegionMapFilter::LaunchTag;
+constexpr auto RunDense = RMFT::Dense { };
+constexpr auto RunSparse = RMFT::Sparse { };
 
 namespace DefaultSetting {
 
@@ -78,7 +81,7 @@ bool selfTest(const TestDescription& desc) {
 	const auto& [map_factory, filter] = desc;
 	const auto& [ground_truth, verifying] = filter;
 
-	const F::RegionMap region_map = map_factory({
+	const RegionMap region_map = map_factory({
 		.RegionCount = 15u
 	}, { 12u, 12u });
 	const RegionMapFilter::LaunchDescription launch_desc {
@@ -89,14 +92,14 @@ bool selfTest(const TestDescription& desc) {
 	};
 
 	any hist_gt_mem;
-	ground_truth.tryAllocateHistogram(launch_desc, hist_gt_mem);
-	const F::DenseNormSingleHistogram& hist_gt = ground_truth(RunDense { }, launch_desc, hist_gt_mem);
+	ground_truth.tryAllocateHistogram(::RunDense, launch_desc, hist_gt_mem);
+	const SH::DenseNorm& hist_gt = ground_truth(::RunDense, launch_desc, hist_gt_mem);
 	for (const auto cmp_filter : verifying) {
 		any hist_cmp_mem;
-		cmp_filter->tryAllocateHistogram(launch_desc, hist_cmp_mem);
-		const F::DenseNormSingleHistogram& hist_cmp = (*cmp_filter)(RunDense { }, launch_desc, hist_cmp_mem);
+		cmp_filter->tryAllocateHistogram(::RunDense, launch_desc, hist_cmp_mem);
+		const SH::DenseNorm& hist_cmp = (*cmp_filter)(::RunDense, launch_desc, hist_cmp_mem);
 
-		if (!std::equal(std::execution::unseq, hist_cmp.cbegin(), hist_cmp.cend(), hist_gt.cbegin())) {
+		if (!(hist_cmp == hist_gt)) {
 			return false;
 		}
 	}

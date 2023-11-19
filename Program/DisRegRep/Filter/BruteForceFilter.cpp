@@ -7,59 +7,84 @@
 #include <ranges>
 
 using std::any, std::any_cast;
-using std::shared_ptr, std::make_shared;
+using std::shared_ptr, std::make_shared_for_overwrite;
 using std::ranges::fill,
 	std::views::iota;
 
 using namespace DisRegRep;
-using namespace Format;
+namespace SH = SingleHistogram;
+using Format::SizeVec2, Format::Bin_t, Format::Region_t;
 
 namespace {
 
-struct BFHistogram {
+constexpr SizeVec2 OneD = { 1u, 1u };
 
-	DenseNormSingleHistogram Histogram;
-	DenseSingleHistogram Cache;
+template<typename TNormHist>
+struct BFFHistogram {
+
+	TNormHist Histogram;
+	SH::Dense Cache;
+
+	template<typename = void>
+	requires(SH::DenseInstance<TNormHist>)
+	constexpr void resize(const SizeVec2& histogram_size, const size_t rc) {
+		this->Histogram.reshape(histogram_size, rc);
+		this->Cache.reshape(::OneD, rc);
+	}
+
+	template<typename = void>
+	requires(SH::SparseInstance<TNormHist>)
+	constexpr void resize(const SizeVec2& histogram_size, const size_t rc) {
+		this->Histogram.reshape(histogram_size);
+		this->Cache.reshape(::OneD, rc);
+	}
 
 };
+using BFFDenseHistogram = BFFHistogram<SH::DenseNorm>;
+using BFFSparseHistogram = BFFHistogram<SH::SparseNorm>;
+
 //shame on you `std::any` for only taking copyable type!!!
-using BFHistogram_t = shared_ptr<BFHistogram>;
+using BFFDenseHistogram_t = shared_ptr<BFFDenseHistogram>;
+using BFFSparseHistogram_t = shared_ptr<BFFSparseHistogram>;
 
-}
+template<typename THist>
+void makeAllocation(const auto& desc, any& output) {
+	using THist_t = shared_ptr<THist>;
 
-void BruteForceFilter::tryAllocateHistogram(const LaunchDescription& desc, any& output) const {
-	const RegionMap& map = *desc.Map;
-	const size_t region_count = map.RegionCount;
-
-	const size_t histogram_size = Arithmetic::horizontalProduct(desc.Extent) * region_count;
-
+	THist* allocation;
 	//compatibility check
-	if (const auto* const bf = any_cast<::BFHistogram_t>(&output);
-		bf) {
-		auto& [hist, cache] = **bf;
-		hist.resize(histogram_size);
-		cache.resize(region_count);
+	if (const auto* const bff = any_cast<THist_t>(&output);
+		bff) {
+		allocation = &**bff;
 	} else {
-		output = make_shared<::BFHistogram>(::BFHistogram {
-			.Histogram = DenseNormSingleHistogram(histogram_size),
-			.Cache = DenseSingleHistogram(region_count)
-		});
+		allocation = &*output.emplace<THist_t>(make_shared_for_overwrite<THist>());
 	}
+	allocation->resize(desc.Extent, desc.Map->RegionCount);
 }
 
-const DenseNormSingleHistogram& BruteForceFilter::operator()(LaunchTag::Dense,
+}
+
+void BruteForceFilter::tryAllocateHistogram(LaunchTag::Dense, const LaunchDescription& desc, any& output) const {
+	::makeAllocation<::BFFDenseHistogram>(desc, output);
+}
+
+void BruteForceFilter::tryAllocateHistogram(LaunchTag::Sparse, const LaunchDescription& desc, any& output) const {
+	::makeAllocation<::BFFSparseHistogram>(desc, output);
+}
+
+const SH::DenseNorm& BruteForceFilter::operator()(LaunchTag::Dense,
 	const LaunchDescription& desc, any& memory) const {
 	const auto& [map_ptr, offset, extent, radius] = desc;
 	const RegionMap& map = *map_ptr;
 	
-	const auto [off_x, off_y] = Arithmetic::toSigned(offset);
-	const auto [ext_x, ext_y] = Arithmetic::toSigned(extent);
-	const auto sradius = Arithmetic::toSigned(radius);
+	using Arithmetic::toSigned;
+	const auto [off_x, off_y] = toSigned(offset);
+	const auto [ext_x, ext_y] = toSigned(extent);
+	const auto sradius = toSigned(radius);
 	const double ext_area = 1.0 * Arithmetic::horizontalProduct(extent);
 
-	auto& [histogram, cache] = *any_cast<::BFHistogram_t&>(memory);
-	
-	const auto hist_indexer = DefaultDenseHistogramIndexer(ext_x, ext_y, map.RegionCount);
+	auto& [histogram, cache_hist] = *any_cast<::BFFDenseHistogram_t&>(memory);
+	const SH::Dense::BinView cache = cache_hist(0u, 0u, 0u);
 
 	for (const auto y : iota(Arithmetic::ssize_t { 0 }, ext_y)) {
 		for (const auto x : iota(Arithmetic::ssize_t { 0 }, ext_x)) {
@@ -76,9 +101,16 @@ const DenseNormSingleHistogram& BruteForceFilter::operator()(LaunchTag::Dense,
 			//normalise bin and copy to output
 #pragma warning(push)
 #pragma warning(disable: 4244)//type conversion
-			Arithmetic::scaleRange(cache, histogram.begin() + hist_indexer(x, y, 0), ext_area);
+			Arithmetic::scaleRange(cache, histogram(x, y, 0).begin(), ext_area);
 #pragma warning(pop)
 		}
 	}
+	return histogram;
+}
+
+const SH::SparseNorm& BruteForceFilter::operator()(LaunchTag::Sparse,
+	const LaunchDescription& desc, any& memory) const {
+	auto& [histogram, cache] = *any_cast<::BFFSparseHistogram_t&>(memory);
+
 	return histogram;
 }

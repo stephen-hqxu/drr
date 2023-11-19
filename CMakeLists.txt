@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_compile_options(/W4 /arch:AVX2 /MP)
+add_compile_options(/wd4251 /wd4275) # DLL export warning
 
 project(DisRegRep
 	VERSION 1.0.0

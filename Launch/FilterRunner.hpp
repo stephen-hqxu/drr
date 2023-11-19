@@ -1,6 +1,8 @@
 #pragma once
 
 #include <DisRegRep/Format.hpp>
+#include <DisRegRep/Container/RegionMap.hpp>
+
 #include <DisRegRep/Factory/RegionMapFactory.hpp>
 #include <DisRegRep/Filter/RegionMapFilter.hpp>
 
@@ -25,7 +27,7 @@ private:
 	size_t RegionCount;
 
 	bool DirtyMap;/**< If true, region map will be regenerated in the next execution. */
-	Format::RegionMap Map;
+	RegionMap Map;
 	std::any Histogram;
 
 	//Create a new benchmark.

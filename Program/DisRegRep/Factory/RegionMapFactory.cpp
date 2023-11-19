@@ -1,19 +1,17 @@
 #include <DisRegRep/Factory/RegionMapFactory.hpp>
 
 using namespace DisRegRep;
-using namespace Format;
-
-using Arithmetic::horizontalProduct;
+using Format::SizeVec2;
 
 RegionMap RegionMapFactory::allocate(const SizeVec2& dimension) {
 	RegionMap map;
-	map.resizeToDimension(dimension);
+	map.reshape(dimension);
 	return map;
 }
 
 bool RegionMapFactory::reshape(RegionMap& region_map, const SizeVec2& dimension) {
 	const size_t old_size = region_map.size(),
-		new_size = region_map.resizeToDimension(dimension);
+		new_size = region_map.reshape(dimension);
 
 	//determine if original contents are undefined
 	if (new_size > old_size) {

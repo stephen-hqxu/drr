@@ -20,9 +20,14 @@ public:
 		return "BFF";
 	}
 
-	void tryAllocateHistogram(const LaunchDescription& desc, std::any& output) const override;
+	void tryAllocateHistogram(LaunchTag::Dense tag_dense,
+		const LaunchDescription& desc, std::any& output) const override;
+	void tryAllocateHistogram(LaunchTag::Sparse tag_sparse,
+		const LaunchDescription& desc, std::any& output) const override;
 
-	const Format::DenseNormSingleHistogram& operator()(LaunchTag::Dense tag_dense,
+	const SingleHistogram::DenseNorm& operator()(LaunchTag::Dense tag_dense,
+		const LaunchDescription& desc, std::any& memory) const override;
+	const SingleHistogram::SparseNorm& operator()(LaunchTag::Sparse tag_sparse,
 		const LaunchDescription& desc, std::any& memory) const override;
 
 };

@@ -27,11 +27,11 @@ namespace nb = ankerl::nanobench;
 using namespace DisRegRep::Format;
 using namespace DisRegRep::Launch;
 
-using RMFT = DisRegRep::RegionMapFilter::LaunchTag;
-using RunDense = RMFT::Dense;
-using RunSparse = RMFT::Sparse;
-
 namespace {
+
+using RMFT = DisRegRep::RegionMapFilter::LaunchTag;
+constexpr auto RunDense = RMFT::Dense { };
+constexpr auto RunSparse = RMFT::Sparse { };
 
 constexpr char RenderResultTemplate[] = R"DELIM(x,iter,t_median,t_mean,t_mdape,t_total
 {{#result}}{{name}},{{sum(iterations)}},{{median(elapsed)}},{{average(elapsed)}},{{medianAbsolutePercentError(elapsed)}},{{sumProduct(elapsed,iterations)}}
@@ -137,12 +137,12 @@ void FilterRunner::sweepRadius(const SizeVec2& extent, const span<const Radius_t
 		.Extent = extent
 	};
 	const auto run = [&desc, &histogram = this->Histogram, &filter = *this->Filter]() -> void {
-		nb::doNotOptimizeAway(filter(RunDense { }, desc, histogram));
+		nb::doNotOptimizeAway(filter(::RunDense, desc, histogram));
 	};
 	for (const auto r : radius_arr) {
 		desc.Radius = r;
 		desc.Offset = Utility::calcMinimumOffset(r);
-		this->Filter->tryAllocateHistogram(desc, this->Histogram);
+		this->Filter->tryAllocateHistogram(::RunDense, desc, this->Histogram);
 
 		bench.run(::toString(r).data(), run);
 	}
@@ -165,13 +165,13 @@ void FilterRunner::sweepRegionCount(const SizeVec2& extent, const Radius_t radiu
 		.Radius = radius
 	};
 	const auto run = [&desc, &histogram = this->Histogram, &filter = *this->Filter]() -> void {
-		nb::doNotOptimizeAway(filter(RunDense { }, desc, histogram));
+		nb::doNotOptimizeAway(filter(::RunDense, desc, histogram));
 	};
 	for (const auto rc : region_count_arr) {
 		this->setRegionCount(rc);
 		//shouldn't trigger reallocation because size does not change
 		this->refreshMap(extent, radius);
-		this->Filter->tryAllocateHistogram(desc, this->Histogram);
+		this->Filter->tryAllocateHistogram(::RunDense, desc, this->Histogram);
 
 		bench.run(::toString(rc).data(), run);
 	}

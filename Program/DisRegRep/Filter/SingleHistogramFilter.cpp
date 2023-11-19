@@ -3,90 +3,121 @@
 
 #include <memory>
 
+#include <span>
 #include <algorithm>
 #include <ranges>
 #include <functional>
 
 using std::any, std::any_cast;
-using std::shared_ptr, std::make_shared;
+using std::shared_ptr, std::make_shared_for_overwrite;
 using std::plus, std::minus;
-using std::views::iota, std::views::take, std::views::drop,
+using std::span;
+using std::views::iota,
 	std::ranges::fill, std::ranges::copy;
 
 using namespace DisRegRep;
-using namespace Format;
+namespace SH = SingleHistogram;
+using Format::SizeVec2, Format::Radius_t, Format::Bin_t, Format::Region_t;
 
 namespace {
 
+constexpr SizeVec2 OneD = { 1u, 1u };
+
+//Calculate dimension for horizontal pass histogram.
+constexpr SizeVec2 calcHorizontalHistogramDimension(SizeVec2 histogram_size, const Radius_t radius) noexcept {
+	//Remember we have transposed x,y axes during filtering to improve cache locality.
+	//It does improve performance by around 10%, which is pretty decent :)
+	//Therefore the horizontal pass requires padding above and below.
+	histogram_size[0] += 2u * radius;
+	return histogram_size;
+}
+
+template<typename THist, typename TNormHist>
 struct SHFHistogram {
 
 	struct {
 
-		DenseSingleHistogram Horizontal;
-		DenseNormSingleHistogram Final;
+		THist Horizontal;
+		TNormHist Final;
 
 	} Histogram;
-	DenseSingleHistogram Cache;
+	SH::Dense Cache;
+
+	template<typename = void>
+	requires(SH::DenseInstance<THist> && SH::DenseInstance<TNormHist>)
+	constexpr void resize(const SizeVec2& histogram_size, const size_t rc, const Radius_t radius) {
+		auto& [hori, final] = this->Histogram;
+		hori.reshape(::calcHorizontalHistogramDimension(histogram_size, radius), rc);
+		final.reshape(histogram_size, rc);
+		this->Cache.reshape(::OneD, rc);
+	}
+
+	template<typename = void>
+	requires(SH::SparseInstance<THist> && SH::SparseInstance<TNormHist>)
+	constexpr void resize(const SizeVec2& histogram_size, const size_t rc, const Radius_t radius) {
+		auto& [hori, final] = this->Histogram;
+		hori.reshape(::calcHorizontalHistogramDimension(histogram_size, radius));
+		final.reshape(histogram_size);
+		this->Cache.reshape(::OneD, rc);
+	}
 
 };
-using SHFHistogram_t = shared_ptr<SHFHistogram>;
+using SHFDenseHistogram = SHFHistogram<SH::Dense, SH::DenseNorm>;
+using SHFSparseHistogram = SHFHistogram<SH::Sparse, SH::SparseNorm>;
 
-}
+using SHFDenseHistogram_t = shared_ptr<SHFDenseHistogram>;
+using SHFSparseHistogram_t = shared_ptr<SHFSparseHistogram>;
 
-void SingleHistogramFilter::tryAllocateHistogram(const LaunchDescription& desc, any& output) const {
-	const RegionMap& map = *desc.Map;
-	const auto [ext_x, ext_y] = desc.Extent;
-	const size_t region_count = map.RegionCount;
+template<typename THist>
+void makeAllocation(const auto& desc, any& output) {
+	using THist_t = shared_ptr<THist>;
 
-	const size_t row_length = ext_x * region_count,
-		histogram_size = row_length * ext_y,
-		//horizontal pass requires padding above and below
-		histogram_h_size = row_length * (ext_y + 2u * desc.Radius);
-
-	if (const auto* const shf = any_cast<::SHFHistogram_t>(&output);
+	THist* allocation;
+	if (const auto* const shf = any_cast<THist_t>(&output);
 		shf) {
-		auto& [hist, cache] = **shf;
-		auto& [hori, final] = hist;
-		hori.resize(histogram_h_size);
-		final.resize(histogram_size);
-		cache.resize(region_count);
+		allocation = &**shf;
 	} else {
-		output = make_shared<::SHFHistogram>(::SHFHistogram {
-			.Histogram = {
-				.Horizontal = DenseSingleHistogram(histogram_h_size),
-				.Final = DenseNormSingleHistogram(histogram_size)
-			},
-			.Cache = DenseSingleHistogram(region_count)
-		});
+		allocation = &*output.emplace<THist_t>(make_shared_for_overwrite<THist>());
 	}
+	allocation->resize(desc.Extent, desc.Map->RegionCount, desc.Radius);
 }
 
-const DenseNormSingleHistogram& SingleHistogramFilter::operator()(LaunchTag::Dense,
+}
+
+void SingleHistogramFilter::tryAllocateHistogram(LaunchTag::Dense, const LaunchDescription& desc, any& output) const {
+	::makeAllocation<::SHFDenseHistogram>(desc, output);
+}
+
+void SingleHistogramFilter::tryAllocateHistogram(LaunchTag::Sparse, const LaunchDescription& desc, any& output) const {
+	const auto& ext = desc.Extent;
+	const auto [ext_x, ext_y] = ext;
+
+	::makeAllocation<::SHFSparseHistogram>(desc, output);
+}
+
+const SH::DenseNorm& SingleHistogramFilter::operator()(LaunchTag::Dense,
 	const LaunchDescription& desc, any& memory) const {
 	const auto& [map_ptr, offset, extent, radius] = desc;
 	const RegionMap& map = *map_ptr;
 	const size_t region_count = map.RegionCount;
 
-	const auto [off_x, off_y] = Arithmetic::toSigned(offset);
-	const auto [ext_x, ext_y] = Arithmetic::toSigned(extent);
-	const auto sradius = Arithmetic::toSigned(radius);
+	using Arithmetic::toSigned;
+	const auto [off_x, off_y] = toSigned(offset);
+	const auto [ext_x, ext_y] = toSigned(extent);
+	const auto sradius = toSigned(radius);
 	const auto sradius_2 = 2 * sradius;
 	const double ext_area = 1.0 * Arithmetic::horizontalProduct(extent);
 
-	auto& [histogram, cache] = *any_cast<::SHFHistogram_t&>(memory);
+	auto& [histogram, cache_hist] = *any_cast<::SHFDenseHistogram_t&>(memory);
+	const SH::Dense::BinView cache = cache_hist(0u, 0u, 0u);
 	auto& [histogram_h, histogram_full] = histogram;
-	
-	//now we swap x and y axes of horizontal histogram to improve cache locality during read back in vertical pass
-	//it does improve performance by around 10%, which is pretty decent :)
-	const auto hist_h_indexer = DefaultDenseHistogramIndexer(ext_y + sradius_2, ext_x, region_count),
-		hist_full_indexer = DefaultDenseHistogramIndexer(ext_x, ext_y, region_count);
 
 	const auto empty_cache = [&cache]() constexpr -> void {
 		fill(cache, Bin_t { });
 	};
-	const auto copy_to_histogram_h = [&cache, &hist_h_indexer, &histogram_h](const auto x, const auto y) constexpr -> void {
+	const auto copy_to_histogram_h = [&cache, &histogram_h](const auto x, const auto y) constexpr -> void {
 		//axes swapped
-		copy(cache, histogram_h.begin() + hist_h_indexer(y, x, 0));
+		copy(cache, histogram_h(y, x, 0).begin());
 	};
 	/********************
 	 * Horizontal pass
@@ -118,15 +149,15 @@ const DenseNormSingleHistogram& SingleHistogramFilter::operator()(LaunchTag::Den
 
 #pragma warning(push)
 #pragma warning(disable: 4244)//type conversion
-	const auto cache_op_histogram_h = [&cache, &histogram_h, &hist_h_indexer, region_count]
+	const auto cache_op_histogram_h = [&cache, &histogram_h, region_count]
 		(const auto x, const auto y, const auto& op) constexpr -> void {
 		//basically add everything from existing histogram into the cache
 		//also axes swapped
-		const auto bin = histogram_h | drop(hist_h_indexer(y, x, 0)) | take(region_count);
+		const auto bin = span(histogram_h(y, x, 0).cbegin(), region_count);
 		Arithmetic::addRange(cache, op, bin, cache.begin());
 	};
-	const auto copy_to_output = [&cache, &histogram_full, &hist_full_indexer, ext_area](const auto x, const auto y) -> void {
-		Arithmetic::scaleRange(cache, histogram_full.begin() + hist_full_indexer(x, y, 0), ext_area);
+	const auto copy_to_output = [&cache, &histogram_full, ext_area](const auto x, const auto y) -> void {
+		Arithmetic::scaleRange(cache, histogram_full(x, y, 0).begin(), ext_area);
 	};
 #pragma warning(pop)
 	const auto op_plus = plus { };
@@ -153,5 +184,13 @@ const DenseNormSingleHistogram& SingleHistogramFilter::operator()(LaunchTag::Den
 		}
 	}
 	
+	return histogram_full;
+}
+
+const SH::SparseNorm& SingleHistogramFilter::operator()(LaunchTag::Sparse,
+	const LaunchDescription& desc, any& memory) const {
+	auto& [histogram, cache] = *any_cast<::SHFSparseHistogram_t&>(memory);
+	auto& [histogram_h, histogram_full] = histogram;
+
 	return histogram_full;
 }

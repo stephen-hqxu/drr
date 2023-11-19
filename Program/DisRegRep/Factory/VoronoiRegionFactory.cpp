@@ -14,19 +14,19 @@
 #include <cmath>
 
 using std::ranges::generate, std::min_element, std::for_each,
-	std::views::iota, std::views::transform,
+	std::views::iota, std::views::transform, std::views::zip,
 	std::execution::par_unseq, std::execution::unseq;
 using std::as_const;
 
 using ankerl::nanobench::Rng;
 
 using namespace DisRegRep;
-using namespace Format;
+using Format::SizeVec2, Format::Region_t;
 
 namespace {
 
 float l2Distance(const SizeVec2& a, const SizeVec2& b) {
-	const auto it = std::views::zip(a, b) | transform([](const auto ab) constexpr noexcept {
+	const auto it = zip(a, b) | transform([](const auto ab) constexpr noexcept {
 		const auto& [a, b] = ab;
 		return a - b;
 	});

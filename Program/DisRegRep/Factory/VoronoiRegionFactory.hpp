@@ -26,7 +26,7 @@ public:
 		return "Voronoi";
 	}
 
-	void operator()(const CreateDescription& desc, Format::RegionMap& output) const override;
+	void operator()(const CreateDescription& desc, RegionMap& output) const override;
 
 };
 
