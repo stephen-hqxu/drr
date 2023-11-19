@@ -86,11 +86,15 @@ public:
 	 * @brief Get the extent length for an axis.
 	 * 
 	 * @param axis The axis index.
+	 * If not provided, return the array containing extents for all axes.
 	 * 
 	 * @return The axis extent.
 	*/
 	constexpr size_t extent(const size_t axis) const noexcept {
 		return this->Extent[axis];
+	}
+	constexpr const auto& extent() const noexcept {
+		return this->Extent;
 	}
 
 	/**

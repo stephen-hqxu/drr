@@ -34,10 +34,10 @@ private:
 	static auto createBenchmark();
 
 	//Create a new report file from benchmark.
-	void renderReport(auto& bench);
+	void renderReport(auto&);
 
 	//Refresh map dimension and content.
-	void refreshMap(const Format::SizeVec2& new_extent, const Format::Radius_t radius);
+	void refreshMap(const Format::SizeVec2&, Format::Radius_t);
 
 public:
 
@@ -51,7 +51,7 @@ public:
 	 * 
 	 * @param test_report_dir The directory where test reports are stored.
 	*/
-	FilterRunner(std::string_view test_report_dir);
+	FilterRunner(std::string_view);
 
 	FilterRunner(const FilterRunner&) = delete;
 
@@ -64,14 +64,14 @@ public:
 	 * 
 	 * @param region_count The new region count.
 	*/
-	void setRegionCount(const size_t region_count) noexcept;
+	void setRegionCount(size_t) noexcept;
 
 	/**
 	 * @brief Set the factory used for generating region map.
 	 * 
 	 * @param factory The factory.
 	*/
-	void setFactory(const RegionMapFactory& factory) noexcept;
+	void setFactory(const RegionMapFactory&) noexcept;
 
 	/**
 	 * @brief Profile impact of runtime by varying radius.
@@ -81,7 +81,7 @@ public:
 	 * @param extent The extent of filter run area.
 	 * @param radius_arr An array of radii to be run in order.
 	*/
-	void sweepRadius(const Format::SizeVec2& extent, std::span<const Format::Radius_t> radius_arr);
+	void sweepRadius(const Format::SizeVec2&, std::span<const Format::Radius_t>);
 
 	/**
 	 * @brief Profile impact of runtime by varying region count.
@@ -92,8 +92,7 @@ public:
 	 * @param radius The radius of filter kernel.
 	 * @param region_count_arr An array of region count.
 	*/
-	void sweepRegionCount(const Format::SizeVec2& extent, Format::Radius_t radius,
-		std::span<const size_t> region_count_arr);
+	void sweepRegionCount(const Format::SizeVec2&, Format::Radius_t, std::span<const size_t>);
 
 };
 

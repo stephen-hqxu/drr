@@ -54,7 +54,7 @@ public:
 	 *
 	 * @return New size.
 	*/
-	size_t reshape(const Format::SizeVec2& dimension);
+	size_t reshape(const Format::SizeVec2&);
 
 	/**
 	 * @brief Get the size of region map.

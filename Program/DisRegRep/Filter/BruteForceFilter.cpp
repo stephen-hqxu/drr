@@ -2,6 +2,7 @@
 #include <DisRegRep/Maths/Arithmetic.hpp>
 
 #include <memory>
+#include <utility>
 
 #include <algorithm>
 #include <ranges>
@@ -13,7 +14,7 @@ using std::ranges::fill,
 
 using namespace DisRegRep;
 namespace SH = SingleHistogram;
-using Format::SizeVec2, Format::Bin_t, Format::Region_t;
+using Format::SizeVec2, Format::Bin_t, Format::NormBin_t, Format::Region_t;
 
 namespace {
 
@@ -22,18 +23,20 @@ constexpr SizeVec2 OneD = { 1u, 1u };
 template<typename TNormHist>
 struct BFFHistogram {
 
-	TNormHist Histogram;
+	using NormHistogramType = TNormHist;
+
+	NormHistogramType Histogram;
 	SH::Dense Cache;
 
 	template<typename = void>
-	requires(SH::DenseInstance<TNormHist>)
+	requires(SH::DenseInstance<NormHistogramType>)
 	constexpr void resize(const SizeVec2& histogram_size, const size_t rc) {
 		this->Histogram.reshape(histogram_size, rc);
 		this->Cache.reshape(::OneD, rc);
 	}
 
 	template<typename = void>
-	requires(SH::SparseInstance<TNormHist>)
+	requires(SH::SparseInstance<NormHistogramType>)
 	constexpr void resize(const SizeVec2& histogram_size, const size_t rc) {
 		this->Histogram.reshape(histogram_size);
 		this->Cache.reshape(::OneD, rc);
@@ -43,12 +46,8 @@ struct BFFHistogram {
 using BFFDenseHistogram = BFFHistogram<SH::DenseNorm>;
 using BFFSparseHistogram = BFFHistogram<SH::SparseNorm>;
 
-//shame on you `std::any` for only taking copyable type!!!
-using BFFDenseHistogram_t = shared_ptr<BFFDenseHistogram>;
-using BFFSparseHistogram_t = shared_ptr<BFFSparseHistogram>;
-
 template<typename THist>
-void makeAllocation(const auto& desc, any& output) {
+inline void makeAllocation(const auto& desc, any& output) {
 	using THist_t = shared_ptr<THist>;
 
 	THist* allocation;
@@ -62,30 +61,30 @@ void makeAllocation(const auto& desc, any& output) {
 	allocation->resize(desc.Extent, desc.Map->RegionCount);
 }
 
-}
+template<typename THist>
+inline const auto& runFilter(const auto& desc, any& memory) {
+	using THist_t = shared_ptr<THist>;
+	constexpr static bool IsOutputDense = SH::DenseInstance<typename THist::NormHistogramType>;
 
-void BruteForceFilter::tryAllocateHistogram(LaunchTag::Dense, const LaunchDescription& desc, any& output) const {
-	::makeAllocation<::BFFDenseHistogram>(desc, output);
-}
-
-void BruteForceFilter::tryAllocateHistogram(LaunchTag::Sparse, const LaunchDescription& desc, any& output) const {
-	::makeAllocation<::BFFSparseHistogram>(desc, output);
-}
-
-const SH::DenseNorm& BruteForceFilter::operator()(LaunchTag::Dense,
-	const LaunchDescription& desc, any& memory) const {
 	const auto& [map_ptr, offset, extent, radius] = desc;
 	const RegionMap& map = *map_ptr;
-	
+
 	using Arithmetic::toSigned;
 	const auto [off_x, off_y] = toSigned(offset);
 	const auto [ext_x, ext_y] = toSigned(extent);
 	const auto sradius = toSigned(radius);
-	const double ext_area = 1.0 * Arithmetic::horizontalProduct(extent);
 
-	auto& [histogram, cache_hist] = *any_cast<::BFFDenseHistogram_t&>(memory);
+	auto& [histogram, cache_hist] = *any_cast<THist_t&>(memory);
 	const SH::Dense::BinView cache = cache_hist(0u, 0u, 0u);
 
+	const auto copy_cache_to_histogram = [&histogram, &cache = std::as_const(cache),
+		ext_area = 1.0 * Arithmetic::horizontalProduct(extent)](const auto x, const auto y) -> void {
+		if constexpr (IsOutputDense) {
+			Arithmetic::scaleRange(cache, histogram(x, y, 0).begin(), ext_area);
+		} else {
+			histogram.pushDenseNormalised(cache, x, y, ext_area);
+		}
+	};
 	for (const auto y : iota(Arithmetic::ssize_t { 0 }, ext_y)) {
 		for (const auto x : iota(Arithmetic::ssize_t { 0 }, ext_x)) {
 			//clear bin cache for every pixel
@@ -101,16 +100,29 @@ const SH::DenseNorm& BruteForceFilter::operator()(LaunchTag::Dense,
 			//normalise bin and copy to output
 #pragma warning(push)
 #pragma warning(disable: 4244)//type conversion
-			Arithmetic::scaleRange(cache, histogram(x, y, 0).begin(), ext_area);
+			copy_cache_to_histogram(x, y);
 #pragma warning(pop)
 		}
 	}
 	return histogram;
 }
 
+}
+
+void BruteForceFilter::tryAllocateHistogram(LaunchTag::Dense, const LaunchDescription& desc, any& output) const {
+	::makeAllocation<::BFFDenseHistogram>(desc, output);
+}
+
+void BruteForceFilter::tryAllocateHistogram(LaunchTag::Sparse, const LaunchDescription& desc, any& output) const {
+	::makeAllocation<::BFFSparseHistogram>(desc, output);
+}
+
+const SH::DenseNorm& BruteForceFilter::operator()(LaunchTag::Dense,
+	const LaunchDescription& desc, any& memory) const {
+	return ::runFilter<::BFFDenseHistogram>(desc, memory);
+}
+
 const SH::SparseNorm& BruteForceFilter::operator()(LaunchTag::Sparse,
 	const LaunchDescription& desc, any& memory) const {
-	auto& [histogram, cache] = *any_cast<::BFFSparseHistogram_t&>(memory);
-
-	return histogram;
+	return ::runFilter<::BFFSparseHistogram>(desc, memory);
 }

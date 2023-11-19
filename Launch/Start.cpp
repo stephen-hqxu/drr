@@ -49,7 +49,7 @@ constexpr size_t RegionCount = 8u;
 constexpr F::Radius_t Radius = 8u;
 
 constexpr uint64_t Seed = 0x1CD4C39A662BF9CAull;
-constexpr size_t Centroid = 30u;
+constexpr size_t CentroidCount = 10u;
 
 }
 
@@ -167,7 +167,7 @@ void run() {
 	println("Initialising test environment...");
 	//factory
 	const auto random_factory = RandomRegionFactory(::DefaultSetting::Seed);
-	const auto voronoi_factory = VoronoiRegionFactory(::DefaultSetting::Seed, ::DefaultSetting::Centroid);
+	const auto voronoi_factory = VoronoiRegionFactory(::DefaultSetting::Seed, ::DefaultSetting::CentroidCount);
 	//filter
 	const BruteForceFilter bf;
 	const SingleHistogramFilter shf;

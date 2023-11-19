@@ -68,10 +68,10 @@ public:
 	 * @param desc The filter launch description.
 	 * @param output The allocated memory.
 	*/
-	virtual void tryAllocateHistogram(LaunchTag::Dense tag_dense,
-		const LaunchDescription& desc, std::any& output) const = 0;
-	virtual void tryAllocateHistogram(LaunchTag::Sparse tag_sparse,
-		const LaunchDescription& desc, std::any& output) const = 0;
+	virtual void tryAllocateHistogram(LaunchTag::Dense,
+		const LaunchDescription&, std::any&) const = 0;
+	virtual void tryAllocateHistogram(LaunchTag::Sparse,
+		const LaunchDescription&, std::any&) const = 0;
 
 	/**
 	 * @brief Perform filter on region map.
@@ -87,10 +87,10 @@ public:
 	 * @return The generated normalised single histogram for this region map.
 	 * The memory is held by the `memory` input.
 	*/
-	virtual const SingleHistogram::DenseNorm& operator()(LaunchTag::Dense tag_dense,
-		const LaunchDescription& desc, std::any& memory) const = 0;
-	virtual const SingleHistogram::SparseNorm& operator()(LaunchTag::Sparse tag_sparse,
-		const LaunchDescription& desc, std::any& memory) const = 0;
+	virtual const SingleHistogram::DenseNorm& operator()(LaunchTag::Dense,
+		const LaunchDescription&, std::any&) const = 0;
+	virtual const SingleHistogram::SparseNorm& operator()(LaunchTag::Sparse,
+		const LaunchDescription&, std::any&) const = 0;
 
 };
 

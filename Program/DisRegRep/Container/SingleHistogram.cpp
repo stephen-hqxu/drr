@@ -1,12 +1,14 @@
 #include <DisRegRep/Container/SingleHistogram.hpp>
 #include <DisRegRep/Maths/Arithmetic.hpp>
 
-#include <execution>
 #include <algorithm>
+#include <execution>
+
+#include <cassert>
 
 using std::array;
 using std::ranges::copy, std::ranges::fill, std::ranges::for_each, std::equal,
-	std::views::stride, std::views::join,
+	std::views::stride, std::views::join, std::views::iota, std::views::transform,
 	std::execution::unseq;
 
 using namespace DisRegRep;
@@ -29,8 +31,9 @@ void BasicDense<TBin>::reshape(const SizeVec2& dimension, const size_t bin_count
 	this->DenseIndexer = DenseIndexer_t(dim_3);
 }
 
-template DRR_API class BasicDense<Bin_t>;
-template DRR_API class BasicDense<NormBin_t>;
+#define INS_DENSE(TYPE) template DRR_API class BasicDense<TYPE>
+INS_DENSE(Bin_t);
+INS_DENSE(NormBin_t);
 
 template<typename TBin>
 bool BasicSparse<TBin>::operator==(const BasicSparse& comp) const {
@@ -55,5 +58,59 @@ void BasicSparse<TBin>::reshape(SizeVec2 dimension) {
 	for_each(this->Bin, [](auto& bin_y) constexpr noexcept { bin_y.clear(); });
 }
 
-template DRR_API class BasicSparse<Bin_t>;
-template DRR_API class BasicSparse<NormBin_t>;
+#define INS_SPARSE(TYPE) template DRR_API class BasicSparse<TYPE>
+INS_SPARSE(Bin_t);
+INS_SPARSE(NormBin_t);
+
+template<typename U>
+bool SingleHistogram::operator==(const BasicDense<U>& a, const BasicSparse<U>& b) {
+	//first compare their sizes
+	const auto [dense_x, dense_y, dense_region_count] = a.DenseIndexer.extent();
+	const auto [sparse_x, sparse_y] = b.OffsetIndexer.extent();
+	if (dense_x != sparse_x - 1u || dense_y != sparse_y) {
+		return false;
+	}
+
+	using Format::Region_t;
+	for (const auto y : iota(size_t { 0 }, dense_y)) {
+		for (const auto x : iota(size_t { 0 }, dense_x)) {
+			const auto dense_hist = a(x, y, 0u);
+			const auto sparse_hist = b(x, y);
+
+			//It should be sorted against region for every histogram
+			//	because of how we constructed the sparse histogram in first place (by enumerate).
+			assert(std::ranges::is_sorted(sparse_hist, { }, [](const auto& bin) constexpr noexcept { return bin.Region; }));
+			const size_t expected_region_count = std::max<size_t>(sparse_hist.back().Region + 1u, dense_region_count);
+
+			//Basically we are forging a dense histogram from sparse, and compare two dense histograms as usual.
+			auto sparse_forged_dense = iota(Region_t { 0 }, expected_region_count)
+				| transform([sparse_it = sparse_hist.cbegin(), sparse_end = sparse_hist.cend()]
+					(const auto dense_region) mutable constexpr noexcept {
+					if (sparse_it == sparse_end) {
+						return U { };
+					}
+					const auto [sparse_region, value] = *sparse_it;
+					if (sparse_region == dense_region) {
+						sparse_it++;
+						return value;
+					}
+					return U { };
+				});
+			if (!std::ranges::equal(dense_hist, sparse_forged_dense)) {
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
+template<typename U>
+bool SingleHistogram::operator==(const BasicSparse<U>& a, const BasicDense<U>& b) {
+	return b == a;
+}
+
+#define INS_EQ(TYPE) template DRR_API bool SingleHistogram::operator==<TYPE>(const BasicDense<TYPE>&, const BasicSparse<TYPE>&); \
+template DRR_API bool SingleHistogram::operator==<TYPE>(const BasicSparse<TYPE>&, const BasicDense<TYPE>&)
+INS_EQ(Bin_t);
+INS_EQ(NormBin_t);

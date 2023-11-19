@@ -39,7 +39,7 @@ public:
 	 * 
 	 * @return The allocated region map. The content of this map is undefined.
 	*/
-	[[nodiscard]] static RegionMap allocate(const Format::SizeVec2& dimension);
+	[[nodiscard]] static RegionMap allocate(const Format::SizeVec2&);
 
 	/**
 	 * @brief Reshape the region map with a new dimension.
@@ -54,7 +54,7 @@ public:
 	 * @return True if reallocation happens, or region map has been enlarged.
 	 * In both cases, the content of the original region map becomes undefined.
 	*/
-	static bool reshape(RegionMap& region_map, const Format::SizeVec2& dimension);
+	static bool reshape(RegionMap&, const Format::SizeVec2&);
 
 	/**
 	 * @brief Get an identifying name for the factory implementation.
@@ -69,7 +69,7 @@ public:
 	 * @param desc The generation description.
 	 * @param output Created region map.
 	*/
-	virtual void operator()(const CreateDescription& desc, RegionMap& output) const = 0;
+	virtual void operator()(const CreateDescription&, RegionMap&) const = 0;
 
 	/**
 	 * @brief This is a shortcut function. Allocate a new region map, and fill region map with content.
@@ -79,7 +79,7 @@ public:
 	 * 
 	 * @return The created region map.
 	*/
-	[[nodiscard]] RegionMap operator()(const CreateDescription& desc, const Format::SizeVec2& dimension) const;
+	[[nodiscard]] RegionMap operator()(const CreateDescription&, const Format::SizeVec2&) const;
 
 };
 

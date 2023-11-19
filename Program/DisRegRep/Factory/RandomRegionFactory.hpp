@@ -24,7 +24,7 @@ public:
 		return "Random";
 	}
 
-	void operator()(const CreateDescription& desc, RegionMap& output) const override;
+	void operator()(const CreateDescription&, RegionMap&) const override;
 
 };
 

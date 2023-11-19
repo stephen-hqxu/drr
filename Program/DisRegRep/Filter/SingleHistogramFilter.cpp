@@ -2,6 +2,7 @@
 #include <DisRegRep/Maths/Arithmetic.hpp>
 
 #include <memory>
+#include <utility>
 
 #include <span>
 #include <algorithm>
@@ -35,10 +36,13 @@ constexpr SizeVec2 calcHorizontalHistogramDimension(SizeVec2 histogram_size, con
 template<typename THist, typename TNormHist>
 struct SHFHistogram {
 
+	using HistogramType = THist;
+	using NormHistogramType = TNormHist;
+
 	struct {
 
-		THist Horizontal;
-		TNormHist Final;
+		HistogramType Horizontal;
+		NormHistogramType Final;
 
 	} Histogram;
 	SH::Dense Cache;
@@ -65,11 +69,8 @@ struct SHFHistogram {
 using SHFDenseHistogram = SHFHistogram<SH::Dense, SH::DenseNorm>;
 using SHFSparseHistogram = SHFHistogram<SH::Sparse, SH::SparseNorm>;
 
-using SHFDenseHistogram_t = shared_ptr<SHFDenseHistogram>;
-using SHFSparseHistogram_t = shared_ptr<SHFSparseHistogram>;
-
 template<typename THist>
-void makeAllocation(const auto& desc, any& output) {
+inline void makeAllocation(const auto& desc, any& output) {
 	using THist_t = shared_ptr<THist>;
 
 	THist* allocation;
@@ -82,42 +83,35 @@ void makeAllocation(const auto& desc, any& output) {
 	allocation->resize(desc.Extent, desc.Map->RegionCount, desc.Radius);
 }
 
-}
+template<typename THist>
+inline const auto& runFilter(const auto& desc, any& memory) {
+	using THist_t = shared_ptr<THist>;
+	constexpr static bool IsHorizontalDense = SH::DenseInstance<typename THist::HistogramType>,
+		IsOutputDense = SH::DenseInstance<typename THist::NormHistogramType>;
 
-void SingleHistogramFilter::tryAllocateHistogram(LaunchTag::Dense, const LaunchDescription& desc, any& output) const {
-	::makeAllocation<::SHFDenseHistogram>(desc, output);
-}
-
-void SingleHistogramFilter::tryAllocateHistogram(LaunchTag::Sparse, const LaunchDescription& desc, any& output) const {
-	const auto& ext = desc.Extent;
-	const auto [ext_x, ext_y] = ext;
-
-	::makeAllocation<::SHFSparseHistogram>(desc, output);
-}
-
-const SH::DenseNorm& SingleHistogramFilter::operator()(LaunchTag::Dense,
-	const LaunchDescription& desc, any& memory) const {
 	const auto& [map_ptr, offset, extent, radius] = desc;
 	const RegionMap& map = *map_ptr;
-	const size_t region_count = map.RegionCount;
 
-	using Arithmetic::toSigned;
+	using std::as_const, Arithmetic::toSigned;
 	const auto [off_x, off_y] = toSigned(offset);
 	const auto [ext_x, ext_y] = toSigned(extent);
 	const auto sradius = toSigned(radius);
 	const auto sradius_2 = 2 * sradius;
-	const double ext_area = 1.0 * Arithmetic::horizontalProduct(extent);
 
-	auto& [histogram, cache_hist] = *any_cast<::SHFDenseHistogram_t&>(memory);
+	auto& [histogram, cache_hist] = *any_cast<THist_t&>(memory);
 	const SH::Dense::BinView cache = cache_hist(0u, 0u, 0u);
 	auto& [histogram_h, histogram_full] = histogram;
 
 	const auto empty_cache = [&cache]() constexpr -> void {
 		fill(cache, Bin_t { });
 	};
-	const auto copy_to_histogram_h = [&cache, &histogram_h](const auto x, const auto y) constexpr -> void {
-		//axes swapped
-		copy(cache, histogram_h(y, x, 0).begin());
+	const auto copy_to_histogram_h = [&cache = as_const(cache), &histogram_h](const auto x, const auto y) constexpr -> void {
+		//remember axes are swapped
+		if constexpr (IsHorizontalDense) {
+			copy(cache, histogram_h(y, x, 0).begin());
+		} else {
+			histogram_h.pushDense(cache, y, x);
+		}
 	};
 	/********************
 	 * Horizontal pass
@@ -149,15 +143,25 @@ const SH::DenseNorm& SingleHistogramFilter::operator()(LaunchTag::Dense,
 
 #pragma warning(push)
 #pragma warning(disable: 4244)//type conversion
-	const auto cache_op_histogram_h = [&cache, &histogram_h, region_count]
+	//For some reason the `as_const` here on horizontal histogram is very important,
+	//	benchmark shows up-to 16% of improvement in timing for using const v.s. non-const version.
+	const auto cache_op_histogram_h = [&cache, &histogram_h = as_const(histogram_h)]
 		(const auto x, const auto y, const auto& op) constexpr -> void {
 		//basically add everything from existing histogram into the cache
-		//also axes swapped
-		const auto bin = span(histogram_h(y, x, 0).cbegin(), region_count);
-		Arithmetic::addRange(cache, op, bin, cache.begin());
+		//also remember that axes are swapped
+		if constexpr (IsHorizontalDense) {
+			Arithmetic::addRange(cache, op, histogram_h(y, x, 0), cache.begin());
+		} else {
+			histogram_h.readDense(cache, y, x, op);
+		}
 	};
-	const auto copy_to_output = [&cache, &histogram_full, ext_area](const auto x, const auto y) -> void {
-		Arithmetic::scaleRange(cache, histogram_full(x, y, 0).begin(), ext_area);
+	const auto copy_to_output = [&cache = as_const(cache), &histogram_full,
+		ext_area = 1.0 * Arithmetic::horizontalProduct(extent)](const auto x, const auto y) -> void {
+		if constexpr (IsOutputDense) {
+			Arithmetic::scaleRange(cache, histogram_full(x, y, 0).begin(), ext_area);
+		} else {
+			histogram_full.pushDenseNormalised(cache, x, y, ext_area);
+		}
 	};
 #pragma warning(pop)
 	const auto op_plus = plus { };
@@ -187,10 +191,20 @@ const SH::DenseNorm& SingleHistogramFilter::operator()(LaunchTag::Dense,
 	return histogram_full;
 }
 
-const SH::SparseNorm& SingleHistogramFilter::operator()(LaunchTag::Sparse,
-	const LaunchDescription& desc, any& memory) const {
-	auto& [histogram, cache] = *any_cast<::SHFSparseHistogram_t&>(memory);
-	auto& [histogram_h, histogram_full] = histogram;
+}
 
-	return histogram_full;
+void SingleHistogramFilter::tryAllocateHistogram(LaunchTag::Dense, const LaunchDescription& desc, any& output) const {
+	::makeAllocation<::SHFDenseHistogram>(desc, output);
+}
+
+void SingleHistogramFilter::tryAllocateHistogram(LaunchTag::Sparse, const LaunchDescription& desc, any& output) const {
+	::makeAllocation<::SHFSparseHistogram>(desc, output);
+}
+
+const SH::DenseNorm& SingleHistogramFilter::operator()(LaunchTag::Dense, const LaunchDescription& desc, any& memory) const {
+	return ::runFilter<::SHFDenseHistogram>(desc, memory);
+}
+
+const SH::SparseNorm& SingleHistogramFilter::operator()(LaunchTag::Sparse, const LaunchDescription& desc, any& memory) const {
+	return ::runFilter<::SHFSparseHistogram>(desc, memory);
 }
