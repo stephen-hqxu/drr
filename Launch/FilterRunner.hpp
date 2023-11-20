@@ -24,17 +24,23 @@ private:
 	std::filesystem::path ReportRoot;
 
 	const RegionMapFactory* Factory;
-	size_t RegionCount;
+	Format::Region_t RegionCount;
 
 	bool DirtyMap;/**< If true, region map will be regenerated in the next execution. */
 	RegionMap Map;
-	std::any Histogram;
+	struct {
+
+		std::any Dense, Sparse;
+
+	} Histogram;
 
 	//Create a new benchmark.
 	static auto createBenchmark();
 
 	//Create a new report file from benchmark.
-	void renderReport(auto&);
+	template<typename Tag>
+	void renderReport(Tag, auto&);
+	void renderReport(const std::string_view&, auto&);
 
 	//Refresh map dimension and content.
 	void refreshMap(const Format::SizeVec2&, Format::Radius_t);
@@ -50,8 +56,10 @@ public:
 	 * @brief Initialise a filter runner.
 	 * 
 	 * @param test_report_dir The directory where test reports are stored.
+	 * It's possible to place this directory with a common root path that is shared with other filter runners,
+	 * this constructor ensures no filesystem race occurs.
 	*/
-	FilterRunner(std::string_view);
+	FilterRunner(const std::filesystem::path&);
 
 	FilterRunner(const FilterRunner&) = delete;
 
@@ -64,7 +72,7 @@ public:
 	 * 
 	 * @param region_count The new region count.
 	*/
-	void setRegionCount(size_t) noexcept;
+	void setRegionCount(Format::Region_t) noexcept;
 
 	/**
 	 * @brief Set the factory used for generating region map.
@@ -72,6 +80,13 @@ public:
 	 * @param factory The factory.
 	*/
 	void setFactory(const RegionMapFactory&) noexcept;
+
+	/**
+	 * @brief Mark region map to be dirty.
+	 * This function is automatically called when region count and factory has been updated by user.
+	 * However, application should call this function if changes are made outside the awareness of this filter runner instance.
+	*/
+	void markRegionMapDirty() noexcept;
 
 	/**
 	 * @brief Profile impact of runtime by varying radius.
@@ -92,7 +107,7 @@ public:
 	 * @param radius The radius of filter kernel.
 	 * @param region_count_arr An array of region count.
 	*/
-	void sweepRegionCount(const Format::SizeVec2&, Format::Radius_t, std::span<const size_t>);
+	void sweepRegionCount(const Format::SizeVec2&, Format::Radius_t, std::span<const Format::Region_t>);
 
 };
 

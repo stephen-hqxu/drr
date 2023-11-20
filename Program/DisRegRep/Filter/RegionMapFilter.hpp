@@ -12,6 +12,8 @@
 #include <type_traits>
 #include <concepts>
 
+#define DEFINE_TAG(NAME) struct NAME { constexpr static std::string_view TagName = #NAME; }
+
 namespace DisRegRep {
 
 /**
@@ -25,8 +27,8 @@ public:
 	*/
 	struct LaunchTag {
 
-		struct Dense { };/**< Dense matrix. */
-		struct Sparse { };/**< Sparse matrix. */
+		DEFINE_TAG(Dense);
+		DEFINE_TAG(Sparse);
 
 	};
 
@@ -95,3 +97,5 @@ public:
 };
 
 }
+
+#undef DEFINE_TAG

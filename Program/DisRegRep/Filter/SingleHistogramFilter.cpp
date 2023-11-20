@@ -146,7 +146,7 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 	//For some reason the `as_const` here on horizontal histogram is very important,
 	//	benchmark shows up-to 16% of improvement in timing for using const v.s. non-const version.
 	const auto cache_op_histogram_h = [&cache, &histogram_h = as_const(histogram_h)]
-		(const auto x, const auto y, const auto& op) constexpr -> void {
+		(const auto x, const auto y, const auto op) constexpr -> void {
 		//basically add everything from existing histogram into the cache
 		//also remember that axes are swapped
 		if constexpr (IsHorizontalDense) {

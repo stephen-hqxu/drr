@@ -4,13 +4,16 @@
 #include <nb/nanobench.h>
 
 #include <array>
-
 #include <algorithm>
 
 #include <format>
 #include <fstream>
-#include <chrono>
 #include <stdexcept>
+
+//WORKAROUND: MSVC's bug for not having constexpr mutex by default,
+//	their documentation says it will be fixed in 17.9
+#define _ENABLE_CONSTEXPR_MUTEX_CONSTRUCTOR
+#include <mutex>
 
 #include <charconv>
 #include <concepts>
@@ -18,7 +21,7 @@
 
 using std::ranges::max_element;
 
-using std::string, std::string_view, std::span, std::array;
+using std::string_view, std::span, std::array, std::any;
 using std::to_chars;
 using std::ofstream, std::runtime_error, std::format;
 
@@ -37,10 +40,7 @@ constexpr char RenderResultTemplate[] = R"DELIM(x,iter,t_median,t_mean,t_mdape,t
 {{#result}}{{name}},{{sum(iterations)}},{{median(elapsed)}},{{average(elapsed)}},{{medianAbsolutePercentError(elapsed)}},{{sumProduct(elapsed,iterations)}}
 {{/result}})DELIM";
 
-string formatSize(const SizeVec2& size) {
-	const auto [x, y] = size;
-	return format("({}, {})", x, y);
-}
+constinit std::mutex GlobalFilesystemLock;
 
 template<std::integral T>
 auto toString(const T input) {
@@ -56,20 +56,10 @@ auto toString(const T input) {
 
 }
 
-FilterRunner::FilterRunner(const string_view test_report_dir) :
+FilterRunner::FilterRunner(const fs::path& test_report_dir) :
 	ReportRoot(test_report_dir), Factory(nullptr), RegionCount { }, DirtyMap(true), Filter(nullptr) {
-	//canonical path will remove potential trailing slash
-	this->ReportRoot = fs::weakly_canonical(this->ReportRoot);
-	{
-		using namespace std::chrono;
-		const auto now = zoned_time(current_zone(), system_clock::now()).get_local_time();
-
-		//add a timestamp to the output directory
-		this->ReportRoot.replace_filename(format("{}-{:%Y-%m-%d_%H-%M}", this->ReportRoot.filename().string(), now));
-	}
-	if (!fs::create_directory(this->ReportRoot)) {
-		throw runtime_error(format("Unable use directory \'{}\'.", this->ReportRoot.string()));
-	}
+	const auto fs_lock = std::unique_lock(::GlobalFilesystemLock);
+	fs::create_directory(this->ReportRoot);
 }
 
 auto FilterRunner::createBenchmark() {
@@ -84,16 +74,21 @@ auto FilterRunner::createBenchmark() {
 	return bench;
 }
 
-void FilterRunner::renderReport(auto& bench) {
-	string_view tag;
+template<typename Tag>
+void FilterRunner::renderReport(Tag, auto& bench) {
+	this->renderReport(Tag::TagName, bench);
+}
+
+void FilterRunner::renderReport(const string_view& filter_tag, auto& bench) {
+	string_view user_tag;
 	if (this->UserTag.empty()) {
-		tag = "-";
+		user_tag = "-";
 	} else {
-		tag = this->UserTag;
+		user_tag = this->UserTag;
 	}
 
-	const fs::path report_file = this->ReportRoot / format("{0}({2},{1},{3}).csv", bench.title(),
-		this->Filter->name(), this->Factory->name(), tag);
+	const fs::path report_file = this->ReportRoot / format("{0}({2},{4},{1},{3}).csv", bench.title(),
+		this->Filter->name(), this->Factory->name(), user_tag, filter_tag);
 
 	auto csv = ofstream(report_file.string());
 	bench.render(::RenderResultTemplate, csv);
@@ -102,7 +97,7 @@ void FilterRunner::renderReport(auto& bench) {
 inline void FilterRunner::refreshMap(const SizeVec2& new_extent, const Radius_t radius) {
 	const SizeVec2 new_dimension = Utility::calcMinimumDimension(new_extent, radius);
 	if (RegionMapFactory::reshape(this->Map, new_dimension)) {
-		this->DirtyMap = true;
+		this->markRegionMapDirty();
 	}
 
 	//need to regenerate it if region map is dirty
@@ -114,67 +109,82 @@ inline void FilterRunner::refreshMap(const SizeVec2& new_extent, const Radius_t 
 	}
 }
 
-void FilterRunner::setRegionCount(const size_t region_count) noexcept {
+void FilterRunner::setRegionCount(const Region_t region_count) noexcept {
 	this->RegionCount = region_count;
-	this->DirtyMap = true;
+	this->markRegionMapDirty();
 }
 
 void FilterRunner::setFactory(const RegionMapFactory& factory) noexcept {
 	this->Factory = &factory;
+	this->markRegionMapDirty();
+}
+
+void FilterRunner::markRegionMapDirty() noexcept {
 	this->DirtyMap = true;
 }
 
 void FilterRunner::sweepRadius(const SizeVec2& extent, const span<const Radius_t> radius_arr) {
 	this->refreshMap(extent, *max_element(radius_arr));
-
-	nb::Bench bench = FilterRunner::createBenchmark();
-	bench.title("Time-Radius")
-		.context("RegionCount", ::toString(this->Map.RegionCount).data())
-		.context("Extent", ::formatSize(extent));
-
 	RegionMapFilter::LaunchDescription desc {
 		.Map = &this->Map,
 		.Extent = extent
 	};
-	const auto run = [&desc, &histogram = this->Histogram, &filter = *this->Filter]() -> void {
-		nb::doNotOptimizeAway(filter(::RunDense, desc, histogram));
+
+	const auto run_radius = [this, &extent, &radius_arr, &desc]
+		(const auto filter_tag, any& histogram) -> void {
+		nb::Bench bench = FilterRunner::createBenchmark();
+		bench.title("Time-Radius");
+
+		const RegionMapFilter& filter = *this->Filter;
+		const auto run = [&desc, &histogram, &filter, filter_tag]() -> void {
+			nb::doNotOptimizeAway(filter(filter_tag, desc, histogram));
+		};
+		for (const auto r : radius_arr) {
+			desc.Radius = r;
+			desc.Offset = Utility::calcMinimumOffset(r);
+			filter.tryAllocateHistogram(filter_tag, desc, histogram);
+
+			bench.run(::toString(r).data(), run);
+		}
+
+		this->renderReport(filter_tag, bench);	
 	};
-	for (const auto r : radius_arr) {
-		desc.Radius = r;
-		desc.Offset = Utility::calcMinimumOffset(r);
-		this->Filter->tryAllocateHistogram(::RunDense, desc, this->Histogram);
-
-		bench.run(::toString(r).data(), run);
-	}
-
-	this->renderReport(bench);
+	auto& [dense, sparse] = this->Histogram;
+	run_radius(::RunDense, dense);
+	run_radius(::RunSparse, sparse);
 }
 
 void FilterRunner::sweepRegionCount(const SizeVec2& extent, const Radius_t radius,
-	const span<const size_t> region_count_arr) {
-
-	nb::Bench bench = FilterRunner::createBenchmark();
-	bench.title("Time-RegionCount")
-		.context("Extent", ::formatSize(extent))
-		.context("Radius", ::toString(radius).data());
-
+	const span<const Region_t> region_count_arr) {
 	const RegionMapFilter::LaunchDescription desc {
 		.Map = &this->Map,
 		.Offset = Utility::calcMinimumOffset(radius),
 		.Extent = extent,
 		.Radius = radius
 	};
-	const auto run = [&desc, &histogram = this->Histogram, &filter = *this->Filter]() -> void {
-		nb::doNotOptimizeAway(filter(::RunDense, desc, histogram));
+
+	const auto run_region_count = [this, &extent, radius, &region_count_arr, &desc]
+		(const auto filter_tag, any& histogram) -> void {
+		nb::Bench bench = FilterRunner::createBenchmark();
+		bench.title("Time-RegionCount");
+
+		const RegionMapFilter& filter = *this->Filter;
+		const auto run = [&desc, &histogram, &filter, filter_tag]() -> void {
+			nb::doNotOptimizeAway(filter(filter_tag, desc, histogram));
+		};
+		for (const auto rc : region_count_arr) {
+			this->setRegionCount(rc);
+			//shouldn't trigger reallocation because size does not change
+			this->refreshMap(extent, radius);
+			filter.tryAllocateHistogram(filter_tag, desc, histogram);
+
+			bench.run(::toString(rc).data(), run);
+		}
+
+		this->renderReport(filter_tag, bench);
 	};
-	for (const auto rc : region_count_arr) {
-		this->setRegionCount(rc);
-		//shouldn't trigger reallocation because size does not change
-		this->refreshMap(extent, radius);
-		this->Filter->tryAllocateHistogram(::RunDense, desc, this->Histogram);
+	auto& [dense, sparse] = this->Histogram;
+	run_region_count(::RunDense, dense);
+	run_region_count(::RunSparse, sparse);
 
-		bench.run(::toString(rc).data(), run);
-	}
-
-	this->renderReport(bench);
 }

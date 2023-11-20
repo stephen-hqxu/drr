@@ -22,7 +22,7 @@ private:
 
 public:
 
-	size_t RegionCount { };/**< The total number of contiguous region presented on region map. */
+	Format::Region_t RegionCount { };/**< The total number of contiguous region presented on region map. */
 
 	constexpr RegionMap() noexcept = default;
 

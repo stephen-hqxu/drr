@@ -20,7 +20,7 @@ public:
 	*/
 	struct CreateDescription {
 
-		size_t RegionCount;/**< The number of region to be used. */
+		Format::Region_t RegionCount;/**< The number of region to be used. */
 
 	};
 
