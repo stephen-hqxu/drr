@@ -1,16 +1,17 @@
 #pragma once
 
 #include <DisRegRep/ProgramExport.hpp>
+#include "ContainerTrait.hpp"
+#include "SparseBin.hpp"
+
 #include "../Format.hpp"
+#include "../Maths/Arithmetic.hpp"
 #include "../Maths/Indexer.hpp"
 
 #include <vector>
 #include <span>
-
 #include <ranges>
-#include <functional>
 
-#include <concepts>
 #include <cstdint>
 
 namespace DisRegRep {
@@ -38,13 +39,13 @@ DENSE_EQ_SPARSE(DRR_API);
 /**
  * @brief A dense single histogram uses a 3D matrix.
  * 
- * @tparam TBin The bin type.
+ * @tparam T The bin type.
 */
-template<typename TBin>
-class DRR_API BasicDense {
+template<typename T>
+class BasicDense {
 public:
 
-	using value_type = TBin;
+	using value_type = T;
 
 private:
 
@@ -52,6 +53,14 @@ private:
 
 	using DenseIndexer_t = Indexer<1, 2, 0>;/**< Default indexing order of histogram. */
 	DenseIndexer_t DenseIndexer;
+
+	//Get the iterator to the histogram given 2D coordinate.
+	constexpr auto getHistogramIterator(const auto x, const auto y) noexcept {
+		return this->Histogram.begin() + this->DenseIndexer(x, y, 0);
+	}
+	constexpr auto getHistogramIterator(const auto x, const auto y) const noexcept {
+		return this->Histogram.cbegin() + this->DenseIndexer(x, y, 0);
+	}
 
 public:
 
@@ -73,34 +82,56 @@ public:
 	 * 
 	 * @return True if two histograms are identical.
 	*/
-	bool operator==(const BasicDense&) const;
+	DRR_API bool operator==(const BasicDense&) const;
 
 	FRIEND_DENSE_EQ_SPARSE;
 
 	/**
-	 * @brief Reshape the dimension of histogram.
+	 * @brief Resize the dimension of histogram.
 	 * If dimension is shrunken, extra data will be trimmed.
 	 * 
 	 * @param dimension The new dimension.
-	 * @param bin_count The number of bin per histogram.
+	 * @param region_count The number of region per histogram.
 	*/
-	void reshape(const Format::SizeVec2&, size_t);
+	DRR_API void resize(const Format::SizeVec2&, Format::Region_t);
+
+	/**
+	 * @brief This function must be called to reset internal state before commencing new computations.
+	 * It's currently a no-op, but I am keeping it for consistency reasons.
+	 * 
+	 * @see BasicSparse::clear()
+	*/
+	constexpr void clear() const noexcept { }
+
+	/**
+	 * @brief Set bins of a histogram from a range.
+	 * 
+	 * @tparam R The range type.
+	 * @tparam T The type of factor.
+	 * 
+	 * @param input The input range of bins to be filled into this histogram.
+	 * @param x, y The coordinates into this histogram.
+	 * @param factor Can be specified to scale the range before writing to the histogram.
+	*/
+	template<ContainerTrait::ValueRange<value_type> R>
+	constexpr void operator()(R&& input, const auto x, const auto y) {
+		std::ranges::copy(input, this->getHistogramIterator(x, y));
+	}
+	template<std::ranges::input_range R, typename T>
+	requires(std::floating_point<value_type>)
+	void operator()(R&& input, const auto x, const auto y, const T factor) {
+		Arithmetic::scaleRange(std::forward<R>(input), this->getHistogramIterator(x, y), factor);
+	}
 
 	/**
 	 * @brief Get the view into a histogram.
 	 * 
-	 * @param x The x index.
-	 * @param y The y index.
-	 * @param bin The bin index.
+	 * @param x, y The coordinates.
 	 * 
 	 * @return The view of all bins in a histogram.
 	*/
-	constexpr BinView operator()(const auto x, const auto y, const auto bin) noexcept {
-		const ConstBinView view_const = const_cast<const BasicDense&>(*this)(x, y, bin);
-		return BinView(const_cast<BinView::pointer>(view_const.data()), view_const.size());
-	}
-	constexpr ConstBinView operator()(const auto x, const auto y, const auto bin) const noexcept {
-		return ConstBinView(this->Histogram.cbegin() + this->DenseIndexer(x, y, bin), this->DenseIndexer.extent(2u));
+	constexpr ConstBinView operator()(const auto x, const auto y) const noexcept {
+		return ConstBinView(this->getHistogramIterator(x, y), this->DenseIndexer.extent(2u));
 	}
 
 };
@@ -108,47 +139,37 @@ using Dense = BasicDense<Format::Bin_t>;
 using DenseNorm = BasicDense<Format::NormBin_t>;
 
 template<typename T>
-concept DenseInstance = requires {
-	{ BasicDense<typename T::value_type> { } } -> std::same_as<T>;
-};
+concept DenseInstance = ContainerTrait::ContainerInstance<T, BasicDense>;
+
+#define SCALE_TRANSFORM static_cast<value_type>(value / factor)
 
 /**
  * @brief A sparse single histogram is a 2D matrix of arrays with, useful if the bin axis is sparse.
  * 
- * @tparam TBin The bin type.
+ * @tparam T The bin type.
 */
-template<typename TBin>
-class DRR_API BasicSparse {
+template<typename T>
+class BasicSparse {
 public:
 
-	using value_type = TBin;
-
-	/**
-	 * @brief Type of bin.
-	*/
-	struct BinType {
-
-		Format::Region_t Region;/**< The region this bin is storing. */
-		value_type Value;/**< Bin value for this region. */
-
-		constexpr bool operator==(const BinType&) const noexcept = default;
-
-	};
-	using ConstBinView = std::span<const BinType>;
+	using value_type = T;
 
 private:
 
-	using BinOffset_t = std::uint32_t;
+	using bin_type = SparseBin::BasicSparseBin<value_type>;
+	using offset_type = std::uint32_t;
 
-	std::vector<BinOffset_t> Offset;
+	std::vector<offset_type> Offset;
 	//List-of-List sparse matrix format, this is better than List-of-Flattened-List
 	//	for allowing constructing the matrix in row-major or column-major order at the same time.
-	std::vector<std::vector<BinType>> Bin;
+	std::vector<std::vector<bin_type>> Bin;
 
 	using BinOffsetIndexer_t = Indexer<0, 1>;
 	BinOffsetIndexer_t OffsetIndexer;
 
 public:
+
+	using ConstBinView = std::span<const bin_type>;
 
 	constexpr BasicSparse() noexcept = default;
 
@@ -165,66 +186,93 @@ public:
 	 *
 	 * @return True if two histograms are identical if all offsets and bins are equal.
 	*/
-	bool operator==(const BasicSparse&) const;
+	DRR_API bool operator==(const BasicSparse&) const;
 
 	FRIEND_DENSE_EQ_SPARSE;
 
 	/**
-	 * @brief Get the number of histogram stored.
-	 *
-	 * @return The size of single histogram.
-	*/
-	constexpr size_t size() const noexcept {
-		return this->Offset.size();
-	}
-
-	/**
-	 * @brief Reshape the histogram.
+	 * @brief Resize the histogram.
 	 * All contents in the histogram will be cleared.
 	 *
 	 * @param dimension The new dimension for the histogram.
+	 * @param region_count The number of region per histogram.
+	 * This argument is unused in sparse histogram, keeping this for API consistency.
 	*/
-	void reshape(Format::SizeVec2);
+	DRR_API void resize(Format::SizeVec2, Format::Region_t);
 
 	/**
+	 * @brief Clear the sparse histogram for new computations.
+	 * This function must be called to reset internal state of the histogram
+	 * and clear old values before commencing any computations.
+	*/
+	DRR_API void clear();
+
+	/**
+	 * OVERLOAD-1
+	 * @brief Push some bins from a sparse histogram into the current one.
+	 * 
+	 * @tparam R The type of input range.
+	 * @tparam T The type of factor.
+	 * 
+	 * @param input The input range containing bins to be pushed.
+	 * @param x,y The index to the histogram.
+	 * @param factor Provide a factor to scale the input before writing to the histogram.
+	*/
+	template<SparseBin::SparseBinRangeValue<value_type> R>
+	constexpr void operator()(R&& input, const auto x, const auto y) {
+		auto& bin_y = this->Bin[y];
+		bin_y.insert_range(bin_y.cend(), input);
+		this->Offset[this->OffsetIndexer(x + 1, y)] = static_cast<offset_type>(bin_y.size());
+	}
+	template<SparseBin::SparseBinRange R, typename T>
+	requires(std::floating_point<value_type>)
+	constexpr void operator()(R&& input, const auto x, const auto y, const T factor) {
+		//resolves to OVERLOAD-1
+		(*this)(std::forward<R>(input) | std::views::transform([factor](const auto& bin) constexpr noexcept {
+			const auto [region, value] = bin;
+			return bin_type {
+				.Region = region,
+				.Value = SCALE_TRANSFORM
+			};
+		}), x, y);
+	}
+
+	/**
+	 * OVERLOAD-2
 	 * @brief Push some bins from a dense histogram into the current sparse histogram.
 	 * 
 	 * @tparam R The type of input range.
-	 * @tparam Range_t The value of the range.
-	 * @tparam Proj The projector function type.
+	 * @tparam T The type of factor.
 	 * 
 	 * @param input The input range containing bins to be pushed.
 	 * @param x, y The index to the histogram whose bins are belonging to.
-	 * The behaviour is undefined if bins are not pushed contiguously in y axis.
-	 * @param proj Project range value before writing to the histogram.
+	 * The behaviour is undefined if bins are not pushed contiguously in x axis.
+	 * @param factor Provide a factor to scale the input before writing to the histogram.
 	*/
-	template<std::ranges::input_range R, typename Proj = std::identity>
-	constexpr void pushDense(R&& input, const auto x, const auto y, Proj&& proj = { }) {
+	template<ContainerTrait::ValueRange<value_type> R>
+	requires(!SparseBin::SparseBinRange<R>)
+	constexpr void operator()(R&& input, const auto x, const auto y) {
 		using Range_t = std::ranges::range_value_t<R>;
-		
 		auto input_range = input
 			| std::views::enumerate
 			| std::views::filter([](const auto& bin) constexpr noexcept {
 				return std::get<1u>(bin) != Range_t { 0 };
-			}) | std::views::transform([&proj](const auto& bin) constexpr noexcept {
+			}) | std::views::transform([](const auto& bin) constexpr noexcept {
 				const auto [region, value] = bin;
-				return BinType {
+				return bin_type {
 					.Region = static_cast<Format::Region_t>(region),
-					.Value = std::forward<Proj>(proj)(value)
+					.Value = value
 				};
 			});
-		
-		auto& bin_y = this->Bin[y];
-		bin_y.insert_range(bin_y.cend(), input_range);
-		this->Offset[this->OffsetIndexer(x + 1, y)] = static_cast<BinOffset_t>(bin_y.size());
+		//resolves to OVERLOAD-1
+		(*this)(input_range, x, y);
 	}
-
-	//Similar, but automatically normalised the dense histogram before pushing to the sparse.
-	template<std::ranges::input_range R, std::floating_point T>
-	requires(std::floating_point<value_type>)
-	constexpr void pushDenseNormalised(R&& input, const auto x, const auto y, const T factor) {
-		this->pushDense(std::forward<R>(input), x, y,
-			[factor](const auto value) constexpr noexcept { return static_cast<value_type>(value / factor); });
+	template<std::ranges::input_range R, typename T>
+	requires(!SparseBin::SparseBinRange<R> && std::floating_point<value_type>)
+	constexpr void operator()(R&& input, const auto x, const auto y, const T factor) {
+		//resolves to OVERLOAD-2
+		(*this)(std::forward<R>(input) | std::views::transform(
+			[factor](const auto value) constexpr noexcept { return SCALE_TRANSFORM; }), x, y);
 	}
 
 	/**
@@ -234,7 +282,7 @@ public:
 	 * 
 	 * @return The view into the histogram bins for the current coordinate.
 	*/
-	constexpr ConstBinView operator()(const auto x, const auto y) const {
+	constexpr ConstBinView operator()(const auto x, const auto y) const noexcept {
 		//as offset matrix is row-major linear, we are doing this to avoid recalculating the offset linear index twice
 		const size_t offset_idx = this->OffsetIndexer(x, y),
 			bin_start_idx = this->Offset[offset_idx],
@@ -244,32 +292,14 @@ public:
 		return ConstBinView(bin_it + bin_start_idx, bin_it + bin_end_idx);
 	}
 
-	/**
-	 * @brief Read bins for a dense histogram.
-	 * Output will be written as `output = op(output, current_value)`.
-	 * 
-	 * @tparam Op The type of operator mapped to the output.
-	 * @tparam R The input/output range type.
-	 * @param io The input/output range.
-	 * @param x, y The index to the histogram.
-	 * @param op The operator.
-	*/
-	template<std::ranges::random_access_range R, typename Op>
-	constexpr void readDense(R& io, const auto x, const auto y, Op&& op) const {
-		for (const auto [region, value] : (*this)(x, y)) {
-			auto& output = io[region];
-			output = std::forward<Op>(op)(output, value);
-		}
-	}
-
 };
 using Sparse = BasicSparse<Format::Bin_t>;
 using SparseNorm = BasicSparse<Format::NormBin_t>;
 
 template<typename T>
-concept SparseInstance = requires {
-	{ BasicSparse<typename T::value_type> { } } -> std::same_as<T>;
-};
+concept SparseInstance = ContainerTrait::ContainerInstance<T, BasicSparse>;
+
+#undef SCALE_TRANSFORM
 
 #undef DENSE_EQ_SPARSE
 #undef FRIEND_DENSE_EQ_SPARSE

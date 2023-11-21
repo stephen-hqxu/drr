@@ -1,3 +1,7 @@
+//WORKAROUND: MSVC's bug for not having constexpr mutex by default,
+//	their documentation says it will be fixed in 17.9
+#define _ENABLE_CONSTEXPR_MUTEX_CONSTRUCTOR
+
 #include "FilterRunner.hpp"
 #include "Utility.hpp"
 
@@ -10,9 +14,6 @@
 #include <fstream>
 #include <stdexcept>
 
-//WORKAROUND: MSVC's bug for not having constexpr mutex by default,
-//	their documentation says it will be fixed in 17.9
-#define _ENABLE_CONSTEXPR_MUTEX_CONSTRUCTOR
 #include <mutex>
 
 #include <charconv>

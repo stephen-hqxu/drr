@@ -49,26 +49,110 @@ using RMFT = DisRegRep::RegionMapFilter::LaunchTag;
 constexpr auto RunDense = RMFT::Dense { };
 constexpr auto RunSparse = RMFT::Sparse { };
 
-namespace DefaultSetting {
+//We store all benchmark settings here!
+constexpr struct BenchmarkContext {
 
-constexpr F::SizeVec2 Extent = { 128u, 128u };
-constexpr F::Region_t RegionCount = 8u;
-constexpr F::Radius_t Radius = 8u;
+	constexpr static uint64_t Seed = 0x1CD4C39A662BF9CAull;
 
-constexpr uint64_t Seed = 0x1CD4C39A662BF9CAull;
-constexpr size_t CentroidCount = 10u;
+	//Common parameters for sweeping a variable.
+	template<typename T>
+	struct SweepContext {
+
+		T Sweep, Min, Max;
+
+	};
+
+	F::SizeVec2 Extent;
+	F::Region_t RegionCount;
+	F::Radius_t Radius;
+	size_t CentroidCount;
+
+	SweepContext<F::Radius_t> SweepRadius;
+	struct {
+
+		SweepContext<F::Radius_t> SweepRadius;
+		F::SizeVec2 Extent;
+		F::Region_t RegionCount;
+
+	} SweepRadiusStress;
+	SweepContext<F::Region_t> SweepRegion;
+
+} DefaultSetting = {
+//We keep two different sets of settings for debug and release mode.
+//In debug mode we are mainly trying to hunt for bugs, so turn down the settings to speed things up.
+#ifndef NDEBUG
+	.Extent = { 16u, 16u },
+	.RegionCount = 4u,
+	.Radius = 2u,
+	.CentroidCount = 4u,
+
+	.SweepRadius = { 4u, 2u, 10u },
+	.SweepRadiusStress = {
+		.SweepRadius = { 8u, 4u, 32u },
+		.Extent = { 64u, 64u },
+		.RegionCount = 8u
+	},
+	.SweepRegion = { 6u, 2u, 8u }
+#else//NDEBUG
+	.Extent = { 128u, 128u },
+	.RegionCount = 8u,
+	.Radius = 8u,
+	.CentroidCount = 10u,
+
+	.SweepRadius = { 15u, 2u, 64u },
+	.SweepRadiusStress = {
+		.SweepRadius = { 30u, 8u, 256u },
+		.Extent = { 512u, 512u },
+		.RegionCount = 15u
+	},
+	.SweepRegion = { 15u, 2u, 30u }
+#endif//NDEBUG
+};
+//An alias for default setting
+constexpr auto& DS = ::DefaultSetting;
 
 void exportSetting(const fs::path& export_filename) {
 	auto f = ofstream(export_filename);
 
 	using Lnc::Utility::formatArray;
-	println(f, "Extent = {}", formatArray(Extent));
-	println(f, "Region-Count = {}", RegionCount);
-	println(f, "Radius = {}", Radius);
-	println(f, "Seed = 0x{:X}", Seed);
-	print(f, "Centroid-Count = {}", CentroidCount);
-}
+	println(f, "Default Setting:");
+	println(f, "Extent = {}", formatArray(::DS.Extent));
+	println(f, "Region-Count = {}", ::DS.RegionCount);
+	println(f, "Radius = {}", ::DS.Radius);
+	println(f, "Seed = 0x{:X}", ::DS.Seed);
+	println(f, "Centroid-Count = {}\n", ::DS.CentroidCount);
 
+	const auto export_sweep_setting = [&f](const auto sweep, const auto min, const auto max) -> void {
+		println(f, "Sweep = {}", sweep);
+		println(f, "Min = {}", min);
+		println(f, "Max = {}\n", max);
+		};
+#define BRING_OUT_SETTING(SET_NAME) constexpr auto& S = ::DS.SET_NAME
+#define EXPORT_SETTING export_sweep_setting(S.Sweep, S.Min, S.Max)
+	{
+		BRING_OUT_SETTING(SweepRadius);
+		println(f, "Sweep Radius:");
+		EXPORT_SETTING;
+	}
+	{
+		{
+			BRING_OUT_SETTING(SweepRadiusStress);
+			println(f, "Sweep Radius Stress:");
+			println(f, "Extent = {}", formatArray(S.Extent));
+			println(f, "Region-Count = {}", S.RegionCount);
+		}
+		{
+			BRING_OUT_SETTING(SweepRadiusStress.SweepRadius);
+			EXPORT_SETTING;
+		}
+	}
+	{
+		BRING_OUT_SETTING(SweepRegion);
+		println(f, "Sweep Region:");
+		EXPORT_SETTING;
+	}
+#undef EXPORT_SETTING
+#undef BRING_OUT_SETTING
 }
 
 using FactoryCollection = span<const RegionMapFactory* const>;
@@ -97,7 +181,7 @@ struct RunDescription {
 
 //The main purpose is to make sure our optimised implementation is sound
 template<size_t TestSize>
-requires(TestSize > 0u)
+	requires(TestSize > 0u)
 bool selfTest(const TestDescription<TestSize>& desc) {
 	const auto [factory, filter] = desc;
 	const RegionMap region_map = factory({
@@ -111,7 +195,7 @@ bool selfTest(const TestDescription<TestSize>& desc) {
 	};
 
 	const auto run_test = [&desc, &launch_desc, &filter]
-		<typename RunTag>(const RunTag run_tag, auto& histogram_mem, auto& histogram) -> void {
+		<typename RunTag>(const RunTag run_tag, auto & histogram_mem, auto & histogram) -> void {
 		for (const auto [i, curr_filter_ptr] : enumerate(filter)) {
 			const RegionMapFilter& curr_filter = *curr_filter_ptr;
 
@@ -130,7 +214,7 @@ bool selfTest(const TestDescription<TestSize>& desc) {
 	const auto fun_not_eq = std::not_equal_to { };
 	constexpr static auto dereferencer = [](const auto* const ptr) constexpr noexcept -> const auto& {
 		return *ptr;
-	};
+		};
 	return adjacent_find(dense_hist, fun_not_eq, dereferencer) == dense_hist.cend()
 		&& adjacent_find(sparse_hist, fun_not_eq, dereferencer) == sparse_hist.cend()
 		&& *dense_hist.front() == *sparse_hist.front();
@@ -149,57 +233,52 @@ void handleException(const exception& e) {
 
 void runRadius(const ReportDescription& report_desc, const ::RunDescription& regular_desc,
 	const ::RunDescription& stress_desc) try {
-	constexpr static F::Radius_t RadiusSweep = 15u,
-		MinRadius = 2u,
-		MaxRadius = 64u,
-		RadiusSweepStress = 30u,
-		MinRadiusStress = 8u,
-		MaxRadiusStress = 256u;
-	const F::Region_t RegionCountStress = 15u;
-	constexpr static F::SizeVec2 ExtentStress = { 512u, 512u };
-
 	const auto& [report_root] = report_desc;
 
 	auto radius_runner = Lnc::FilterRunner(report_root / "radius");
 	auto run = [&radius_runner](const ::RunDescription& desc, const auto sweep_radius,
 		const char* const tag, const F::Region_t region_count, const F::SizeVec2& extent) mutable -> void {
-		const auto& [factory_arr, filter_arr] = desc;
-		radius_runner.UserTag = tag;
-		radius_runner.setRegionCount(region_count);
+			const auto& [factory_arr, filter_arr] = desc;
+			radius_runner.UserTag = tag;
+			radius_runner.setRegionCount(region_count);
 
-		for (const auto factory : factory_arr) {
-			radius_runner.setFactory(*factory);
-			for (const auto filter : filter_arr) {
-				radius_runner.Filter = filter;
-				radius_runner.sweepRadius(extent, sweep_radius);
+			for (const auto factory : factory_arr) {
+				radius_runner.setFactory(*factory);
+				for (const auto filter : filter_arr) {
+					radius_runner.Filter = filter;
+					radius_runner.sweepRadius(extent, sweep_radius);
+				}
 			}
-		}	
-	};
-	run(regular_desc, ::generateSweepVariable<F::Radius_t, MinRadius, MaxRadius, RadiusSweep>(),
-		"Compare", ::DefaultSetting::RegionCount, ::DefaultSetting::Extent);
-	run(stress_desc, ::generateSweepVariable<F::Radius_t, MinRadiusStress, MaxRadiusStress, RadiusSweepStress>(),
-		"Stress", RegionCountStress, ExtentStress);
+		};
+	{
+		constexpr auto& SR = ::DS.SweepRadius;
+		run(regular_desc, ::generateSweepVariable<F::Radius_t, SR.Min, SR.Max, SR.Sweep>(),
+			"Default", ::DS.RegionCount, ::DS.Extent);
+	}
+	{
+		constexpr auto& SRS = ::DS.SweepRadiusStress;
+		constexpr auto& SR = SRS.SweepRadius;
+		run(stress_desc, ::generateSweepVariable<F::Radius_t, SR.Min, SR.Max, SR.Sweep>(),
+			"Stress", SRS.RegionCount, SRS.Extent);
+	}
 } catch (const exception& e) {
 	::handleException(e);
 }
 
 void runRegionCount(const ReportDescription& report_desc, const ::RunDescription& run_desc) try {
-	constexpr static F::Region_t RegionSweep = 15u,
-		MinRegion = 2u,
-		MaxRegion = 30u;
-
 	const auto& [report_root] = report_desc;
 	const auto& [factory_arr, filter_arr] = run_desc;
 
-	const auto sweep_region_count = ::generateSweepVariable<F::Region_t, MinRegion, MaxRegion, RegionSweep>();
+	constexpr auto& SR = ::DS.SweepRegion;
+	const auto sweep_region_count = ::generateSweepVariable<F::Region_t, SR.Min, SR.Max, SR.Sweep>();
 	auto region_count_runner = Lnc::FilterRunner(report_root / "region-count");
 
 	for (const auto factory : factory_arr) {
 		region_count_runner.setFactory(*factory);
 		for (const auto filter : filter_arr) {
 			region_count_runner.Filter = filter;
-			region_count_runner.sweepRegionCount(::DefaultSetting::Extent,
-				::DefaultSetting::Radius, sweep_region_count);
+			region_count_runner.sweepRegionCount(::DS.Extent,
+				::DS.Radius, sweep_region_count);
 		}
 	}
 } catch (const exception& e) {
@@ -209,8 +288,8 @@ void runRegionCount(const ReportDescription& report_desc, const ::RunDescription
 void run() {
 	println("Initialising test environment...");
 	//factory
-	const auto random_factory = RandomRegionFactory(::DefaultSetting::Seed);
-	const auto voronoi_factory = VoronoiRegionFactory(::DefaultSetting::Seed, ::DefaultSetting::CentroidCount);
+	const auto random_factory = RandomRegionFactory(::BenchmarkContext::Seed);
+	const auto voronoi_factory = VoronoiRegionFactory(::BenchmarkContext::Seed, ::DS.CentroidCount);
 	//filter
 	const BruteForceFilter bf;
 	const SingleHistogramFilter shf;
@@ -227,7 +306,7 @@ void run() {
 	const bool test_result = ::selfTest<filter.size()>({
 		.Factory = random_factory,
 		.Filter = filter
-	});
+		});
 	println("Self test complete, returning test status: {}\n", test_result ? "PASS" : "FAIL");
 	if (!test_result) {
 		return;
@@ -252,11 +331,11 @@ void run() {
 			jthread(::runRadius, cref(report_desc), cref(run_desc), ::RunDescription {
 				.Factory = span(factory).subspan(0u, 1u),
 				.Filter = span(filter).subspan(1u, 1u)
-			}),
+				}),
 			jthread(::runRegionCount, cref(report_desc), cref(run_desc))
 		};
 
-		::DefaultSetting::exportSetting(report_root / "default-setting.txt");
+		::exportSetting(report_root / "default-setting.txt");
 	}
 	print("Benchmark complete, cleaning up...");
 }

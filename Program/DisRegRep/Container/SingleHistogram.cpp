@@ -8,24 +8,24 @@
 
 using std::array;
 using std::ranges::copy, std::ranges::fill, std::ranges::for_each, std::equal,
-	std::views::stride, std::views::join, std::views::iota, std::views::transform,
+	std::views::join, std::views::iota, std::views::transform,
 	std::execution::unseq;
 
 using namespace DisRegRep;
-using Format::Bin_t, Format::NormBin_t, Format::SizeVec2;
+using Format::Region_t, Format::Bin_t, Format::NormBin_t, Format::SizeVec2;
 using SingleHistogram::BasicDense, SingleHistogram::BasicSparse;
 using Arithmetic::horizontalProduct;
 
-template<typename TBin>
-bool BasicDense<TBin>::operator==(const BasicDense& comp) const {
+template<typename T>
+bool BasicDense<T>::operator==(const BasicDense& comp) const {
 	return equal(unseq, this->Histogram.cbegin(), this->Histogram.cend(), comp.Histogram.cbegin());
 }
 
-template<typename TBin>
-void BasicDense<TBin>::reshape(const SizeVec2& dimension, const size_t bin_count) {
+template<typename T>
+void BasicDense<T>::resize(const SizeVec2& dimension, const Region_t region_count) {
 	array<size_t, 3u> dim_3;
 	copy(dimension, dim_3.begin());
-	dim_3.back() = bin_count;
+	dim_3.back() = region_count;
 
 	this->Histogram.resize(horizontalProduct(dim_3));
 	this->DenseIndexer = DenseIndexer_t(dim_3);
@@ -35,26 +35,32 @@ void BasicDense<TBin>::reshape(const SizeVec2& dimension, const size_t bin_count
 INS_DENSE(Bin_t);
 INS_DENSE(NormBin_t);
 
-template<typename TBin>
-bool BasicSparse<TBin>::operator==(const BasicSparse& comp) const {
+template<typename T>
+bool BasicSparse<T>::operator==(const BasicSparse& comp) const {
 	const auto left_bin = this->Bin | join,
 		right_bin = comp.Bin | join;
 	return equal(unseq, this->Offset.cbegin(), this->Offset.cend(), comp.Offset.cbegin())
 		&& equal(unseq, left_bin.cbegin(), left_bin.cend(), right_bin.cbegin());
 }
 
-template<typename TBin>
-void BasicSparse<TBin>::reshape(SizeVec2 dimension) {
+template<typename T>
+void BasicSparse<T>::resize(SizeVec2 dimension, Region_t) {
 	//we keep one extra offset at the end each x-axis to indicate the total number of bins.
 	auto& [x, y] = dimension;
 	x++;
 
 	this->Offset.resize(horizontalProduct(dimension));
 	this->Bin.resize(y);
-	this->OffsetIndexer = BinOffsetIndexer_t(x, y);
+	this->OffsetIndexer = BinOffsetIndexer_t(dimension);
 
+	this->clear();
+}
+
+template<typename T>
+void BasicSparse<T>::clear() {
 	//initialise starting offset for each row in the new histogram
-	fill(this->Offset | stride(x), BinOffset_t { 0 });
+	fill(this->Offset, offset_type { });
+	//we will be pushing new values into sparse bins, so need to clear the old ones
 	for_each(this->Bin, [](auto& bin_y) constexpr noexcept { bin_y.clear(); });
 }
 
@@ -74,7 +80,7 @@ bool SingleHistogram::operator==(const BasicDense<U>& a, const BasicSparse<U>& b
 	using Format::Region_t;
 	for (const auto y : iota(size_t { 0 }, dense_y)) {
 		for (const auto x : iota(size_t { 0 }, dense_x)) {
-			const auto dense_hist = a(x, y, 0u);
+			const auto dense_hist = a(x, y);
 			const auto sparse_hist = b(x, y);
 
 			//It should be sorted against region for every histogram

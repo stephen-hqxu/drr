@@ -92,6 +92,20 @@ constexpr T horizontalProduct(const std::array<T, S>& num) noexcept {
 	return product(std::make_index_sequence<S> { });
 }
 
+/**
+ * @brief Calculate the kernel area given radius.
+ * 
+ * @tparam T The type of radius.
+ * @param radius The radius of kernel.
+ * 
+ * @return The kernel area.
+*/
+template<std::unsigned_integral T>
+constexpr size_t kernelArea(const T radius) noexcept {
+	const size_t diameter = 2u * radius + 1u;
+	return diameter * diameter;
+}
+
 }
 
 }

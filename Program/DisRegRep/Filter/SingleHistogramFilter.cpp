@@ -1,28 +1,25 @@
 #include <DisRegRep/Filter/SingleHistogramFilter.hpp>
 #include <DisRegRep/Maths/Arithmetic.hpp>
 
+#include <DisRegRep/Container/HistogramCache.hpp>
+
 #include <memory>
 #include <utility>
+#include <type_traits>
 
-#include <span>
-#include <algorithm>
 #include <ranges>
 #include <functional>
 
 using std::any, std::any_cast;
 using std::shared_ptr, std::make_shared_for_overwrite;
-using std::plus, std::minus;
-using std::span;
-using std::views::iota,
-	std::ranges::fill, std::ranges::copy;
+using std::views::iota;
 
 using namespace DisRegRep;
 namespace SH = SingleHistogram;
+namespace HC = HistogramCache;
 using Format::SizeVec2, Format::Radius_t, Format::Bin_t, Format::Region_t;
 
 namespace {
-
-constexpr SizeVec2 OneD = { 1u, 1u };
 
 //Calculate dimension for horizontal pass histogram.
 constexpr SizeVec2 calcHorizontalHistogramDimension(SizeVec2 histogram_size, const Radius_t radius) noexcept {
@@ -45,24 +42,20 @@ struct SHFHistogram {
 		NormHistogramType Final;
 
 	} Histogram;
-	SH::Dense Cache;
+	HC::Dense Cache;
 
-	template<typename = void>
-	requires(SH::DenseInstance<THist> && SH::DenseInstance<TNormHist>)
-	constexpr void resize(const SizeVec2& histogram_size, const size_t rc, const Radius_t radius) {
+	void resize(const SizeVec2& histogram_size, const Region_t rc, const Radius_t radius) {
 		auto& [hori, final] = this->Histogram;
-		hori.reshape(::calcHorizontalHistogramDimension(histogram_size, radius), rc);
-		final.reshape(histogram_size, rc);
-		this->Cache.reshape(::OneD, rc);
+		hori.resize(::calcHorizontalHistogramDimension(histogram_size, radius), rc);
+		final.resize(histogram_size, rc);
+		this->Cache.resize(rc);
 	}
 
-	template<typename = void>
-	requires(SH::SparseInstance<THist> && SH::SparseInstance<TNormHist>)
-	constexpr void resize(const SizeVec2& histogram_size, const size_t rc, const Radius_t radius) {
+	void clear() {
 		auto& [hori, final] = this->Histogram;
-		hori.reshape(::calcHorizontalHistogramDimension(histogram_size, radius));
-		final.reshape(histogram_size);
-		this->Cache.reshape(::OneD, rc);
+		hori.clear();
+		final.clear();
+		this->Cache.clear();
 	}
 
 };
@@ -98,20 +91,15 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 	const auto sradius = toSigned(radius);
 	const auto sradius_2 = 2 * sradius;
 
-	auto& [histogram, cache_hist] = *any_cast<THist_t&>(memory);
-	const SH::Dense::BinView cache = cache_hist(0u, 0u, 0u);
+	THist& shf_histogram = *any_cast<THist_t&>(memory);
+	shf_histogram.clear();
+
+	auto& [histogram, cache] = shf_histogram;
 	auto& [histogram_h, histogram_full] = histogram;
 
-	const auto empty_cache = [&cache]() constexpr -> void {
-		fill(cache, Bin_t { });
-	};
-	const auto copy_to_histogram_h = [&cache = as_const(cache), &histogram_h](const auto x, const auto y) constexpr -> void {
+	const auto copy_to_histogram_h = [&cache = as_const(cache), &histogram_h](const auto x, const auto y) -> void {
 		//remember axes are swapped
-		if constexpr (IsHorizontalDense) {
-			copy(cache, histogram_h(y, x, 0).begin());
-		} else {
-			histogram_h.pushDense(cache, y, x);
-		}
+		histogram_h(cache, y, x);
 	};
 	/********************
 	 * Horizontal pass
@@ -120,11 +108,11 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 		//region map y value
 		const auto rg_y = off_y + y - sradius;
 		
-		empty_cache();
+		cache.clear();
 		//compute initialise bin for the current row
 		for (const auto rx : iota(off_x - sradius, off_x + sradius + 1)) {
 			const Region_t region = map(rx, rg_y);
-			cache[region]++;
+			cache.increment(region);
 		}
 		copy_to_histogram_h(0, y);
 
@@ -134,34 +122,32 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 
 			const Region_t removing_region = map(rg_x - sradius - 1, rg_y),
 				adding_region = map(rg_x + sradius, rg_y);
-			cache[removing_region]--;
-			cache[adding_region]++;
+			cache.decrement(removing_region);
+			cache.increment(adding_region);
 
 			copy_to_histogram_h(x, y);
 		}
 	}
 
+	using std::plus, std::minus, std::is_same_v;
 #pragma warning(push)
 #pragma warning(disable: 4244)//type conversion
 	//For some reason the `as_const` here on horizontal histogram is very important,
 	//	benchmark shows up-to 16% of improvement in timing for using const v.s. non-const version.
 	const auto cache_op_histogram_h = [&cache, &histogram_h = as_const(histogram_h)]
-		(const auto x, const auto y, const auto op) constexpr -> void {
+		<typename Op>(const auto x, const auto y, Op) -> void {
 		//basically add everything from existing histogram into the cache
 		//also remember that axes are swapped
-		if constexpr (IsHorizontalDense) {
-			Arithmetic::addRange(cache, op, histogram_h(y, x, 0), cache.begin());
+		const auto bin_view = histogram_h(y, x);
+		if constexpr (is_same_v<Op, plus<void>>) {
+			cache.increment(bin_view);
 		} else {
-			histogram_h.readDense(cache, y, x, op);
+			cache.decrement(bin_view);
 		}
 	};
 	const auto copy_to_output = [&cache = as_const(cache), &histogram_full,
-		ext_area = 1.0 * Arithmetic::horizontalProduct(extent)](const auto x, const auto y) -> void {
-		if constexpr (IsOutputDense) {
-			Arithmetic::scaleRange(cache, histogram_full(x, y, 0).begin(), ext_area);
-		} else {
-			histogram_full.pushDenseNormalised(cache, x, y, ext_area);
-		}
+		kernel_area = 1.0 * Arithmetic::kernelArea(radius)](const auto x, const auto y) -> void {
+		histogram_full(cache, x, y, kernel_area);
 	};
 #pragma warning(pop)
 	const auto op_plus = plus { };
@@ -171,7 +157,7 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 	 ******************/
 	for (const auto x : iota(Arithmetic::ssize_t { 0 }, ext_x)) {
 		//build initial accumulator
-		empty_cache();
+		cache.clear();
 		for (const auto ry : iota(Arithmetic::ssize_t { 0 }, sradius_2 + 1)) {
 			//this operator will first convert uint16_t to int, and compiler gives a warning
 			//this is fine, because int is representable

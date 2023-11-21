@@ -1,24 +1,23 @@
 #include <DisRegRep/Filter/BruteForceFilter.hpp>
 #include <DisRegRep/Maths/Arithmetic.hpp>
 
+#include <DisRegRep/Container/HistogramCache.hpp>
+
 #include <memory>
 #include <utility>
 
-#include <algorithm>
 #include <ranges>
 
 using std::any, std::any_cast;
 using std::shared_ptr, std::make_shared_for_overwrite;
-using std::ranges::fill,
-	std::views::iota;
+using std::views::iota;
 
 using namespace DisRegRep;
 namespace SH = SingleHistogram;
+namespace HC = HistogramCache;
 using Format::SizeVec2, Format::Bin_t, Format::NormBin_t, Format::Region_t;
 
 namespace {
-
-constexpr SizeVec2 OneD = { 1u, 1u };
 
 template<typename TNormHist>
 struct BFFHistogram {
@@ -26,20 +25,16 @@ struct BFFHistogram {
 	using NormHistogramType = TNormHist;
 
 	NormHistogramType Histogram;
-	SH::Dense Cache;
+	HC::Dense Cache;
 
-	template<typename = void>
-	requires(SH::DenseInstance<NormHistogramType>)
-	constexpr void resize(const SizeVec2& histogram_size, const size_t rc) {
-		this->Histogram.reshape(histogram_size, rc);
-		this->Cache.reshape(::OneD, rc);
+	void resize(const SizeVec2& histogram_size, const Region_t rc) {
+		this->Histogram.resize(histogram_size, rc);
+		this->Cache.resize(rc);
 	}
 
-	template<typename = void>
-	requires(SH::SparseInstance<NormHistogramType>)
-	constexpr void resize(const SizeVec2& histogram_size, const size_t rc) {
-		this->Histogram.reshape(histogram_size);
-		this->Cache.reshape(::OneD, rc);
+	void clear() {
+		this->Histogram.clear();
+		this->Cache.clear();
 	}
 
 };
@@ -74,26 +69,23 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 	const auto [ext_x, ext_y] = toSigned(extent);
 	const auto sradius = toSigned(radius);
 
-	auto& [histogram, cache_hist] = *any_cast<THist_t&>(memory);
-	const SH::Dense::BinView cache = cache_hist(0u, 0u, 0u);
+	THist& bff_histogram = *any_cast<THist_t&>(memory);
+	bff_histogram.clear();
+
+	auto& [histogram, cache] = bff_histogram;
 
 	const auto copy_cache_to_histogram = [&histogram, &cache = std::as_const(cache),
-		ext_area = 1.0 * Arithmetic::horizontalProduct(extent)](const auto x, const auto y) -> void {
-		if constexpr (IsOutputDense) {
-			Arithmetic::scaleRange(cache, histogram(x, y, 0).begin(), ext_area);
-		} else {
-			histogram.pushDenseNormalised(cache, x, y, ext_area);
-		}
+		kernel_area = 1.0 * Arithmetic::kernelArea(radius)](const auto x, const auto y) -> void {
+		histogram(cache, x, y, kernel_area);
 	};
 	for (const auto y : iota(Arithmetic::ssize_t { 0 }, ext_y)) {
 		for (const auto x : iota(Arithmetic::ssize_t { 0 }, ext_x)) {
-			//clear bin cache for every pixel
-			fill(cache, Bin_t { });
+			cache.clear();
 
 			for (const auto ry : iota(off_y - sradius, off_y + sradius + 1)) {
 				for (const auto rx : iota(off_x - sradius, off_x + sradius + 1)) {
 					const Region_t region = map(x + rx, y + ry);
-					cache[region]++;
+					cache.increment(region);
 				}
 			}
 
