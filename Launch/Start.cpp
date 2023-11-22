@@ -13,6 +13,7 @@
 
 #include <span>
 #include <array>
+#include <tuple>
 
 #include <execution>
 #include <algorithm>
@@ -27,6 +28,8 @@
 
 #include <thread>
 #include <exception>
+#include <utility>
+#include <type_traits>
 #include <cstdint>
 
 using std::span, std::array, std::any;
@@ -44,10 +47,6 @@ namespace F = Format;
 namespace Lnc = Launch;
 
 namespace {
-
-using RMFT = DisRegRep::RegionMapFilter::LaunchTag;
-constexpr auto RunDense = RMFT::Dense { };
-constexpr auto RunSparse = RMFT::Sparse { };
 
 //We store all benchmark settings here!
 constexpr struct BenchmarkContext {
@@ -94,10 +93,10 @@ constexpr struct BenchmarkContext {
 	},
 	.SweepRegion = { 6u, 2u, 8u }
 #else//NDEBUG
-	.Extent = { 128u, 128u },
-	.RegionCount = 8u,
-	.Radius = 8u,
-	.CentroidCount = 10u,
+	.Extent = { 192u, 192u },
+	.RegionCount = 5u,
+	.Radius = 16u,
+	.CentroidCount = 5u,
 
 	.SweepRadius = { 15u, 2u, 64u },
 	.SweepRadiusStress = {
@@ -181,7 +180,7 @@ struct RunDescription {
 
 //The main purpose is to make sure our optimised implementation is sound
 template<size_t TestSize>
-	requires(TestSize > 0u)
+requires(TestSize > 0u)
 bool selfTest(const TestDescription<TestSize>& desc) {
 	const auto [factory, filter] = desc;
 	const RegionMap region_map = factory({
@@ -195,7 +194,7 @@ bool selfTest(const TestDescription<TestSize>& desc) {
 	};
 
 	const auto run_test = [&desc, &launch_desc, &filter]
-		<typename RunTag>(const RunTag run_tag, auto & histogram_mem, auto & histogram) -> void {
+		(const auto run_tag, auto& histogram_mem, auto& histogram) -> void {
 		for (const auto [i, curr_filter_ptr] : enumerate(filter)) {
 			const RegionMapFilter& curr_filter = *curr_filter_ptr;
 
@@ -204,20 +203,60 @@ bool selfTest(const TestDescription<TestSize>& desc) {
 			histogram[i] = &curr_filter(run_tag, launch_desc, curr_hist_mem);
 		}
 	};
-	array<any, TestSize> dense_mem, sparse_mem;
-	array<const SH::DenseNorm*, TestSize> dense_hist;
-	array<const SH::SparseNorm*, TestSize> sparse_hist;
-	run_test(::RunDense, dense_mem, dense_hist);
-	run_test(::RunSparse, sparse_mem, sparse_hist);
+	
+	using std::get, std::apply, std::ranges::transform;
+	array<array<any, TestSize>, Lnc::Utility::AllFilterTagSize> hist_mem;
+	std::tuple<
+		array<const SH::DenseNorm*, TestSize>,
+		array<const SH::SparseNormSorted*, TestSize>,
+		array<const SH::SparseNormUnsorted*, TestSize>
+	> hist;
+	array<SH::SparseNormSorted, TestSize> sorted_sparse;
+	array<const SH::SparseNormSorted*, TestSize> sorted_sparse_ptr;
+	
+	const auto run_all_test = [&run_test, &hist_mem, &hist]<size_t... I>(std::index_sequence<I...>) -> void {
+		(run_test(get<I>(Lnc::Utility::AllFilterTag), hist_mem[I], get<I>(hist)), ...);
+	};
+	run_all_test(std::make_index_sequence<Lnc::Utility::AllFilterTagSize> { });
 
-	using std::ranges::adjacent_find;
-	const auto fun_not_eq = std::not_equal_to { };
-	constexpr static auto dereferencer = [](const auto* const ptr) constexpr noexcept -> const auto& {
-		return *ptr;
-		};
-	return adjacent_find(dense_hist, fun_not_eq, dereferencer) == dense_hist.cend()
-		&& adjacent_find(sparse_hist, fun_not_eq, dereferencer) == sparse_hist.cend()
-		&& *dense_hist.front() == *sparse_hist.front();
+	//we cannot compare unsorted histogram directly, need to sort them first
+	transform(get<2u>(hist), sorted_sparse.begin(),
+		[]<typename T>(const T* const unsorted) constexpr noexcept -> T&& {
+			return std::move(*const_cast<T*>(unsorted));
+		});
+	transform(sorted_sparse, sorted_sparse_ptr.begin(), [](const auto& hist) constexpr noexcept { return &hist; });
+
+	/*********************
+	 * Correctness check
+	 ********************/
+	using std::ranges::adjacent_find, std::is_same_v;
+	const auto all_hist_equal = [not_eq_op = std::not_equal_to { }](const auto& hist) -> bool {
+		return adjacent_find(hist, not_eq_op,
+			[](const auto* const ptr) constexpr noexcept -> const auto& { return *ptr; }) == hist.cend();
+	};
+	const auto same_type_compare = [&sorted_sparse_ptr, &all_hist_equal]
+		<typename T>(const array<const T*, TestSize>& hist) -> bool {
+		if constexpr (is_same_v<T, SH::SparseNormUnsorted>) {
+			return all_hist_equal(sorted_sparse_ptr);
+		} else {
+			return all_hist_equal(hist);
+		}
+	};
+	const auto cross_type_get_candidate = [&sorted_sparse_ptr, &hist]
+		<typename T>(const array<const T*, TestSize>& hist) constexpr noexcept -> const auto& {
+		if constexpr (is_same_v<T, SH::SparseNormUnsorted>) {
+			return *sorted_sparse_ptr.front();
+		} else {
+			return *hist.front();
+		}
+	};
+
+	return apply([&same_type_compare](const auto&... h) {
+		return (same_type_compare(h) && ...);
+	}, hist)
+	&& apply([&cross_type_get_candidate](const auto& h, const auto&... hs) {
+		return ((cross_type_get_candidate(h) == cross_type_get_candidate(hs)) && ...);
+	}, hist);
 }
 
 template<typename T, T Min, T Max, T Count>

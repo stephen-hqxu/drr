@@ -19,13 +19,13 @@ using Format::SizeVec2, Format::Bin_t, Format::NormBin_t, Format::Region_t;
 
 namespace {
 
-template<typename TNormHist>
+template<typename TNormHist, typename TCache>
 struct BFFHistogram {
 
 	using NormHistogramType = TNormHist;
 
 	NormHistogramType Histogram;
-	HC::Dense Cache;
+	TCache Cache;
 
 	void resize(const SizeVec2& histogram_size, const Region_t rc) {
 		this->Histogram.resize(histogram_size, rc);
@@ -38,8 +38,9 @@ struct BFFHistogram {
 	}
 
 };
-using BFFDenseHistogram = BFFHistogram<SH::DenseNorm>;
-using BFFSparseHistogram = BFFHistogram<SH::SparseNorm>;
+using BFFdcdh = BFFHistogram<SH::DenseNorm, HC::Dense>;
+using BFFdcsh = BFFHistogram<SH::SparseNormSorted, HC::Dense>;
+using BFFscsh = BFFHistogram<SH::SparseNormUnsorted, HC::Sparse>;
 
 template<typename THist>
 inline void makeAllocation(const auto& desc, any& output) {
@@ -59,7 +60,6 @@ inline void makeAllocation(const auto& desc, any& output) {
 template<typename THist>
 inline const auto& runFilter(const auto& desc, any& memory) {
 	using THist_t = shared_ptr<THist>;
-	constexpr static bool IsOutputDense = SH::DenseInstance<typename THist::NormHistogramType>;
 
 	const auto& [map_ptr, offset, extent, radius] = desc;
 	const RegionMap& map = *map_ptr;
@@ -101,20 +101,26 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 
 }
 
-void BruteForceFilter::tryAllocateHistogram(LaunchTag::Dense, const LaunchDescription& desc, any& output) const {
-	::makeAllocation<::BFFDenseHistogram>(desc, output);
+REGION_MAP_FILTER_ALLOC_FUNC_DCDH_DEF(BruteForceFilter) {
+	::makeAllocation<::BFFdcdh>(desc, output);
 }
 
-void BruteForceFilter::tryAllocateHistogram(LaunchTag::Sparse, const LaunchDescription& desc, any& output) const {
-	::makeAllocation<::BFFSparseHistogram>(desc, output);
+REGION_MAP_FILTER_ALLOC_FUNC_DCSH_DEF(BruteForceFilter) {
+	::makeAllocation<::BFFdcsh>(desc, output);
 }
 
-const SH::DenseNorm& BruteForceFilter::operator()(LaunchTag::Dense,
-	const LaunchDescription& desc, any& memory) const {
-	return ::runFilter<::BFFDenseHistogram>(desc, memory);
+REGION_MAP_FILTER_ALLOC_FUNC_SCSH_DEF(BruteForceFilter) {
+	::makeAllocation<::BFFscsh>(desc, output);
 }
 
-const SH::SparseNorm& BruteForceFilter::operator()(LaunchTag::Sparse,
-	const LaunchDescription& desc, any& memory) const {
-	return ::runFilter<::BFFSparseHistogram>(desc, memory);
+REGION_MAP_FILTER_FILTER_FUNC_DCDH_DEF(BruteForceFilter) {
+	return ::runFilter<::BFFdcdh>(desc, memory);
+}
+
+REGION_MAP_FILTER_FILTER_FUNC_DCSH_DEF(BruteForceFilter) {
+	return ::runFilter<::BFFdcsh>(desc, memory);
+}
+
+REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(BruteForceFilter) {
+	return ::runFilter<::BFFscsh>(desc, memory);
 }

@@ -1,9 +1,11 @@
 #pragma once
 
 #include <DisRegRep/Format.hpp>
+#include <DisRegRep/Filter/RegionMapFilter.hpp>
 
 #include <string>
 #include <array>
+#include <tuple>
 
 #include <algorithm>
 
@@ -17,6 +19,11 @@ namespace DisRegRep::Launch {
  * @brief Some handy tools...
 */
 namespace Utility {
+
+//Some handy type aliases
+using RMFT = DisRegRep::RegionMapFilter::LaunchTag;
+constexpr std::tuple<RMFT::DCacheDHist, RMFT::DCacheSHist, RMFT::SCacheSHist> AllFilterTag { };
+constexpr size_t AllFilterTagSize = std::tuple_size_v<decltype(AllFilterTag)>;
 
 using TimestampClock = std::chrono::system_clock;
 using Timestamp = TimestampClock::time_point;

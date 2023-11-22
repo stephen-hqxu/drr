@@ -1,5 +1,7 @@
 #include <DisRegRep/Container/HistogramCache.hpp>
 
+#include <cassert>
+
 using std::for_each;
 
 using namespace DisRegRep;
@@ -19,8 +21,9 @@ constexpr Sparse::bin_type createSingleValueBin(const Region_t region) noexcept 
 
 void Sparse::increment(const bin_type& bin) {
 	const auto [region, value] = bin;
-	if (const index_type region_idx = this->SparseSet[region];
+	if (index_type& region_idx = this->SparseSet[region];
 		region_idx == Sparse::NoEntryIndex) {
+		region_idx = static_cast<index_type>(this->DenseSet.size());
 		this->DenseSet.push_back(bin);
 	} else {
 		this->DenseSet[region_idx].Value += value;
@@ -34,9 +37,7 @@ void Sparse::increment(const Region_t region) {
 void Sparse::decrement(const bin_type& bin) {
 	const auto [region, value] = bin;
 	index_type& region_idx = this->SparseSet[region];
-	if (region_idx == Sparse::NoEntryIndex) {
-		return;
-	}
+	assert(region_idx != Sparse::NoEntryIndex);
 
 	const auto removing_bin_it = this->DenseSet.begin() + region_idx;
 	if (Bin_t& removing_value = removing_bin_it->Value;

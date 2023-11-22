@@ -215,8 +215,8 @@ public:
 	 * If the bin will become empty after decrementing, bin will be erased from the cache and dictionary will
 	 * be rehashed. Those operations are expensive, so don't call this function too often. In our implementation
 	 * erasure rarely happens, benchmark shows this is still the best method.
-	 *
-	 * It is a no-op if the bin does not exist.
+	 * 
+	 * The behaviour is undefined if bin does not exist.
 	 *
 	 * @tparam R The range type.
 	 *

@@ -30,7 +30,7 @@ constexpr SizeVec2 calcHorizontalHistogramDimension(SizeVec2 histogram_size, con
 	return histogram_size;
 }
 
-template<typename THist, typename TNormHist>
+template<typename THist, typename TNormHist, typename TCache>
 struct SHFHistogram {
 
 	using HistogramType = THist;
@@ -42,7 +42,7 @@ struct SHFHistogram {
 		NormHistogramType Final;
 
 	} Histogram;
-	HC::Dense Cache;
+	TCache Cache;
 
 	void resize(const SizeVec2& histogram_size, const Region_t rc, const Radius_t radius) {
 		auto& [hori, final] = this->Histogram;
@@ -59,8 +59,9 @@ struct SHFHistogram {
 	}
 
 };
-using SHFDenseHistogram = SHFHistogram<SH::Dense, SH::DenseNorm>;
-using SHFSparseHistogram = SHFHistogram<SH::Sparse, SH::SparseNorm>;
+using SHFdcdh = SHFHistogram<SH::Dense, SH::DenseNorm, HC::Dense>;
+using SHFdcsh = SHFHistogram<SH::SparseSorted, SH::SparseNormSorted, HC::Dense>;
+using SHFscsh = SHFHistogram<SH::SparseUnsorted, SH::SparseNormUnsorted, HC::Sparse>;
 
 template<typename THist>
 inline void makeAllocation(const auto& desc, any& output) {
@@ -79,8 +80,6 @@ inline void makeAllocation(const auto& desc, any& output) {
 template<typename THist>
 inline const auto& runFilter(const auto& desc, any& memory) {
 	using THist_t = shared_ptr<THist>;
-	constexpr static bool IsHorizontalDense = SH::DenseInstance<typename THist::HistogramType>,
-		IsOutputDense = SH::DenseInstance<typename THist::NormHistogramType>;
 
 	const auto& [map_ptr, offset, extent, radius] = desc;
 	const RegionMap& map = *map_ptr;
@@ -179,18 +178,26 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 
 }
 
-void SingleHistogramFilter::tryAllocateHistogram(LaunchTag::Dense, const LaunchDescription& desc, any& output) const {
-	::makeAllocation<::SHFDenseHistogram>(desc, output);
+REGION_MAP_FILTER_ALLOC_FUNC_DCDH_DEF(SingleHistogramFilter) {
+	::makeAllocation<::SHFdcdh>(desc, output);
 }
 
-void SingleHistogramFilter::tryAllocateHistogram(LaunchTag::Sparse, const LaunchDescription& desc, any& output) const {
-	::makeAllocation<::SHFSparseHistogram>(desc, output);
+REGION_MAP_FILTER_ALLOC_FUNC_DCSH_DEF(SingleHistogramFilter) {
+	::makeAllocation<::SHFdcsh>(desc, output);
 }
 
-const SH::DenseNorm& SingleHistogramFilter::operator()(LaunchTag::Dense, const LaunchDescription& desc, any& memory) const {
-	return ::runFilter<::SHFDenseHistogram>(desc, memory);
+REGION_MAP_FILTER_ALLOC_FUNC_SCSH_DEF(SingleHistogramFilter) {
+	::makeAllocation<::SHFscsh>(desc, output);
 }
 
-const SH::SparseNorm& SingleHistogramFilter::operator()(LaunchTag::Sparse, const LaunchDescription& desc, any& memory) const {
-	return ::runFilter<::SHFSparseHistogram>(desc, memory);
+REGION_MAP_FILTER_FILTER_FUNC_DCDH_DEF(SingleHistogramFilter) {
+	return ::runFilter<::SHFdcdh>(desc, memory);
+}
+
+REGION_MAP_FILTER_FILTER_FUNC_DCSH_DEF(SingleHistogramFilter) {
+	return ::runFilter<::SHFdcsh>(desc, memory);
+}
+
+REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(SingleHistogramFilter) {
+	return ::runFilter<::SHFscsh>(desc, memory);
 }

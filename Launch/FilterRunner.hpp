@@ -9,6 +9,7 @@
 #include <string>
 #include <string_view>
 #include <span>
+#include <array>
 #include <any>
 
 #include <filesystem>
@@ -28,11 +29,7 @@ private:
 
 	bool DirtyMap;/**< If true, region map will be regenerated in the next execution. */
 	RegionMap Map;
-	struct {
-
-		std::any Dense, Sparse;
-
-	} Histogram;
+	std::array<std::any, 3u> Histogram;
 
 	//Create a new benchmark.
 	static auto createBenchmark();
@@ -44,6 +41,9 @@ private:
 
 	//Refresh map dimension and content.
 	void refreshMap(const Format::SizeVec2&, Format::Radius_t);
+
+	template<typename Func>
+	void runAllFilter(const Func&);
 
 public:
 

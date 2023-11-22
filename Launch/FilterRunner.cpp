@@ -7,8 +7,8 @@
 
 #include <nb/nanobench.h>
 
-#include <array>
 #include <algorithm>
+#include <functional>
 
 #include <format>
 #include <fstream>
@@ -19,12 +19,14 @@
 #include <charconv>
 #include <concepts>
 #include <limits>
+#include <utility>
 
 using std::ranges::max_element;
 
 using std::string_view, std::span, std::array, std::any;
 using std::to_chars;
 using std::ofstream, std::runtime_error, std::format;
+using std::tuple;
 
 namespace fs = std::filesystem;
 namespace nb = ankerl::nanobench;
@@ -32,10 +34,6 @@ using namespace DisRegRep::Format;
 using namespace DisRegRep::Launch;
 
 namespace {
-
-using RMFT = DisRegRep::RegionMapFilter::LaunchTag;
-constexpr auto RunDense = RMFT::Dense { };
-constexpr auto RunSparse = RMFT::Sparse { };
 
 constexpr char RenderResultTemplate[] = R"DELIM(x,iter,t_median,t_mean,t_mdape,t_total
 {{#result}}{{name}},{{sum(iterations)}},{{median(elapsed)}},{{average(elapsed)}},{{medianAbsolutePercentError(elapsed)}},{{sumProduct(elapsed,iterations)}}
@@ -110,6 +108,14 @@ inline void FilterRunner::refreshMap(const SizeVec2& new_extent, const Radius_t 
 	}
 }
 
+template<typename Func>
+void FilterRunner::runAllFilter(const Func& runner) {
+	const auto run = [&runner, &hist_mem = this->Histogram]<size_t... I>(std::index_sequence<I...>) -> void {
+		(std::invoke(runner, std::get<I>(Utility::AllFilterTag), hist_mem[I]), ...);
+	};
+	run(std::make_index_sequence<Utility::AllFilterTagSize> { });
+}
+
 void FilterRunner::setRegionCount(const Region_t region_count) noexcept {
 	this->RegionCount = region_count;
 	this->markRegionMapDirty();
@@ -150,9 +156,7 @@ void FilterRunner::sweepRadius(const SizeVec2& extent, const span<const Radius_t
 
 		this->renderReport(filter_tag, bench);	
 	};
-	auto& [dense, sparse] = this->Histogram;
-	run_radius(::RunDense, dense);
-	run_radius(::RunSparse, sparse);
+	this->runAllFilter(run_radius);
 }
 
 void FilterRunner::sweepRegionCount(const SizeVec2& extent, const Radius_t radius,
@@ -184,8 +188,6 @@ void FilterRunner::sweepRegionCount(const SizeVec2& extent, const Radius_t radiu
 
 		this->renderReport(filter_tag, bench);
 	};
-	auto& [dense, sparse] = this->Histogram;
-	run_region_count(::RunDense, dense);
-	run_region_count(::RunSparse, sparse);
+	this->runAllFilter(run_region_count);
 
 }

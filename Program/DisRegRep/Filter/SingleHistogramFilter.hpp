@@ -20,15 +20,8 @@ public:
 		return "SHF";
 	}
 
-	void tryAllocateHistogram(LaunchTag::Dense,
-		const LaunchDescription&, std::any&) const override;
-	void tryAllocateHistogram(LaunchTag::Sparse,
-		const LaunchDescription&, std::any&) const override;
-
-	const SingleHistogram::DenseNorm& operator()(LaunchTag::Dense,
-		const LaunchDescription&, std::any&) const override;
-	const SingleHistogram::SparseNorm& operator()(LaunchTag::Sparse,
-		const LaunchDescription&, std::any&) const override;
+	REGION_MAP_FILTER_ALLOC_FUNC_ALL;
+	REGION_MAP_FILTER_FILTER_FUNC_ALL;
 
 };
 
