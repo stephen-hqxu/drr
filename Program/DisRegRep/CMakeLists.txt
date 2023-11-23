@@ -12,16 +12,18 @@ add_library(${DRR_PROGRAM} SHARED
 	# Filter/
 	Filter/BruteForceFilter.cpp
 	Filter/SingleHistogramFilter.cpp
+	# /
+	ThreadPool.cpp
 )
 
 target_sources(${DRR_PROGRAM} PRIVATE
 	# Container/
 	Container/ContainerTrait.hpp
-	Container/FixedHeapArray.hpp
 	Container/HistogramCache.hpp
 	Container/RegionMap.hpp
 	Container/SingleHistogram.hpp
 	Container/SparseBin.hpp
+	Container/TrivialArrayList.hpp
 	# Factory/
 	Factory/RandomRegionFactory.hpp
 	Factory/RegionMapFactory.hpp
@@ -35,6 +37,7 @@ target_sources(${DRR_PROGRAM} PRIVATE
 	Maths/Indexer.hpp
 	# /
 	Format.hpp
+	ThreadPool.hpp
 )
 
 set(generated_include_dir ${CMAKE_CURRENT_BINARY_DIR}/GeneratedInclude)

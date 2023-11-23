@@ -1,5 +1,5 @@
 #include <DisRegRep/Factory/VoronoiRegionFactory.hpp>
-#include <DisRegRep/Container/FixedHeapArray.hpp>
+#include <DisRegRep/Container/TrivialArrayList.hpp>
 
 #include <nb/nanobench.h>
 
@@ -42,8 +42,8 @@ void VoronoiRegionFactory::operator()(const CreateDescription& desc, RegionMap& 
 
 	auto rng = Rng(this->RandomSeed);
 	//generate all the centroids with random region assignment
-	auto region_centroid = FixedHeapArray<SizeVec2>(this->CentroidCount);
-	auto region_assignment = FixedHeapArray<Region_t>(this->CentroidCount);
+	auto region_centroid = TrivialArrayList<SizeVec2>(this->CentroidCount);
+	auto region_assignment = TrivialArrayList<Region_t>(this->CentroidCount);
 	
 	generate(region_centroid,
 		[&rng, x = static_cast<uint32_t>(dim_x), y = static_cast<uint32_t>(dim_y)]() noexcept {

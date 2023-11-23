@@ -11,6 +11,7 @@
 #include "FilterRunner.hpp"
 #include "Utility.hpp"
 
+#include <string_view>
 #include <span>
 #include <array>
 #include <tuple>
@@ -26,20 +27,18 @@
 #include <print>
 #include <format>
 
-#include <thread>
 #include <exception>
-#include <utility>
 #include <type_traits>
 #include <cstdint>
 
-using std::span, std::array, std::any;
+using std::span, std::array, std::string_view, std::any;
 using std::ranges::copy,
 	std::views::iota, std::views::stride, std::views::take, std::views::drop, std::views::enumerate,
 	std::equal;
 
 namespace fs = std::filesystem;
 using std::print, std::println, std::format, std::ofstream;
-using std::jthread, std::exception;
+using std::exception;
 
 using namespace DisRegRep;
 namespace SH = SingleHistogram;
@@ -165,14 +164,9 @@ struct TestDescription {
 
 };
 
-struct ReportDescription {
-
-	const fs::path& ReportRoot;
-
-};
-
 struct RunDescription {
 
+	Lnc::FilterRunner& Runner;
 	const FactoryCollection Factory;
 	const FilterCollection Filter;
 
@@ -270,23 +264,16 @@ void handleException(const exception& e) {
 	println(std::cerr, "Error occurs during execution: {}", e.what());
 }
 
-void runRadius(const ReportDescription& report_desc, const ::RunDescription& regular_desc,
-	const ::RunDescription& stress_desc) try {
-	const auto& [report_root] = report_desc;
-
-	auto radius_runner = Lnc::FilterRunner(report_root / "radius");
-	auto run = [&radius_runner](const ::RunDescription& desc, const auto sweep_radius,
-		const char* const tag, const F::Region_t region_count, const F::SizeVec2& extent) mutable -> void {
-			const auto& [factory_arr, filter_arr] = desc;
-			radius_runner.UserTag = tag;
-			radius_runner.setRegionCount(region_count);
-
+void runRadius(const ::RunDescription& regular_desc, const ::RunDescription& stress_desc) {
+	auto run = [](const ::RunDescription& desc, const auto sweep_radius,
+		const string_view tag, const F::Region_t region_count, const F::SizeVec2& extent) mutable -> void {
+			const auto& [runner, factory_arr, filter_arr] = desc;
 			for (const auto factory : factory_arr) {
-				radius_runner.setFactory(*factory);
-				for (const auto filter : filter_arr) {
-					radius_runner.Filter = filter;
-					radius_runner.sweepRadius(extent, sweep_radius);
-				}
+				runner.sweepRadius({
+					.Factory = factory,
+					.Filter = filter_arr,
+					.UserTag = tag
+				}, extent, sweep_radius, region_count);
 			}
 		};
 	{
@@ -300,28 +287,20 @@ void runRadius(const ReportDescription& report_desc, const ::RunDescription& reg
 		run(stress_desc, ::generateSweepVariable<F::Radius_t, SR.Min, SR.Max, SR.Sweep>(),
 			"Stress", SRS.RegionCount, SRS.Extent);
 	}
-} catch (const exception& e) {
-	::handleException(e);
 }
 
-void runRegionCount(const ReportDescription& report_desc, const ::RunDescription& run_desc) try {
-	const auto& [report_root] = report_desc;
-	const auto& [factory_arr, filter_arr] = run_desc;
+void runRegionCount(const ::RunDescription& run_desc) {
+	const auto& [runner, factory_arr, filter_arr] = run_desc;
 
 	constexpr auto& SR = ::DS.SweepRegion;
 	const auto sweep_region_count = ::generateSweepVariable<F::Region_t, SR.Min, SR.Max, SR.Sweep>();
-	auto region_count_runner = Lnc::FilterRunner(report_root / "region-count");
 
 	for (const auto factory : factory_arr) {
-		region_count_runner.setFactory(*factory);
-		for (const auto filter : filter_arr) {
-			region_count_runner.Filter = filter;
-			region_count_runner.sweepRegionCount(::DS.Extent,
-				::DS.Radius, sweep_region_count);
-		}
+		runner.sweepRegionCount({
+			.Factory = factory,
+			.Filter = filter_arr
+		}, ::DS.Extent, ::DS.Radius, sweep_region_count);
 	}
-} catch (const exception& e) {
-	::handleException(e);
 }
 
 void run() {
@@ -357,22 +336,19 @@ void run() {
 		const auto report_root = fs::path(format("bench-result_{}", Lnc::Utility::formatTimestamp(ts)));
 		fs::create_directory(report_root);
 
-		const ::ReportDescription report_desc {
-			.ReportRoot = report_root
-		};
+		auto runner = Lnc::FilterRunner(report_root);
+
 		const ::RunDescription run_desc {
+			.Runner = runner,
 			.Factory = factory,
 			.Filter = filter
 		};
-
-		using std::cref;
-		const array<jthread, 2u> worker {
-			jthread(::runRadius, cref(report_desc), cref(run_desc), ::RunDescription {
-				.Factory = span(factory).subspan(0u, 1u),
-				.Filter = span(filter).subspan(1u, 1u)
-				}),
-			jthread(::runRegionCount, cref(report_desc), cref(run_desc))
-		};
+		::runRadius(run_desc, {
+			.Runner = runner,
+			.Factory = span(factory).subspan(0u, 1u),
+			.Filter = span(filter).subspan(1u, 1u)
+		});
+		::runRegionCount(run_desc);
 
 		::exportSetting(report_root / "default-setting.txt");
 	}

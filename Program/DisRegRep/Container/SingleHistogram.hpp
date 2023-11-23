@@ -179,7 +179,7 @@ protected:
 	template<typename R>
 	constexpr void insertBin(R&& input, const auto x, const auto y) {
 		auto& bin_y = this->Bin[y];
-		bin_y.insert_range(bin_y.cend(), input);
+		bin_y.append_range(input);
 		this->Offset[this->OffsetIndexer(x + 1, y)] = static_cast<offset_type>(bin_y.size());
 	}
 
