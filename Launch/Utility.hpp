@@ -1,7 +1,9 @@
 #pragma once
 
 #include <DisRegRep/Format.hpp>
+#include <DisRegRep/Factory/RegionMapFactory.hpp>
 #include <DisRegRep/Filter/RegionMapFilter.hpp>
+#include <DisRegRep/Container/RegionMap.hpp>
 
 #include <string>
 #include <array>
@@ -86,6 +88,24 @@ inline std::string formatTimestamp(const Timestamp& timestamp) {
 	using namespace std::chrono;
 	const auto now = zoned_time(current_zone(), timestamp).get_local_time();
 	return std::format("{:%Y-%m-%d_%H-%M}", now);
+}
+
+/**
+ * @brief Generate a smallest region map that satisfies the requirement.
+ * 
+ * @param region_map The region map output.
+ * @param factory The region map factory.
+ * @param extent The expected extent of filtering.
+ * @param radius The expected radius of filtering kernel.
+ * @param region_count The number of region.
+*/
+inline void generateMinimumRegionMap(RegionMap& region_map, const RegionMapFactory& factory,
+	const Format::SizeVec2& extent, const Format::Radius_t radius, const Format::Region_t region_count) {
+	const Format::SizeVec2 new_dimension = calcMinimumDimension(extent, radius);
+	RegionMapFactory::reshape(region_map, new_dimension);
+	factory({
+		.RegionCount = region_count
+	}, region_map);
 }
 
 }

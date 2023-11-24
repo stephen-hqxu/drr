@@ -1,7 +1,8 @@
 #include <DisRegRep/Factory/VoronoiRegionFactory.hpp>
-#include <DisRegRep/Container/TrivialArrayList.hpp>
 
 #include <nb/nanobench.h>
+
+#include <vector>
 
 #include <execution>
 #include <algorithm>
@@ -13,6 +14,7 @@
 
 #include <cmath>
 
+using std::vector;
 using std::ranges::generate, std::min_element, std::for_each,
 	std::views::iota, std::views::transform, std::views::zip,
 	std::execution::par_unseq, std::execution::unseq;
@@ -42,8 +44,8 @@ void VoronoiRegionFactory::operator()(const CreateDescription& desc, RegionMap& 
 
 	auto rng = Rng(this->RandomSeed);
 	//generate all the centroids with random region assignment
-	auto region_centroid = TrivialArrayList<SizeVec2>(this->CentroidCount);
-	auto region_assignment = TrivialArrayList<Region_t>(this->CentroidCount);
+	auto region_centroid = vector<SizeVec2>(this->CentroidCount);
+	auto region_assignment = vector<Region_t>(this->CentroidCount);
 	
 	generate(region_centroid,
 		[&rng, x = static_cast<uint32_t>(dim_x), y = static_cast<uint32_t>(dim_y)]() noexcept {

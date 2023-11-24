@@ -23,7 +23,6 @@ target_sources(${DRR_PROGRAM} PRIVATE
 	Container/RegionMap.hpp
 	Container/SingleHistogram.hpp
 	Container/SparseBin.hpp
-	Container/TrivialArrayList.hpp
 	# Factory/
 	Factory/RandomRegionFactory.hpp
 	Factory/RegionMapFactory.hpp

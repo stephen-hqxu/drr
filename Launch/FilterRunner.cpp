@@ -22,10 +22,10 @@
 #include <utility>
 #include <type_traits>
 
-using std::ranges::max_element;
+using std::ranges::for_each;
 
 using std::string_view, std::span, std::array, std::any;
-using std::to_chars, std::as_const;
+using std::to_chars, std::as_const, std::move;
 using std::ofstream, std::runtime_error, std::format, std::unique_lock;
 
 namespace fs = std::filesystem;
@@ -53,15 +53,6 @@ auto toString(const T input) {
 		throw runtime_error("Input conversion to string failed");
 	}
 	return str;
-}
-
-void refreshMap(RegionMap& map, const RegionMapFactory& factory,
-	const SizeVec2& new_extent, const Radius_t radius, const Region_t region_count) {
-	const SizeVec2 new_dimension = Utility::calcMinimumDimension(new_extent, radius);
-	RegionMapFactory::reshape(map, new_dimension);
-	(factory)({
-		.RegionCount = region_count
-	}, map);
 }
 
 template<typename Tag>
@@ -104,8 +95,10 @@ void FilterRunner::renderReport(Tag, const RunDescription& desc, auto& bench) co
 }
 
 template<typename Func>
-void FilterRunner::runFilter(const Func& runner, const SweepDescription& sweep_desc) {
-	const auto invoke_runner = [this, &runner, &sweep_desc](const ThreadPool::ThreadInfo& info,
+void FilterRunner::runFilter(Func&& runner, const SweepDescription& sweep_desc) {
+	//It is very important to make sure to pass all captures by values
+	//	since this function will be run from another thread.
+	const auto invoke_runner = [this, runner = move(runner), sweep_desc](const ThreadPool::ThreadInfo& info,
 		const auto tag, const size_t tag_idx, const size_t filter_idx) -> void {
 		const auto& [factory, filter, user_tag] = sweep_desc;
 			
@@ -126,23 +119,20 @@ void FilterRunner::runFilter(const Func& runner, const SweepDescription& sweep_d
 	for (const auto filter_idx : std::views::iota(size_t { 0 }, sweep_desc.Filter.size())) {
 		enqueue_invoke_runner(std::make_index_sequence<Utility::AllFilterTagSize> { }, filter_idx);
 	}
+}
 
-	std::ranges::for_each(this->PendingTask, [](auto& future) { future.get(); });
+void FilterRunner::waitAll() {
+	for_each(this->PendingTask, [](auto& future) { future.get(); });
 	this->PendingTask.clear();
 }
 
-void FilterRunner::sweepRadius(const SweepDescription& desc, const SizeVec2& extent,
-	const span<const Radius_t> radius_arr, const Region_t region_count) {
-	//As region map is immutable during radius sweep run,
-	//	we only need to generate it once and reuse it across multiple threads.
-	RegionMap& map = this->Map.front();
-	::refreshMap(map, *desc.Factory, extent, *max_element(radius_arr), region_count);
-
-	const auto run_radius = [this, &extent, &radius_arr, &map = as_const(map)]
+void FilterRunner::sweepRadius(const SweepDescription& desc, const RegionMap& region_map,
+	const SizeVec2& extent, const span<const Radius_t> radius_arr) {
+	auto run_radius = [this, &region_map, extent, radius_arr]
 		(const auto filter_tag, const RunDescription run_desc) -> void {
 		const auto& [factory, filter, _1, _2, histogram] = run_desc;
 		RegionMapFilter::LaunchDescription filter_desc {
-			.Map = &map,
+			.Map = &region_map,
 			.Extent = extent
 		};
 		
@@ -162,12 +152,12 @@ void FilterRunner::sweepRadius(const SweepDescription& desc, const SizeVec2& ext
 
 		this->renderReport(filter_tag, run_desc, bench);
 	};
-	this->runFilter(run_radius, desc);
+	this->runFilter(move(run_radius), desc);
 }
 
 void FilterRunner::sweepRegionCount(const SweepDescription& desc, const SizeVec2& extent,
 	const Radius_t radius, const span<const Region_t> region_count_arr) {
-	const auto run_region_count = [this, &extent, radius, &region_count_arr]
+	auto run_region_count = [this, extent, radius, region_count_arr]
 		(const auto filter_tag, const RunDescription run_desc) -> void {
 		const auto& [factory, filter, _, map, histogram] = run_desc;
 		const RegionMapFilter::LaunchDescription desc {
@@ -185,7 +175,7 @@ void FilterRunner::sweepRegionCount(const SweepDescription& desc, const SizeVec2
 		};
 		for (const auto rc : region_count_arr) {
 			//shouldn't trigger reallocation because size does not change
-			::refreshMap(map, factory, extent, radius, rc);
+			Utility::generateMinimumRegionMap(map, factory, extent, radius, rc);
 			filter.tryAllocateHistogram(filter_tag, desc, histogram);
 
 			bench.run(::toString(rc).data(), run);
@@ -193,6 +183,6 @@ void FilterRunner::sweepRegionCount(const SweepDescription& desc, const SizeVec2
 
 		this->renderReport(filter_tag, run_desc, bench);
 	};
-	this->runFilter(run_region_count, desc);
+	this->runFilter(move(run_region_count), desc);
 
 }
