@@ -9,17 +9,16 @@
 #include <DisRegRep/Filter/SingleHistogramFilter.hpp>
 
 #include "FilterRunner.hpp"
+#include "FilterTester.hpp"
 #include "Utility.hpp"
 
 #include <string>
 #include <span>
 #include <array>
-#include <tuple>
 
 #include <execution>
 #include <algorithm>
 #include <ranges>
-#include <functional>
 
 #include <iostream>
 #include <fstream>
@@ -28,14 +27,12 @@
 #include <format>
 
 #include <exception>
-#include <type_traits>
 #include <cstdint>
 
-using std::span, std::array, std::string, std::any;
+using std::span, std::array, std::string;
 using std::ranges::copy, std::ranges::max_element,
-	std::views::iota, std::views::stride, std::views::take, std::views::drop, std::views::enumerate,
-	std::views::zip,
-	std::equal;
+	std::views::iota, std::views::stride, std::views::take,
+	std::views::zip;
 
 namespace fs = std::filesystem;
 using std::print, std::println, std::format, std::ofstream;
@@ -163,14 +160,6 @@ void exportSetting(const fs::path& export_filename) {
 #undef BRING_OUT_SETTING
 }
 
-template<size_t TestSize>
-struct TestDescription {
-
-	const RegionMapFactory& Factory;
-	const span<const RegionMapFilter* const, TestSize> Filter;
-
-};
-
 template<size_t FacSize, size_t FiltSize>
 struct RunDescription {
 
@@ -183,87 +172,6 @@ struct RunDescription {
 constexpr auto RadiusVariation = ::generateSweepVariable<F::Radius_t, ::DS.SweepRadius>();
 constexpr auto RadiusStressVariation = ::generateSweepVariable<F::Radius_t, ::DS.SweepRadiusStress.SweepRadius>();
 constexpr auto RegionVariation = ::generateSweepVariable<F::Region_t, ::DS.SweepRegion>();
-
-//The main purpose is to make sure our optimised implementation is sound
-template<size_t TestSize>
-requires(TestSize > 0u)
-bool selfTest(const TestDescription<TestSize>& desc) {
-	const auto [factory, filter] = desc;
-	const RegionMap region_map = factory({
-		.RegionCount = 15u
-	}, { 12u, 12u });
-	const RegionMapFilter::LaunchDescription launch_desc {
-		.Map = &region_map,
-		.Offset = { 2u, 2u },
-		.Extent = { 8u, 8u },
-		.Radius = 2u
-	};
-
-	const auto run_test = [&desc, &launch_desc, &filter]
-		(const auto run_tag, auto& histogram_mem, auto& histogram) -> void {
-		for (const auto [i, curr_filter_ptr] : enumerate(filter)) {
-			const RegionMapFilter& curr_filter = *curr_filter_ptr;
-
-			any& curr_hist_mem = histogram_mem[i];
-			curr_filter.tryAllocateHistogram(run_tag, launch_desc, curr_hist_mem);
-			histogram[i] = &curr_filter(run_tag, launch_desc, curr_hist_mem);
-		}
-	};
-	
-	using std::get, std::apply, std::ranges::transform;
-	array<array<any, TestSize>, Lnc::Utility::AllFilterTagSize> hist_mem;
-	std::tuple<
-		array<const SH::DenseNorm*, TestSize>,
-		array<const SH::SparseNormSorted*, TestSize>,
-		array<const SH::SparseNormUnsorted*, TestSize>
-	> hist;
-	array<SH::SparseNormSorted, TestSize> sorted_sparse;
-	array<const SH::SparseNormSorted*, TestSize> sorted_sparse_ptr;
-	
-	const auto run_all_test = [&run_test, &hist_mem, &hist]<size_t... I>(std::index_sequence<I...>) -> void {
-		(run_test(get<I>(Lnc::Utility::AllFilterTag), hist_mem[I], get<I>(hist)), ...);
-	};
-	run_all_test(std::make_index_sequence<Lnc::Utility::AllFilterTagSize> { });
-
-	//we cannot compare unsorted histogram directly, need to sort them first
-	transform(get<2u>(hist), sorted_sparse.begin(),
-		[]<typename T>(const T* const unsorted) constexpr noexcept -> T&& {
-			return std::move(*const_cast<T*>(unsorted));
-		});
-	transform(sorted_sparse, sorted_sparse_ptr.begin(), [](const auto& hist) constexpr noexcept { return &hist; });
-
-	/*********************
-	 * Correctness check
-	 ********************/
-	using std::ranges::adjacent_find, std::is_same_v;
-	const auto all_hist_equal = [not_eq_op = std::not_equal_to { }](const auto& hist) -> bool {
-		return adjacent_find(hist, not_eq_op,
-			[](const auto* const ptr) constexpr noexcept -> const auto& { return *ptr; }) == hist.cend();
-	};
-	const auto same_type_compare = [&sorted_sparse_ptr, &all_hist_equal]
-		<typename T>(const array<const T*, TestSize>& hist) -> bool {
-		if constexpr (is_same_v<T, SH::SparseNormUnsorted>) {
-			return all_hist_equal(sorted_sparse_ptr);
-		} else {
-			return all_hist_equal(hist);
-		}
-	};
-	const auto cross_type_get_candidate = [&sorted_sparse_ptr, &hist]
-		<typename T>(const array<const T*, TestSize>& hist) constexpr noexcept -> const auto& {
-		if constexpr (is_same_v<T, SH::SparseNormUnsorted>) {
-			return *sorted_sparse_ptr.front();
-		} else {
-			return *hist.front();
-		}
-	};
-
-	return apply([&same_type_compare](const auto&... h) {
-		return (same_type_compare(h) && ...);
-	}, hist)
-	&& apply([&cross_type_get_candidate](const auto& h, const auto&... hs) {
-		return ((cross_type_get_candidate(h) == cross_type_get_candidate(hs)) && ...);
-	}, hist);
-}
 
 void handleException(const exception& e) {
 	println(std::cerr, "Error occurs during execution: {}", e.what());
@@ -333,8 +241,8 @@ void run() {
 	println("Initialisation complete\n");
 
 	println("Performing self test, this should only take a fractional of a second...");
-	const bool test_result = ::selfTest(::TestDescription {
-		.Factory = random_factory,
+	const bool test_result = Lnc::FilterTester::test(Lnc::FilterTester::TestDescription {
+		.Factory = &random_factory,
 		.Filter = filter
 	});
 	println("Self test complete, returning test status: {}\n", test_result ? "PASS" : "FAIL");

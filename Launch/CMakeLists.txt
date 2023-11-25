@@ -1,10 +1,12 @@
 add_executable(${DRR_LAUNCH}
 	FilterRunner.cpp
+	FilterTester.cpp
 	Start.cpp
 )
 
 target_sources(${DRR_LAUNCH} PRIVATE
 	FilterRunner.hpp
+	FilterTester.hpp
 	Utility.hpp
 )
 
