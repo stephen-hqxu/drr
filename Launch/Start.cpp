@@ -159,6 +159,11 @@ void exportSetting(const fs::path& export_filename) {
 		println(f, "Sweep Region:");
 		EXPORT_SETTING;
 	}
+	{
+		BRING_OUT_SETTING(SweepCentroid);
+		println(f, "Sweep Centroid");
+		EXPORT_SETTING;
+	}
 #undef EXPORT_SETTING
 #undef BRING_OUT_SETTING
 }

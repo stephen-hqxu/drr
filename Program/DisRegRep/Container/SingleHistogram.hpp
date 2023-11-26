@@ -98,6 +98,13 @@ public:
 	FRIEND_DENSE_EQ_SPARSE;
 
 	/**
+	 * @brief Get the number of byte the dense histogram occupies.
+	 * 
+	 * @return The size in byte.
+	*/
+	DRR_API size_t sizeByte() const noexcept;
+
+	/**
 	 * @brief Resize the dimension of histogram.
 	 * If dimension is shrunken, extra data will be trimmed.
 	 * 
@@ -204,6 +211,13 @@ public:
 	constexpr BasicSparseInternalStorage(BasicSparseInternalStorage&&) noexcept = default;
 
 	constexpr ~BasicSparseInternalStorage() = default;
+
+	/**
+	 * @brief Get the size in byte of this sparse histogram.
+	 * 
+	 * @return The size in byte.
+	*/
+	DRR_API size_t sizeByte() const noexcept;
 
 	/**
 	 * @brief Resize the histogram.

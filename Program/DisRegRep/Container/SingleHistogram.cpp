@@ -2,13 +2,14 @@
 #include <DisRegRep/Maths/Arithmetic.hpp>
 
 #include <algorithm>
+#include <numeric>
 #include <execution>
 
 #include <cassert>
 
 using std::array;
 using std::ranges::copy, std::ranges::fill, std::ranges::for_each, std::equal,
-	std::views::join, std::views::iota, std::views::transform,
+	std::views::join, std::views::iota, std::views::transform, std::views::all,
 	std::execution::unseq;
 
 using namespace DisRegRep;
@@ -19,6 +20,11 @@ using Arithmetic::horizontalProduct;
 template<typename T>
 bool BasicDense<T>::operator==(const BasicDense& comp) const {
 	return equal(unseq, this->Histogram.cbegin(), this->Histogram.cend(), comp.Histogram.cbegin());
+}
+
+template<typename T>
+size_t BasicDense<T>::sizeByte() const noexcept {
+	return this->Histogram.size() * sizeof(value_type);
 }
 
 template<typename T>
@@ -34,6 +40,15 @@ void BasicDense<T>::resize(const SizeVec2& dimension, const Region_t region_coun
 #define INS_DENSE(TYPE) template class BasicDense<TYPE>
 INS_DENSE(Bin_t);
 INS_DENSE(NormBin_t);
+
+template<typename T>
+size_t BasicSparseInternalStorage<T>::sizeByte() const noexcept {
+	const auto bin_row = this->Bin | all | transform(
+		[](const auto& bin) constexpr noexcept { return bin.size(); });
+	return this->Offset.size() * sizeof(offset_type)
+		+ this->Bin.size() * sizeof(typename decltype(this->Bin)::value_type)
+		+ std::reduce(bin_row.cbegin(), bin_row.cend()) * sizeof(bin_type);
+}
 
 template<typename T>
 void BasicSparseInternalStorage<T>::resize(SizeVec2 dimension, Region_t) {

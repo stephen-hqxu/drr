@@ -12,7 +12,10 @@
 #include <type_traits>
 #include <concepts>
 
-#define DEFINE_TAG(NAME) struct NAME { constexpr static std::string_view TagName = #NAME; }
+#define DEFINE_TAG(NAME, HIST_TYPE) struct NAME { \
+	using HistogramType = SingleHistogram::HIST_TYPE; \
+	constexpr static std::string_view TagName = #NAME; \
+}
 
 //declare `tryAllocateHistogram`
 #define REGION_MAP_FILTER_ALLOC_FUNC(TAG) void tryAllocateHistogram(LaunchTag::TAG, \
@@ -26,11 +29,12 @@ REGION_MAP_FILTER_ALLOC_FUNC_DCSH override; \
 REGION_MAP_FILTER_ALLOC_FUNC_SCSH override
 
 //declare `operator()`
-#define REGION_MAP_FILTER_FILTER_FUNC(RET, TAG) const SingleHistogram::RET& operator()(LaunchTag::TAG, \
+#define REGION_MAP_FILTER_FILTER_FUNC(TAG) \
+const RegionMapFilter::LaunchTag::TAG::HistogramType& operator()(LaunchTag::TAG, \
 const LaunchDescription&, std::any&) const
-#define REGION_MAP_FILTER_FILTER_FUNC_DCDH REGION_MAP_FILTER_FILTER_FUNC(DenseNorm, DCacheDHist)
-#define REGION_MAP_FILTER_FILTER_FUNC_DCSH REGION_MAP_FILTER_FILTER_FUNC(SparseNormSorted, DCacheSHist)
-#define REGION_MAP_FILTER_FILTER_FUNC_SCSH REGION_MAP_FILTER_FILTER_FUNC(SparseNormUnsorted, SCacheSHist)
+#define REGION_MAP_FILTER_FILTER_FUNC_DCDH REGION_MAP_FILTER_FILTER_FUNC(DCacheDHist)
+#define REGION_MAP_FILTER_FILTER_FUNC_DCSH REGION_MAP_FILTER_FILTER_FUNC(DCacheSHist)
+#define REGION_MAP_FILTER_FILTER_FUNC_SCSH REGION_MAP_FILTER_FILTER_FUNC(SCacheSHist)
 #define REGION_MAP_FILTER_FILTER_FUNC_ALL \
 REGION_MAP_FILTER_FILTER_FUNC_DCDH override; \
 REGION_MAP_FILTER_FILTER_FUNC_DCSH override; \
@@ -44,11 +48,12 @@ const LaunchDescription& desc, any& output) const
 #define REGION_MAP_FILTER_ALLOC_FUNC_SCSH_DEF(CLASS) REGION_MAP_FILTER_ALLOC_FUNC_DEF(CLASS, SCacheSHist)
 
 //define `operator()`
-#define REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, RET, TAG) const SingleHistogram::RET& CLASS::operator()(LaunchTag::TAG, \
+#define REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, TAG) \
+const RegionMapFilter::LaunchTag::TAG::HistogramType& CLASS::operator()(LaunchTag::TAG, \
 const LaunchDescription& desc, any& memory) const
-#define REGION_MAP_FILTER_FILTER_FUNC_DCDH_DEF(CLASS) REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, DenseNorm, DCacheDHist)
-#define REGION_MAP_FILTER_FILTER_FUNC_DCSH_DEF(CLASS) REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, SparseNormSorted, DCacheSHist)
-#define REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(CLASS) REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, SparseNormUnsorted, SCacheSHist)
+#define REGION_MAP_FILTER_FILTER_FUNC_DCDH_DEF(CLASS) REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, DCacheDHist)
+#define REGION_MAP_FILTER_FILTER_FUNC_DCSH_DEF(CLASS) REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, DCacheSHist)
+#define REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(CLASS) REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, SCacheSHist)
 
 namespace DisRegRep {
 
@@ -63,9 +68,9 @@ public:
 	*/
 	struct LaunchTag {
 
-		DEFINE_TAG(DCacheDHist);/**< Dense cache dense histogram */
-		DEFINE_TAG(DCacheSHist);/**< Dense cache sparse histogram */
-		DEFINE_TAG(SCacheSHist);/**< Sparse cache sparse histogram */
+		DEFINE_TAG(DCacheDHist, DenseNorm);/**< Dense cache dense histogram */
+		DEFINE_TAG(DCacheSHist, SparseNormSorted);/**< Dense cache sparse histogram */
+		DEFINE_TAG(SCacheSHist, SparseNormUnsorted);/**< Sparse cache sparse histogram */
 
 	};
 

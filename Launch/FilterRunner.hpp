@@ -10,7 +10,6 @@
 #include "Utility.hpp"
 
 #include <string>
-#include <string_view>
 #include <span>
 #include <array>
 #include <vector>
@@ -46,7 +45,14 @@ public:
 
 private:
 
-	struct RunDescription;
+	struct RunDescription;/**< Store information of a run. */
+	//Store result of a run.
+	struct RunResult {
+
+		size_t MemoryUsage;
+
+	};
+	using RunResultSet = std::vector<RunResult>;
 
 	constexpr static size_t ThreadCount = 5u;
 
@@ -54,6 +60,7 @@ private:
 
 	std::array<RegionMap, ThreadCount> Map;
 	std::array<std::array<std::any, Utility::AllFilterTagSize>, ThreadCount> Histogram;/**< One histogram per thread per tag. */
+	std::array<RunResultSet, ThreadCount> Result;
 
 	ThreadPool Worker;
 
@@ -61,7 +68,7 @@ private:
 
 	//Create a new report file from benchmark.
 	template<typename Tag>
-	void renderReport(Tag, const RunDescription&, auto&) const;
+	void renderReport(Tag, const RunDescription&, const auto&) const;
 
 	template<typename Func>
 	void runFilter(Func&&, const SweepDescription&);
