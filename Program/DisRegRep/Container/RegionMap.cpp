@@ -6,13 +6,10 @@
 using namespace DisRegRep;
 using Format::SizeVec2;
 
-size_t RegionMap::reshape(const SizeVec2& dimension) {
-	const size_t new_size = Arithmetic::horizontalProduct(dimension);
-
-	this->Map.resize(new_size);
+void RegionMap::reshape(const SizeVec2& dimension) {
+	this->Map.resize(Arithmetic::horizontalProduct(dimension));
 	this->Dimension = dimension;
 	this->RegionMapIndexer = RegionMapIndexer_t(dimension);
-	return new_size;
 }
 
 size_t RegionMap::size() const noexcept {

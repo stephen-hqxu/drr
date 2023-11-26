@@ -17,6 +17,7 @@
 #include <any>
 
 #include <filesystem>
+#include <cstdint>
 
 namespace DisRegRep::Launch {
 
@@ -45,19 +46,9 @@ public:
 
 private:
 
-	//Used for running a single invocation of filter.
-	struct RunDescription {
+	struct RunDescription;
 
-		const RegionMapFactory& Factory;
-		const RegionMapFilter& Filter;
-		const std::string_view UserTag;
-
-		RegionMap& Map;
-		std::any& Histogram;
-
-	};
-
-	constexpr static size_t ThreadCount = 4u;
+	constexpr static size_t ThreadCount = 5u;
 
 	std::filesystem::path ReportRoot;
 
@@ -127,6 +118,26 @@ public:
 	*/
 	void sweepRegionCount(const SweepDescription&, const Format::SizeVec2&,
 		Format::Radius_t, std::span<const Format::Region_t>);
+
+	/**
+	 * @brief Profile impact of the number of region presented on the region map.
+	 * Region map will be automatically regenerated during running this test.
+	 * Memory lifetime guarantees:
+	 * - The underlying array held by `centroid_count_arr`
+	 * 
+	 * @param desc The description about the sweep.
+	 * The `Factory` component is ignored.
+	 * @param extent The size of the filter area.
+	 * @param radius The radius of filter kernel.
+	 * @param region_count The number of region on the region map.
+	 * Note that the region count can be different from the centroid count,
+	 * this is to emulate that while a world can have many biomes,
+	 * there are only a small subset of them presented in the area.
+	 * @param random_seed The seed for random number generator.
+	 * @param centroid_count_arr An array of centroid count.
+	*/
+	void sweepCentroidCount(const SweepDescription&, const Format::SizeVec2&,
+		Format::Radius_t, Format::Region_t, std::uint64_t, std::span<const size_t>);
 
 };
 

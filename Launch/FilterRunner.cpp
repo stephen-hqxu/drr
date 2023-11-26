@@ -4,6 +4,8 @@
 
 #include "FilterRunner.hpp"
 
+#include <DisRegRep/Factory/VoronoiRegionFactory.hpp>
+
 #include <nb/nanobench.h>
 
 #include <algorithm>
@@ -76,6 +78,17 @@ nb::Bench createBenchmark(Tag) {
 
 }
 
+struct FilterRunner::RunDescription {
+
+	const RegionMapFactory* Factory;
+	const RegionMapFilter* Filter;
+	std::string_view UserTag;
+
+	RegionMap* Map;
+	std::any* Histogram;
+
+};
+
 FilterRunner::FilterRunner(const fs::path& test_report_dir) :
 	ReportRoot(test_report_dir), Worker(ThreadCount) {
 	const auto fs_lock = unique_lock(::GlobalFilesystemLock);
@@ -87,7 +100,7 @@ void FilterRunner::renderReport(Tag, const RunDescription& desc, auto& bench) co
 	const auto& [factory, filter, user_tag, _1, _2] = desc;
 
 	const fs::path report_file = this->ReportRoot / format("{0}({2},{4},{1},{3}).csv", bench.title(),
-		filter.name(), factory.name(), user_tag.empty() ? "-" : user_tag, Tag::TagName);
+		filter->name(), factory->name(), user_tag.empty() ? "Default" : user_tag, Tag::TagName);
 
 	const auto lock = unique_lock(::GlobalFilesystemLock);
 	auto csv = ofstream(report_file.string());
@@ -103,12 +116,12 @@ void FilterRunner::runFilter(Func&& runner, const SweepDescription& sweep_desc) 
 		const auto& [factory, filter, user_tag] = sweep_desc;
 			
 		std::invoke(runner, tag, RunDescription {
-			.Factory = *factory,
-			.Filter = *filter[filter_idx],
+			.Factory = factory,
+			.Filter = filter[filter_idx],
 			.UserTag = user_tag,
 
-			.Map = this->Map[info.ThreadIndex],
-			.Histogram = this->Histogram[info.ThreadIndex][tag_idx]
+			.Map = &this->Map[info.ThreadIndex],
+			.Histogram = &this->Histogram[info.ThreadIndex][tag_idx]
 		});
 	};
 	const auto enqueue_invoke_runner = [this, &invoke_runner]<size_t... I>(
@@ -130,7 +143,7 @@ void FilterRunner::sweepRadius(const SweepDescription& desc, const RegionMap& re
 	const SizeVec2& extent, const span<const Radius_t> radius_arr) {
 	auto run_radius = [this, &region_map, extent, radius_arr]
 		(const auto filter_tag, const RunDescription run_desc) -> void {
-		const auto& [factory, filter, _1, _2, histogram] = run_desc;
+		const auto& [_1, filter, _2, _3, histogram] = run_desc;
 		RegionMapFilter::LaunchDescription filter_desc {
 			.Map = &region_map,
 			.Extent = extent
@@ -139,13 +152,13 @@ void FilterRunner::sweepRadius(const SweepDescription& desc, const RegionMap& re
 		nb::Bench bench = ::createBenchmark(filter_tag);
 		bench.title("Time-Radius");
 
-		const auto run = [&filter_desc, &histogram, &filter, filter_tag]() -> void {
-			nb::doNotOptimizeAway(filter(filter_tag, filter_desc, histogram));
+		const auto run = [&filter_desc, histogram, filter, filter_tag]() -> void {
+			nb::doNotOptimizeAway((*filter)(filter_tag, filter_desc, *histogram));
 		};
 		for (const auto r : radius_arr) {
 			filter_desc.Radius = r;
 			filter_desc.Offset = Utility::calcMinimumOffset(r);
-			filter.tryAllocateHistogram(filter_tag, filter_desc, histogram);
+			filter->tryAllocateHistogram(filter_tag, filter_desc, *histogram);
 
 			bench.run(::toString(r).data(), run);
 		}
@@ -161,7 +174,7 @@ void FilterRunner::sweepRegionCount(const SweepDescription& desc, const SizeVec2
 		(const auto filter_tag, const RunDescription run_desc) -> void {
 		const auto& [factory, filter, _, map, histogram] = run_desc;
 		const RegionMapFilter::LaunchDescription desc {
-			.Map = &map,
+			.Map = map,
 			.Offset = Utility::calcMinimumOffset(radius),
 			.Extent = extent,
 			.Radius = radius
@@ -170,13 +183,13 @@ void FilterRunner::sweepRegionCount(const SweepDescription& desc, const SizeVec2
 		nb::Bench bench = ::createBenchmark(filter_tag);
 		bench.title("Time-RegionCount");
 
-		const auto run = [&desc, &histogram, &filter, filter_tag]() -> void {
-			nb::doNotOptimizeAway(filter(filter_tag, desc, histogram));
+		const auto run = [&desc, histogram, filter, filter_tag]() -> void {
+			nb::doNotOptimizeAway((*filter)(filter_tag, desc, *histogram));
 		};
 		for (const auto rc : region_count_arr) {
 			//shouldn't trigger reallocation because size does not change
-			Utility::generateMinimumRegionMap(map, factory, extent, radius, rc);
-			filter.tryAllocateHistogram(filter_tag, desc, histogram);
+			Utility::generateMinimumRegionMap(*map, *factory, extent, radius, rc);
+			filter->tryAllocateHistogram(filter_tag, desc, *histogram);
 
 			bench.run(::toString(rc).data(), run);
 		}
@@ -185,4 +198,39 @@ void FilterRunner::sweepRegionCount(const SweepDescription& desc, const SizeVec2
 	};
 	this->runFilter(move(run_region_count), desc);
 
+}
+
+void FilterRunner::sweepCentroidCount(const SweepDescription& desc, const SizeVec2& extent,
+	const Radius_t radius, const Region_t region_count, const std::uint64_t random_seed,
+	const span<const size_t> centroid_count_arr) {
+	auto run_centroid_count = [this, extent, radius, region_count, random_seed, centroid_count_arr]
+		(const auto filter_tag, RunDescription run_desc) -> void {
+		const auto& [_1, filter, _2, map, histogram] = run_desc;
+		const RegionMapFilter::LaunchDescription desc {
+			.Map = map,
+			.Offset = Utility::calcMinimumOffset(radius),
+			.Extent = extent,
+			.Radius = radius
+		};
+
+		auto voronoi_factory = DisRegRep::VoronoiRegionFactory(random_seed);
+		run_desc.Factory = &voronoi_factory;
+
+		nb::Bench bench = ::createBenchmark(filter_tag);
+		bench.title("Time-CentroidCount");
+
+		const auto run = [&desc, histogram, filter, filter_tag]() -> void {
+			nb::doNotOptimizeAway((*filter)(filter_tag, desc, *histogram));
+		};
+		for (const auto cc : centroid_count_arr) {
+			voronoi_factory.CentroidCount = cc;
+			Utility::generateMinimumRegionMap(*map, voronoi_factory, extent, radius, region_count);
+			filter->tryAllocateHistogram(filter_tag, desc, *histogram);
+
+			bench.run(::toString(cc).data(), run);
+		}
+
+		this->renderReport(filter_tag, run_desc, bench);
+	};
+	this->runFilter(move(run_centroid_count), desc);
 }

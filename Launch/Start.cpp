@@ -74,36 +74,39 @@ constexpr struct BenchmarkContext {
 
 	} SweepRadiusStress;
 	SweepContext<F::Region_t> SweepRegion;
+	SweepContext<size_t> SweepCentroid;
 
 } DefaultSetting = {
 //We keep two different sets of settings for debug and release mode.
 //In debug mode we are mainly trying to hunt for bugs, so turn down the settings to speed things up.
 #ifndef NDEBUG
-	.Extent = { 16u, 16u },
-	.RegionCount = 4u,
-	.Radius = 2u,
-	.CentroidCount = 4u,
+	.Extent = { 16, 16 },
+	.RegionCount = 4,
+	.Radius = 2,
+	.CentroidCount = 4,
 
-	.SweepRadius = { 4u, 2u, 10u },
+	.SweepRadius = { 4, 2, 10 },
 	.SweepRadiusStress = {
-		.SweepRadius = { 8u, 4u, 32u },
-		.Extent = { 64u, 64u },
-		.RegionCount = 8u
+		.SweepRadius = { 8, 4, 32 },
+		.Extent = { 64, 64 },
+		.RegionCount = 8
 	},
-	.SweepRegion = { 6u, 2u, 8u }
+	.SweepRegion = { 6, 2, 8 },
+	.SweepCentroid = { 4, 1, 10 }
 #else//NDEBUG
-	.Extent = { 192u, 192u },
-	.RegionCount = 5u,
-	.Radius = 16u,
-	.CentroidCount = 5u,
+	.Extent = { 192, 192 },
+	.RegionCount = 5,
+	.Radius = 16,
+	.CentroidCount = 5,
 
-	.SweepRadius = { 15u, 2u, 64u },
+	.SweepRadius = { 15, 2, 64 },
 	.SweepRadiusStress = {
-		.SweepRadius = { 30u, 8u, 256u },
-		.Extent = { 512u, 512u },
-		.RegionCount = 15u
+		.SweepRadius = { 30, 8, 256 },
+		.Extent = { 512, 512 },
+		.RegionCount = 15
 	},
-	.SweepRegion = { 15u, 2u, 30u }
+	.SweepRegion = { 15, 2, 30 },
+	.SweepCentroid = { 15, 1, 60 }
 #endif//NDEBUG
 };
 //An alias for default setting
@@ -172,6 +175,7 @@ struct RunDescription {
 constexpr auto RadiusVariation = ::generateSweepVariable<F::Radius_t, ::DS.SweepRadius>();
 constexpr auto RadiusStressVariation = ::generateSweepVariable<F::Radius_t, ::DS.SweepRadiusStress.SweepRadius>();
 constexpr auto RegionVariation = ::generateSweepVariable<F::Region_t, ::DS.SweepRegion>();
+constexpr auto CentroidVariation = ::generateSweepVariable<size_t, ::DS.SweepCentroid>();
 
 void handleException(const exception& e) {
 	println(std::cerr, "Error occurs during execution: {}", e.what());
@@ -181,7 +185,7 @@ template<size_t S1, size_t S2, size_t S3, size_t S4>
 void runRadius(const ::RunDescription<S1, S2>& regular_desc, const span<RegionMap, S1> regular_rm,
 	const ::RunDescription<S3, S4>& stress_desc, const span<RegionMap, S3> stress_rm) {
 	const auto run = [](const auto& desc, const auto& region_map_arr, const F::Region_t region_count,
-		const F::SizeVec2& extent, const auto& sweep_radius, string&& tag) -> void {
+		const F::SizeVec2& extent, const auto& sweep_radius, const string& tag = { }) -> void {
 			const auto& [runner, factory_arr, filter_arr] = desc;
 			for (const auto [factory, region_map] : zip(factory_arr, region_map_arr)) {
 				Lnc::Utility::generateMinimumRegionMap(region_map, *factory, extent,
@@ -190,12 +194,12 @@ void runRadius(const ::RunDescription<S1, S2>& regular_desc, const span<RegionMa
 				runner.sweepRadius({
 					.Factory = factory,
 					.Filter = filter_arr,
-					.UserTag = std::move(tag)
+					.UserTag = tag
 				}, region_map, extent, sweep_radius);
 			}
 		};
 	{
-		run(regular_desc, regular_rm, ::DS.RegionCount, ::DS.Extent, ::RadiusVariation, "Default");
+		run(regular_desc, regular_rm, ::DS.RegionCount, ::DS.Extent, ::RadiusVariation);
 	}
 	{
 		constexpr auto& SRS = ::DS.SweepRadiusStress;
@@ -210,10 +214,18 @@ void runRegionCount(const ::RunDescription<S1, S2>& run_desc) {
 	for (const auto factory : factory_arr) {
 		runner.sweepRegionCount({
 			.Factory = factory,
-			.Filter = filter_arr,
-			.UserTag = "Default"
+			.Filter = filter_arr
 		}, ::DS.Extent, ::DS.Radius, ::RegionVariation);
 	}
+}
+
+template<size_t S1, size_t S2>
+void runCentroidCount(const ::RunDescription<S1, S2>& run_desc) {
+	const auto& [runner, _, filter_arr] = run_desc;
+
+	runner.sweepCentroidCount({
+		.Filter = filter_arr
+	}, ::DS.Extent, ::DS.Radius, ::DS.RegionCount, ::DS.Seed, ::CentroidVariation);
 }
 
 void run() {
@@ -269,6 +281,7 @@ void run() {
 			.Filter = filter.subspan<1u, 1u>()
 		}, rm_radius_stress);
 		::runRegionCount(run_desc);
+		::runCentroidCount(run_desc);
 
 		::exportSetting(report_root / "default-setting.txt");
 

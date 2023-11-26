@@ -51,10 +51,8 @@ public:
 	 *
 	 * @param dimension The new dimension of region map.
 	 * If dimension is shrunken, region map will be trimmed linearly.
-	 *
-	 * @return New size.
 	*/
-	size_t reshape(const Format::SizeVec2&);
+	void reshape(const Format::SizeVec2&);
 
 	/**
 	 * @brief Get the size of region map.

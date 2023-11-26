@@ -50,11 +50,8 @@ public:
 	 * The content of region map becomes undefined after this function returns if reallocation or enlargement happens.
 	 * Otherwise, content will be trimmed.
 	 * @param dimension The new dimension to be set.
-	 * 
-	 * @return True if reallocation happens, or region map has been enlarged.
-	 * In both cases, the content of the original region map becomes undefined.
 	*/
-	static bool reshape(RegionMap&, const Format::SizeVec2&);
+	static void reshape(RegionMap&, const Format::SizeVec2&);
 
 	/**
 	 * @brief Get an identifying name for the factory implementation.
