@@ -29,6 +29,7 @@ target_sources(${DRR_PROGRAM} PRIVATE
 	Factory/VoronoiRegionFactory.hpp
 	# Filter/
 	Filter/BruteForceFilter.hpp
+	Filter/FilterTrait.hpp
 	Filter/RegionMapFilter.hpp
 	Filter/SingleHistogramFilter.hpp
 	# Maths/

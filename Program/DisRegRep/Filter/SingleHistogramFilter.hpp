@@ -2,8 +2,6 @@
 
 #include "RegionMapFilter.hpp"
 
-#include <any>
-
 namespace DisRegRep {
 
 /**

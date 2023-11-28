@@ -1,33 +1,30 @@
 #include <DisRegRep/Filter/BruteForceFilter.hpp>
-#include <DisRegRep/Maths/Arithmetic.hpp>
+#include <DisRegRep/Filter/FilterTrait.hpp>
 
 #include <DisRegRep/Container/HistogramCache.hpp>
-
-#include <memory>
-#include <utility>
+#include <DisRegRep/Maths/Arithmetic.hpp>
 
 #include <ranges>
+#include <utility>
 
 using std::any, std::any_cast;
-using std::shared_ptr, std::make_shared_for_overwrite;
+using std::shared_ptr;
 using std::views::iota;
 
 using namespace DisRegRep;
 namespace SH = SingleHistogram;
 namespace HC = HistogramCache;
-using Format::SizeVec2, Format::Bin_t, Format::NormBin_t, Format::Region_t;
+using Format::SizeVec2, Format::Region_t, Format::Radius_t;
 
 namespace {
 
 template<typename TNormHist, typename TCache>
 struct BFFHistogram {
 
-	using NormHistogramType = TNormHist;
-
-	NormHistogramType Histogram;
+	TNormHist Histogram;
 	TCache Cache;
 
-	void resize(const SizeVec2& histogram_size, const Region_t rc) {
+	void resize(const SizeVec2& histogram_size, const Region_t rc, Radius_t) {
 		this->Histogram.resize(histogram_size, rc);
 		this->Cache.resize(rc);
 	}
@@ -43,24 +40,7 @@ using BFFdcsh = BFFHistogram<SH::SparseNormSorted, HC::Dense>;
 using BFFscsh = BFFHistogram<SH::SparseNormUnsorted, HC::Sparse>;
 
 template<typename THist>
-inline void makeAllocation(const auto& desc, any& output) {
-	using THist_t = shared_ptr<THist>;
-
-	THist* allocation;
-	//compatibility check
-	if (const auto* const bff = any_cast<THist_t>(&output);
-		bff) {
-		allocation = &**bff;
-	} else {
-		allocation = &*output.emplace<THist_t>(make_shared_for_overwrite<THist>());
-	}
-	allocation->resize(desc.Extent, desc.Map->RegionCount);
-}
-
-template<typename THist>
 inline const auto& runFilter(const auto& desc, any& memory) {
-	using THist_t = shared_ptr<THist>;
-
 	const auto& [map_ptr, offset, extent, radius] = desc;
 	const RegionMap& map = *map_ptr;
 
@@ -69,7 +49,7 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 	const auto [ext_x, ext_y] = toSigned(extent);
 	const auto sradius = toSigned(radius);
 
-	THist& bff_histogram = *any_cast<THist_t&>(memory);
+	THist& bff_histogram = *any_cast<shared_ptr<THist>&>(memory);
 	bff_histogram.clear();
 
 	auto& [histogram, cache] = bff_histogram;
@@ -90,10 +70,7 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 			}
 
 			//normalise bin and copy to output
-#pragma warning(push)
-#pragma warning(disable: 4244)//type conversion
 			copy_cache_to_histogram(x, y);
-#pragma warning(pop)
 		}
 	}
 	return histogram;
@@ -101,26 +78,5 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 
 }
 
-REGION_MAP_FILTER_ALLOC_FUNC_DCDH_DEF(BruteForceFilter) {
-	::makeAllocation<::BFFdcdh>(desc, output);
-}
-
-REGION_MAP_FILTER_ALLOC_FUNC_DCSH_DEF(BruteForceFilter) {
-	::makeAllocation<::BFFdcsh>(desc, output);
-}
-
-REGION_MAP_FILTER_ALLOC_FUNC_SCSH_DEF(BruteForceFilter) {
-	::makeAllocation<::BFFscsh>(desc, output);
-}
-
-REGION_MAP_FILTER_FILTER_FUNC_DCDH_DEF(BruteForceFilter) {
-	return ::runFilter<::BFFdcdh>(desc, memory);
-}
-
-REGION_MAP_FILTER_FILTER_FUNC_DCSH_DEF(BruteForceFilter) {
-	return ::runFilter<::BFFdcsh>(desc, memory);
-}
-
-REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(BruteForceFilter) {
-	return ::runFilter<::BFFscsh>(desc, memory);
-}
+DEFINE_ALL_REGION_MAP_FILTER_ALLOC_FUNC(BruteForceFilter, ::BFF)
+DEFINE_ALL_REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(BruteForceFilter, ::BFF)

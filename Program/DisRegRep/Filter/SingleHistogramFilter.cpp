@@ -1,14 +1,14 @@
 #include <DisRegRep/Filter/SingleHistogramFilter.hpp>
-#include <DisRegRep/Maths/Arithmetic.hpp>
+#include <DisRegRep/Filter/FilterTrait.hpp>
 
 #include <DisRegRep/Container/HistogramCache.hpp>
-
-#include <memory>
-#include <utility>
-#include <type_traits>
+#include <DisRegRep/Maths/Arithmetic.hpp>
 
 #include <ranges>
 #include <functional>
+
+#include <utility>
+#include <type_traits>
 
 using std::any, std::any_cast;
 using std::shared_ptr, std::make_shared_for_overwrite;
@@ -17,7 +17,7 @@ using std::views::iota;
 using namespace DisRegRep;
 namespace SH = SingleHistogram;
 namespace HC = HistogramCache;
-using Format::SizeVec2, Format::Radius_t, Format::Bin_t, Format::Region_t;
+using Format::SizeVec2, Format::Region_t, Format::Radius_t;
 
 namespace {
 
@@ -33,13 +33,10 @@ constexpr SizeVec2 calcHorizontalHistogramDimension(SizeVec2 histogram_size, con
 template<typename THist, typename TNormHist, typename TCache>
 struct SHFHistogram {
 
-	using HistogramType = THist;
-	using NormHistogramType = TNormHist;
-
 	struct {
 
-		HistogramType Horizontal;
-		NormHistogramType Final;
+		THist Horizontal;
+		TNormHist Final;
 
 	} Histogram;
 	TCache Cache;
@@ -64,23 +61,7 @@ using SHFdcsh = SHFHistogram<SH::SparseSorted, SH::SparseNormSorted, HC::Dense>;
 using SHFscsh = SHFHistogram<SH::SparseUnsorted, SH::SparseNormUnsorted, HC::Sparse>;
 
 template<typename THist>
-inline void makeAllocation(const auto& desc, any& output) {
-	using THist_t = shared_ptr<THist>;
-
-	THist* allocation;
-	if (const auto* const shf = any_cast<THist_t>(&output);
-		shf) {
-		allocation = &**shf;
-	} else {
-		allocation = &*output.emplace<THist_t>(make_shared_for_overwrite<THist>());
-	}
-	allocation->resize(desc.Extent, desc.Map->RegionCount, desc.Radius);
-}
-
-template<typename THist>
 inline const auto& runFilter(const auto& desc, any& memory) {
-	using THist_t = shared_ptr<THist>;
-
 	const auto& [map_ptr, offset, extent, radius] = desc;
 	const RegionMap& map = *map_ptr;
 
@@ -90,7 +71,7 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 	const auto sradius = toSigned(radius);
 	const auto sradius_2 = 2 * sradius;
 
-	THist& shf_histogram = *any_cast<THist_t&>(memory);
+	THist& shf_histogram = *any_cast<shared_ptr<THist>&>(memory);
 	shf_histogram.clear();
 
 	auto& [histogram, cache] = shf_histogram;
@@ -129,8 +110,6 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 	}
 
 	using std::plus, std::minus, std::is_same_v;
-#pragma warning(push)
-#pragma warning(disable: 4244)//type conversion
 	//For some reason the `as_const` here on horizontal histogram is very important,
 	//	benchmark shows up-to 16% of improvement in timing for using const v.s. non-const version.
 	const auto cache_op_histogram_h = [&cache, &histogram_h = as_const(histogram_h)]
@@ -148,7 +127,6 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 		kernel_area = 1.0 * Arithmetic::kernelArea(radius)](const auto x, const auto y) -> void {
 		histogram_full(cache, x, y, kernel_area);
 	};
-#pragma warning(pop)
 	const auto op_plus = plus { };
 	const auto op_minus = minus { };
 	/********************
@@ -178,26 +156,5 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 
 }
 
-REGION_MAP_FILTER_ALLOC_FUNC_DCDH_DEF(SingleHistogramFilter) {
-	::makeAllocation<::SHFdcdh>(desc, output);
-}
-
-REGION_MAP_FILTER_ALLOC_FUNC_DCSH_DEF(SingleHistogramFilter) {
-	::makeAllocation<::SHFdcsh>(desc, output);
-}
-
-REGION_MAP_FILTER_ALLOC_FUNC_SCSH_DEF(SingleHistogramFilter) {
-	::makeAllocation<::SHFscsh>(desc, output);
-}
-
-REGION_MAP_FILTER_FILTER_FUNC_DCDH_DEF(SingleHistogramFilter) {
-	return ::runFilter<::SHFdcdh>(desc, memory);
-}
-
-REGION_MAP_FILTER_FILTER_FUNC_DCSH_DEF(SingleHistogramFilter) {
-	return ::runFilter<::SHFdcsh>(desc, memory);
-}
-
-REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(SingleHistogramFilter) {
-	return ::runFilter<::SHFscsh>(desc, memory);
-}
+DEFINE_ALL_REGION_MAP_FILTER_ALLOC_FUNC(SingleHistogramFilter, ::SHF)
+DEFINE_ALL_REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(SingleHistogramFilter, ::SHF)

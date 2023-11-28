@@ -30,7 +30,7 @@ REGION_MAP_FILTER_ALLOC_FUNC_SCSH override
 
 //declare `operator()`
 #define REGION_MAP_FILTER_FILTER_FUNC(TAG) \
-const RegionMapFilter::LaunchTag::TAG::HistogramType& operator()(LaunchTag::TAG, \
+const DisRegRep::RegionMapFilter::LaunchTag::TAG::HistogramType& operator()(LaunchTag::TAG, \
 const LaunchDescription&, std::any&) const
 #define REGION_MAP_FILTER_FILTER_FUNC_DCDH REGION_MAP_FILTER_FILTER_FUNC(DCacheDHist)
 #define REGION_MAP_FILTER_FILTER_FUNC_DCSH REGION_MAP_FILTER_FILTER_FUNC(DCacheSHist)
@@ -49,8 +49,8 @@ const LaunchDescription& desc, any& output) const
 
 //define `operator()`
 #define REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, TAG) \
-const RegionMapFilter::LaunchTag::TAG::HistogramType& CLASS::operator()(LaunchTag::TAG, \
-const LaunchDescription& desc, any& memory) const
+const DisRegRep::RegionMapFilter::LaunchTag::TAG::HistogramType& CLASS::operator()(LaunchTag::TAG, \
+const LaunchDescription& desc, any& output) const
 #define REGION_MAP_FILTER_FILTER_FUNC_DCDH_DEF(CLASS) REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, DCacheDHist)
 #define REGION_MAP_FILTER_FILTER_FUNC_DCSH_DEF(CLASS) REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, DCacheSHist)
 #define REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(CLASS) REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, SCacheSHist)
