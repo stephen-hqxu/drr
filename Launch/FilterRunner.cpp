@@ -195,7 +195,7 @@ void FilterRunner::sweepRadius(const SweepDescription& desc, const RegionMap& re
 		};
 		
 		nb::Bench bench = ::createBenchmark(filter_tag);
-		bench.title("Time-Radius");
+		bench.title("Radius");
 
 		for (const auto r : radius_arr) {
 			desc.Radius = r;
@@ -222,7 +222,7 @@ void FilterRunner::sweepRegionCount(const SweepDescription& desc, const SizeVec2
 		};
 
 		nb::Bench bench = ::createBenchmark(filter_tag);
-		bench.title("Time-RegionCount");
+		bench.title("GlobalRegionCount");
 
 		for (const auto rc : region_count_arr) {
 			//shouldn't trigger reallocation because size does not change
@@ -254,7 +254,7 @@ void FilterRunner::sweepCentroidCount(const SweepDescription& desc, const SizeVe
 		run_desc.Factory = &voronoi_factory;
 
 		nb::Bench bench = ::createBenchmark(filter_tag);
-		bench.title("Time-CentroidCount");
+		bench.title("LocalRegionCount");
 
 		for (const auto cc : centroid_count_arr) {
 			voronoi_factory.CentroidCount = cc;
