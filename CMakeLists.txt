@@ -9,12 +9,12 @@ add_compile_options(/wd4251 /wd4275) # DLL export warning
 
 project(DisRegRep
 	VERSION 1.0.0
-	DESCRIPTION "Benchmark for discrete region representation from my paper"
+	DESCRIPTION "Discrete Region Representation: An implicit and explicit representation for discrete features and feature combination. Useful for fast procedural modelling of diverse landscape, and more."
 	LANGUAGES CXX
 )
 
 set(CMAKE_STATIC_LIBRARY_PREFIX ${CMAKE_PROJECT_NAME}-)
-set(CMAKE_SHARED_LIBRARY_PREFIX lib${CMAKE_STATIC_LIBRARY_PREFIX})
+set(CMAKE_SHARED_LIBRARY_PREFIX ${CMAKE_STATIC_LIBRARY_PREFIX})
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output/arc)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output/bin)

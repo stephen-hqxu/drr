@@ -285,7 +285,11 @@ void run() {
 			.Factory = factory.subspan<0u, 1u>(),
 			.Filter = filter.subspan<1u, 1u>()
 		}, rm_radius_stress);
-		::runRegionCount(run_desc);
+		::runRegionCount(::RunDescription {
+			.Runner = runner,
+			.Factory = factory.subspan<1u, 1u>(),
+			.Filter = filter
+		});
 		::runCentroidCount(run_desc);
 
 		::exportSetting(report_root / "default-setting.txt");
