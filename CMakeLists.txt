@@ -8,9 +8,9 @@ add_compile_options(/W4 /arch:AVX2 /MP)
 add_compile_options(/wd4251 /wd4275) # DLL export warning
 
 project(DisRegRep
-	VERSION 1.0.0
-	DESCRIPTION "Discrete Region Representation: An implicit and explicit representation for discrete features and feature combination. Useful for fast procedural modelling of diverse landscape, and more."
 	LANGUAGES CXX
+	DESCRIPTION "Discrete Region Representation: An implicit and explicit representation for discrete features and feature combination. Useful for fast procedural modelling of diverse landscape, and more."
+	HOMEPAGE_URL https://github.com/stephen-hqxu/drr
 )
 
 set(CMAKE_STATIC_LIBRARY_PREFIX ${CMAKE_PROJECT_NAME}-)

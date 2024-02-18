@@ -17,7 +17,7 @@ using std::views::iota;
 using namespace DisRegRep;
 namespace SH = SingleHistogram;
 namespace HC = HistogramCache;
-using Format::SizeVec2, Format::Region_t, Format::Radius_t;
+using Format::SSize_t, Format::SizeVec2, Format::Region_t, Format::Radius_t;
 
 namespace {
 
@@ -84,7 +84,7 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 	/********************
 	 * Horizontal pass
 	 *******************/
-	for (const auto y : iota(Arithmetic::ssize_t { 0 }, ext_y + sradius_2)) {
+	for (const auto y : iota(SSize_t { 0 }, ext_y + sradius_2)) {
 		//region map y value
 		const auto rg_y = off_y + y - sradius;
 		
@@ -97,7 +97,7 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 		copy_to_histogram_h(0, y);
 
 		//sliding kernel
-		for (const auto x : iota(Arithmetic::ssize_t { 1 }, ext_x)) {
+		for (const auto x : iota(SSize_t { 1 }, ext_x)) {
 			const auto rg_x = off_x + x;
 
 			const Region_t removing_region = map(rg_x - sradius - 1, rg_y),
@@ -132,10 +132,10 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 	/********************
 	 * Vertical pass
 	 ******************/
-	for (const auto x : iota(Arithmetic::ssize_t { 0 }, ext_x)) {
+	for (const auto x : iota(SSize_t { 0 }, ext_x)) {
 		//build initial accumulator
 		cache.clear();
-		for (const auto ry : iota(Arithmetic::ssize_t { 0 }, sradius_2 + 1)) {
+		for (const auto ry : iota(SSize_t { 0 }, sradius_2 + 1)) {
 			//this operator will first convert uint16_t to int, and compiler gives a warning
 			//this is fine, because int is representable
 			cache_op_histogram_h(x, ry, op_plus);
@@ -143,7 +143,7 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 		copy_to_output(x, 0);
 
 		//sliding kernel
-		for (const auto y : iota(Arithmetic::ssize_t { 1 }, ext_y)) {
+		for (const auto y : iota(SSize_t { 1 }, ext_y)) {
 			cache_op_histogram_h(x, y - 1, op_minus);
 			cache_op_histogram_h(x, y + sradius_2, op_plus);
 

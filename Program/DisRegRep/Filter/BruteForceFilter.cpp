@@ -14,7 +14,7 @@ using std::views::iota;
 using namespace DisRegRep;
 namespace SH = SingleHistogram;
 namespace HC = HistogramCache;
-using Format::SizeVec2, Format::Region_t, Format::Radius_t;
+using Format::SSize_t, Format::SizeVec2, Format::Region_t, Format::Radius_t;
 
 namespace {
 
@@ -58,8 +58,8 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 		kernel_area = 1.0 * Arithmetic::kernelArea(radius)](const auto x, const auto y) -> void {
 		histogram(cache, x, y, kernel_area);
 	};
-	for (const auto y : iota(Arithmetic::ssize_t { 0 }, ext_y)) {
-		for (const auto x : iota(Arithmetic::ssize_t { 0 }, ext_x)) {
+	for (const auto y : iota(SSize_t { 0 }, ext_y)) {
+		for (const auto x : iota(SSize_t { 0 }, ext_x)) {
 			cache.clear();
 
 			for (const auto ry : iota(off_y - sradius, off_y + sradius + 1)) {

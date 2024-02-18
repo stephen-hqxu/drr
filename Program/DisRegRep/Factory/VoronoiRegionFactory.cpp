@@ -23,7 +23,7 @@ using std::as_const;
 using ankerl::nanobench::Rng;
 
 using namespace DisRegRep;
-using Format::SizeVec2, Format::Region_t;
+using Format::Size_t, Format::SizeVec2, Format::Region_t;
 
 namespace {
 
@@ -62,10 +62,10 @@ void VoronoiRegionFactory::operator()(const CreateDescription& desc, RegionMap& 
 	//This is a pretty naive algorithm,
 	//	in practice it is better to do with either Quad-Tree or KD-Tree to find K-NN;
 	//	omitted here for simplicity.
-	const auto y_it = iota(size_t { 0 }, dim_y);
+	const auto y_it = iota(Size_t { 0 }, dim_y);
 	for_each(par_unseq, y_it.cbegin(), y_it.cend(),
 		[dim_x, &map = output, &rc = as_const(region_centroid), &ra = as_const(region_assignment)](const auto y) {
-			for (const auto x : iota(size_t { 0 }, dim_x)) {
+			for (const auto x : iota(Size_t { 0 }, dim_x)) {
 				const auto it = rc | transform([curr_position = SizeVec2 { x, y }](const auto& centroid) {
 					return ::l2Distance(curr_position, centroid);
 				});

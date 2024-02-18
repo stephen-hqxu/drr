@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../Format.hpp"
+
 #include <array>
 #include <iterator>
 
@@ -12,14 +14,14 @@
 #include <type_traits>
 #include <concepts>
 
+#include <cstdint>
+
 namespace DisRegRep {
 
 /**
  * @brief Just some helps to do fundamental calculations.
 */
 namespace Arithmetic {
-
-using ssize_t = std::make_signed_t<std::size_t>;/**< signed size_t */
 
 template<std::integral I>
 constexpr auto toSigned(const I num) noexcept {
@@ -28,7 +30,7 @@ constexpr auto toSigned(const I num) noexcept {
 template<std::integral T, size_t S>
 constexpr auto toSigned(const std::array<T, S>& nums) {
 	std::array<std::make_signed_t<T>, S> snums { };
-	std::ranges::transform(nums, snums.begin(), [](const auto v) constexpr noexcept { return toSigned(v); });
+	std::ranges::transform(nums, snums.begin(), toSigned<T>);
 	return snums;
 }
 
@@ -62,19 +64,19 @@ inline void addRange(R1&& a, Op&& op, R2&& b, O&& output) {
  * @brief Scale each value in the range.
  * 
  * @tparam R The input range type.
- * @tparam O The output range type.
+ * @tparam O The output iterator type.
  * @tparam T The scalar type.
  * @param input The input range.
- * @param output The output range.
+ * @param output The output iterator.
  * @param scalar The scalar.
 */
 template<std::floating_point T, std::ranges::input_range R, std::weakly_incrementable O>
-inline void scaleRange(R&& input, O&& output, const T scalar) {
+inline void scaleRange(R&& input, const O output, const T scalar) {
 	using std::ranges::cbegin, std::ranges::cend, std::iterator_traits;
 
 	std::transform(std::execution::unseq, cbegin(input), cend(input), output,
-		[scalar](const auto v) constexpr noexcept
-			{ return static_cast<iterator_traits<O>::value_type>(v / scalar); });
+		[factor = T { 1 } / scalar](const auto v) constexpr noexcept
+			{ return static_cast<iterator_traits<O>::value_type>(v * factor); });
 }
 
 /**
@@ -100,9 +102,8 @@ constexpr T horizontalProduct(const std::array<T, S>& num) noexcept {
  * 
  * @return The kernel area.
 */
-template<std::unsigned_integral T>
-constexpr size_t kernelArea(const T radius) noexcept {
-	const size_t diameter = 2u * radius + 1u;
+constexpr uint32_t kernelArea(const Format::Radius_t radius) noexcept {
+	const uint32_t diameter = 2u * radius + 1u;
 	return diameter * diameter;
 }
 

@@ -13,7 +13,7 @@ using std::ranges::copy, std::ranges::fill, std::ranges::for_each, std::equal,
 	std::execution::unseq;
 
 using namespace DisRegRep;
-using Format::Region_t, Format::Bin_t, Format::NormBin_t, Format::SizeVec2;
+using Format::Region_t, Format::Bin_t, Format::NormBin_t, Format::SizeVec2, Format::SizeVec3;
 using SingleHistogram::BasicDense, SingleHistogram::BasicSparseInternalStorage, SingleHistogram::BasicSparse;
 using Arithmetic::horizontalProduct;
 
@@ -29,7 +29,7 @@ size_t BasicDense<T>::sizeByte() const noexcept {
 
 template<typename T>
 void BasicDense<T>::resize(const SizeVec2& dimension, const Region_t region_count) {
-	array<size_t, 3u> dim_3;
+	SizeVec3 dim_3;
 	copy(dimension, dim_3.begin());
 	dim_3.back() = region_count;
 
