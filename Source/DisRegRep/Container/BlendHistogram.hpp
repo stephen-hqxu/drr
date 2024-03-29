@@ -17,19 +17,20 @@
 namespace DisRegRep {
 
 /**
- * @brief A single histogram is a matrix where each element points to a histogram, which is an array of bins.
-*/
-namespace SingleHistogram {
+ * @brief A blend histogram is a matrix of vectors, and each vector stores blending weights for the corresponding region descriptor in
+ * each element.
+ */
+namespace BlendHistogram {
 
 /**
- * @brief A dense single histogram uses a 3D matrix.
+ * @brief A dense blend histogram uses a 3D matrix.
  *
  * @tparam T The bin type.
 */
 template<typename>
 class BasicDense;
 /**
- * @brief A sparse single histogram is a 2D matrix of arrays with, useful if the bin axis is sparse.
+ * @brief A sparse blend histogram is a 2D matrix of arrays with, useful if the bin axis is sparse.
  *
  * @tparam T The bin type.
  * @tparam Sorted Indicates if each histogram is sorted.

@@ -1,12 +1,10 @@
-#include <DisRegRep/Container/SingleHistogram.hpp>
-
 #include <DisRegRep/Factory/RegionMapFactory.hpp>
 #include <DisRegRep/Factory/RandomRegionFactory.hpp>
 #include <DisRegRep/Factory/VoronoiRegionFactory.hpp>
 
 #include <DisRegRep/Filter/RegionMapFilter.hpp>
-#include <DisRegRep/Filter/BruteForceFilter.hpp>
-#include <DisRegRep/Filter/SingleHistogramFilter.hpp>
+#include <DisRegRep/Filter/ExplicitRegionAreaFilter.hpp>
+#include <DisRegRep/Filter/ExplicitRegionAreaSAFilter.hpp>
 
 #include <DisRegRep/Launch/FilterRunner.hpp>
 #include <DisRegRep/Launch/FilterTester.hpp>
@@ -39,7 +37,6 @@ using std::print, std::println, std::format, std::ofstream;
 using std::exception;
 
 using namespace DisRegRep;
-namespace SH = SingleHistogram;
 namespace F = Format;
 namespace Lnc = Launch;
 
@@ -239,14 +236,14 @@ void run() {
 	const auto random_factory = RandomRegionFactory(::BenchmarkContext::Seed);
 	const auto voronoi_factory = VoronoiRegionFactory(::BenchmarkContext::Seed, ::DS.CentroidCount);
 	//filter
-	const BruteForceFilter bf;
-	const SingleHistogramFilter shf;
+	const ExplicitRegionAreaFilter exra;
+	const ExplicitRegionAreaSAFilter exrasa;
 
 	const array<const RegionMapFactory*, 2u> factory_array {
 		&random_factory, &voronoi_factory
 	};
 	const array<const RegionMapFilter*, 2u> filter_array {
-		&bf, &shf
+		&exra, &exrasa
 	};
 	const span factory = factory_array;
 	const span filter = filter_array;

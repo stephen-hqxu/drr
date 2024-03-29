@@ -24,7 +24,7 @@ namespace Utility {
 
 //Some handy type aliases
 using RMFT = DisRegRep::RegionMapFilter::LaunchTag;
-constexpr std::tuple<RMFT::DCacheDHist, RMFT::DCacheSHist, RMFT::SCacheSHist> AllFilterTag { };
+constexpr std::tuple<RMFT::DCDH, RMFT::DCSH, RMFT::SCSH> AllFilterTag { };
 constexpr size_t AllFilterTagSize = std::tuple_size_v<decltype(AllFilterTag)>;
 
 using TimestampClock = std::chrono::system_clock;

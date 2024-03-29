@@ -1,15 +1,15 @@
 add_executable(${DRR_MAIN}
 	# Container/
+	Container/BlendHistogram.cpp
 	Container/HistogramCache.cpp
 	Container/RegionMap.cpp
-	Container/SingleHistogram.cpp
 	# Factory/
 	Factory/RandomRegionFactory.cpp
 	Factory/RegionMapFactory.cpp
 	Factory/VoronoiRegionFactory.cpp
 	# Filter/
-	Filter/BruteForceFilter.cpp
-	Filter/SingleHistogramFilter.cpp
+	Filter/ExplicitRegionAreaFilter.cpp
+	Filter/ExplicitRegionAreaSAFilter.cpp
 	# Launch/
 	Launch/FilterRunner.cpp
 	Launch/FilterTester.cpp
@@ -19,20 +19,20 @@ add_executable(${DRR_MAIN}
 
 target_sources(${DRR_MAIN} PRIVATE
 	# Container/
+	Container/BlendHistogram.hpp
 	Container/ContainerTrait.hpp
 	Container/HistogramCache.hpp
 	Container/RegionMap.hpp
-	Container/SingleHistogram.hpp
 	Container/SparseBin.hpp
 	# Factory/
 	Factory/RandomRegionFactory.hpp
 	Factory/RegionMapFactory.hpp
 	Factory/VoronoiRegionFactory.hpp
 	# Filter/
-	Filter/BruteForceFilter.hpp
+	Filter/ExplicitRegionAreaFilter.hpp
+	Filter/ExplicitRegionAreaSAFilter.hpp
 	Filter/FilterTrait.hpp
 	Filter/RegionMapFilter.hpp
-	Filter/SingleHistogramFilter.hpp
 	# Launch/
 	Launch/FilterRunner.hpp
 	Launch/FilterTester.hpp

@@ -15,7 +15,7 @@
 namespace DisRegRep {
 
 /**
- * @brief A cache for generation of single histogram.
+ * @brief A cache for generation of blend histogram.
 */
 namespace HistogramCache {
 

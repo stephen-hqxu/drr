@@ -1,6 +1,7 @@
-#include <DisRegRep/Filter/SingleHistogramFilter.hpp>
+#include <DisRegRep/Filter/ExplicitRegionAreaSAFilter.hpp>
 #include <DisRegRep/Filter/FilterTrait.hpp>
 
+#include <DisRegRep/Container/BlendHistogram.hpp>
 #include <DisRegRep/Container/HistogramCache.hpp>
 #include <DisRegRep/Maths/Arithmetic.hpp>
 
@@ -15,7 +16,7 @@ using std::shared_ptr, std::make_shared_for_overwrite;
 using std::views::iota;
 
 using namespace DisRegRep;
-namespace SH = SingleHistogram;
+namespace BH = BlendHistogram;
 namespace HC = HistogramCache;
 using Format::SSize_t, Format::SizeVec2, Format::Region_t, Format::Radius_t;
 
@@ -31,7 +32,7 @@ constexpr SizeVec2 calcHorizontalHistogramDimension(SizeVec2 histogram_size, con
 }
 
 template<typename THist, typename TNormHist, typename TCache>
-struct SHFHistogram {
+struct ExRASAHistogram {
 
 	struct {
 
@@ -56,9 +57,9 @@ struct SHFHistogram {
 	}
 
 };
-using SHFdcdh = SHFHistogram<SH::Dense, SH::DenseNorm, HC::Dense>;
-using SHFdcsh = SHFHistogram<SH::SparseSorted, SH::SparseNormSorted, HC::Dense>;
-using SHFscsh = SHFHistogram<SH::SparseUnsorted, SH::SparseNormUnsorted, HC::Sparse>;
+using ExRASAdcdh = ExRASAHistogram<BH::Dense, BH::DenseNorm, HC::Dense>;
+using ExRASAdcsh = ExRASAHistogram<BH::SparseSorted, BH::SparseNormSorted, HC::Dense>;
+using ExRASAscsh = ExRASAHistogram<BH::SparseUnsorted, BH::SparseNormUnsorted, HC::Sparse>;
 
 template<typename THist>
 inline const auto& runFilter(const auto& desc, any& memory) {
@@ -71,10 +72,10 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 	const auto sradius = toSigned(radius);
 	const auto sradius_2 = 2 * sradius;
 
-	THist& shf_histogram = *any_cast<shared_ptr<THist>&>(memory);
-	shf_histogram.clear();
+	THist& exrasa_histogram = *any_cast<shared_ptr<THist>&>(memory);
+	exrasa_histogram.clear();
 
-	auto& [histogram, cache] = shf_histogram;
+	auto& [histogram, cache] = exrasa_histogram;
 	auto& [histogram_h, histogram_full] = histogram;
 
 	const auto copy_to_histogram_h = [&cache = as_const(cache), &histogram_h](const auto x, const auto y) -> void {
@@ -156,5 +157,5 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 
 }
 
-DEFINE_ALL_REGION_MAP_FILTER_ALLOC_FUNC(SingleHistogramFilter, ::SHF)
-DEFINE_ALL_REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(SingleHistogramFilter, ::SHF)
+DEFINE_ALL_REGION_MAP_FILTER_ALLOC_FUNC(ExplicitRegionAreaSAFilter, ::ExRASA)
+DEFINE_ALL_REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(ExplicitRegionAreaSAFilter, ::ExRASA)

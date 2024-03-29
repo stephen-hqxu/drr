@@ -3,7 +3,7 @@
 #include <DisRegRep/Format.hpp>
 #include <DisRegRep/Maths/Arithmetic.hpp>
 #include <DisRegRep/Container/RegionMap.hpp>
-#include <DisRegRep/Container/SingleHistogram.hpp>
+#include <DisRegRep/Container/BlendHistogram.hpp>
 
 #include "Utility.hpp"
 
@@ -29,7 +29,7 @@ using std::get, std::apply,
 using std::is_same_v;
 
 using namespace DisRegRep::Format;
-namespace SH = DisRegRep::SingleHistogram;
+namespace BH = DisRegRep::BlendHistogram;
 using DisRegRep::RegionMap, DisRegRep::RegionMapFactory, DisRegRep::RegionMapFilter;
 using DisRegRep::Arithmetic::kernelArea;
 using namespace DisRegRep::Launch;
@@ -65,8 +65,8 @@ RegionMap createTestRegionMap() {
 	return rm;
 }
 
-SH::DenseNorm createTestSingleHistogram() {
-	SH::DenseNorm hist;
+BH::DenseNorm createTestSingleHistogram() {
+	BH::DenseNorm hist;
 	const auto write = [&hist, norm_factor = 1.0 * kernelArea(::TestRegionMapInfo.Radius)]
 	(const array<Bin_t, ::TestRegionMapInfo.RegionCount> bin, const uint8_t x, const uint8_t y) -> void {
 		hist(bin, x, y, norm_factor);
@@ -112,18 +112,18 @@ template<size_t TestSize>
 bool FilterTester::test(const TestDescription<TestSize>& desc) {
 	const auto [factory, filter] = desc;
 	const RegionMap region_map = ::createTestRegionMap();
-	const SH::DenseNorm hist_ground_truth = ::createTestSingleHistogram();
+	const BH::DenseNorm hist_ground_truth = ::createTestSingleHistogram();
 	const RegionMapFilter::LaunchDescription launch_desc = ::createLaunchDescription(region_map);
 
 	/**********************
 	 * Generate histogram
 	 *********************/
 	array<array<any, TestSize>, Utility::AllFilterTagSize> hist_mem;
-	array<SH::SparseNormSorted, TestSize> sorted_hist_mem;
+	array<BH::SparseNormSorted, TestSize> sorted_hist_mem;
 	tuple<
-		array<const SH::DenseNorm*, TestSize>,
-		array<const SH::SparseNormSorted*, TestSize>,
-		array<const SH::SparseNormSorted*, TestSize>
+		array<const BH::DenseNorm*, TestSize>,
+		array<const BH::SparseNormSorted*, TestSize>,
+		array<const BH::SparseNormSorted*, TestSize>
 	> hist;
 	
 	const auto generate_histogram = [&filter, &launch_desc, &sorted_hist_mem]
@@ -133,8 +133,8 @@ bool FilterTester::test(const TestDescription<TestSize>& desc) {
 
 			any& curr_hist_mem = hist_mem[i];
 			curr_filter.tryAllocateHistogram(run_tag, launch_desc, curr_hist_mem);
-			if constexpr (is_same_v<Tag, Utility::RMFT::SCacheSHist>) {
-				sorted_hist_mem[i] = std::move(const_cast<SH::SparseNormUnsorted&>(curr_filter(run_tag, launch_desc, curr_hist_mem)));
+			if constexpr (is_same_v<Tag, Utility::RMFT::SCSH>) {
+				sorted_hist_mem[i] = std::move(const_cast<BH::SparseNormUnsorted&>(curr_filter(run_tag, launch_desc, curr_hist_mem)));
 				hist[i] = &sorted_hist_mem[i];
 			} else {
 				hist[i] = &curr_filter(run_tag, launch_desc, curr_hist_mem);

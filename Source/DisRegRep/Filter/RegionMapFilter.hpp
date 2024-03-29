@@ -2,7 +2,7 @@
 
 #include "../Format.hpp"
 #include "../Container/RegionMap.hpp"
-#include "../Container/SingleHistogram.hpp"
+#include "../Container/BlendHistogram.hpp"
 
 #include <any>
 #include <string_view>
@@ -12,16 +12,16 @@
 #include <concepts>
 
 #define DEFINE_TAG(NAME, HIST_TYPE) struct NAME { \
-	using HistogramType = SingleHistogram::HIST_TYPE; \
+	using HistogramType = BlendHistogram::HIST_TYPE; \
 	constexpr static std::string_view TagName = #NAME; \
 }
 
 //declare `tryAllocateHistogram`
 #define REGION_MAP_FILTER_ALLOC_FUNC(TAG) void tryAllocateHistogram(LaunchTag::TAG, \
 const LaunchDescription&, std::any&) const
-#define REGION_MAP_FILTER_ALLOC_FUNC_DCDH REGION_MAP_FILTER_ALLOC_FUNC(DCacheDHist)
-#define REGION_MAP_FILTER_ALLOC_FUNC_DCSH REGION_MAP_FILTER_ALLOC_FUNC(DCacheSHist)
-#define REGION_MAP_FILTER_ALLOC_FUNC_SCSH REGION_MAP_FILTER_ALLOC_FUNC(SCacheSHist)
+#define REGION_MAP_FILTER_ALLOC_FUNC_DCDH REGION_MAP_FILTER_ALLOC_FUNC(DCDH)
+#define REGION_MAP_FILTER_ALLOC_FUNC_DCSH REGION_MAP_FILTER_ALLOC_FUNC(DCSH)
+#define REGION_MAP_FILTER_ALLOC_FUNC_SCSH REGION_MAP_FILTER_ALLOC_FUNC(SCSH)
 #define REGION_MAP_FILTER_ALLOC_FUNC_ALL \
 REGION_MAP_FILTER_ALLOC_FUNC_DCDH override; \
 REGION_MAP_FILTER_ALLOC_FUNC_DCSH override; \
@@ -31,9 +31,9 @@ REGION_MAP_FILTER_ALLOC_FUNC_SCSH override
 #define REGION_MAP_FILTER_FILTER_FUNC(TAG) \
 const DisRegRep::RegionMapFilter::LaunchTag::TAG::HistogramType& operator()(LaunchTag::TAG, \
 const LaunchDescription&, std::any&) const
-#define REGION_MAP_FILTER_FILTER_FUNC_DCDH REGION_MAP_FILTER_FILTER_FUNC(DCacheDHist)
-#define REGION_MAP_FILTER_FILTER_FUNC_DCSH REGION_MAP_FILTER_FILTER_FUNC(DCacheSHist)
-#define REGION_MAP_FILTER_FILTER_FUNC_SCSH REGION_MAP_FILTER_FILTER_FUNC(SCacheSHist)
+#define REGION_MAP_FILTER_FILTER_FUNC_DCDH REGION_MAP_FILTER_FILTER_FUNC(DCDH)
+#define REGION_MAP_FILTER_FILTER_FUNC_DCSH REGION_MAP_FILTER_FILTER_FUNC(DCSH)
+#define REGION_MAP_FILTER_FILTER_FUNC_SCSH REGION_MAP_FILTER_FILTER_FUNC(SCSH)
 #define REGION_MAP_FILTER_FILTER_FUNC_ALL \
 REGION_MAP_FILTER_FILTER_FUNC_DCDH override; \
 REGION_MAP_FILTER_FILTER_FUNC_DCSH override; \
@@ -42,17 +42,17 @@ REGION_MAP_FILTER_FILTER_FUNC_SCSH override
 //define `tryAllocateHistogram`
 #define REGION_MAP_FILTER_ALLOC_FUNC_DEF(CLASS, TAG) void CLASS::tryAllocateHistogram(LaunchTag::TAG, \
 const LaunchDescription& desc, any& output) const
-#define REGION_MAP_FILTER_ALLOC_FUNC_DCDH_DEF(CLASS) REGION_MAP_FILTER_ALLOC_FUNC_DEF(CLASS, DCacheDHist)
-#define REGION_MAP_FILTER_ALLOC_FUNC_DCSH_DEF(CLASS) REGION_MAP_FILTER_ALLOC_FUNC_DEF(CLASS, DCacheSHist)
-#define REGION_MAP_FILTER_ALLOC_FUNC_SCSH_DEF(CLASS) REGION_MAP_FILTER_ALLOC_FUNC_DEF(CLASS, SCacheSHist)
+#define REGION_MAP_FILTER_ALLOC_FUNC_DCDH_DEF(CLASS) REGION_MAP_FILTER_ALLOC_FUNC_DEF(CLASS, DCDH)
+#define REGION_MAP_FILTER_ALLOC_FUNC_DCSH_DEF(CLASS) REGION_MAP_FILTER_ALLOC_FUNC_DEF(CLASS, DCSH)
+#define REGION_MAP_FILTER_ALLOC_FUNC_SCSH_DEF(CLASS) REGION_MAP_FILTER_ALLOC_FUNC_DEF(CLASS, SCSH)
 
 //define `operator()`
 #define REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, TAG) \
 const DisRegRep::RegionMapFilter::LaunchTag::TAG::HistogramType& CLASS::operator()(LaunchTag::TAG, \
 const LaunchDescription& desc, any& output) const
-#define REGION_MAP_FILTER_FILTER_FUNC_DCDH_DEF(CLASS) REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, DCacheDHist)
-#define REGION_MAP_FILTER_FILTER_FUNC_DCSH_DEF(CLASS) REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, DCacheSHist)
-#define REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(CLASS) REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, SCacheSHist)
+#define REGION_MAP_FILTER_FILTER_FUNC_DCDH_DEF(CLASS) REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, DCDH)
+#define REGION_MAP_FILTER_FILTER_FUNC_DCSH_DEF(CLASS) REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, DCSH)
+#define REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(CLASS) REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, SCSH)
 
 namespace DisRegRep {
 
@@ -67,9 +67,9 @@ public:
 	*/
 	struct LaunchTag {
 
-		DEFINE_TAG(DCacheDHist, DenseNorm);/**< Dense cache dense histogram */
-		DEFINE_TAG(DCacheSHist, SparseNormSorted);/**< Dense cache sparse histogram */
-		DEFINE_TAG(SCacheSHist, SparseNormUnsorted);/**< Sparse cache sparse histogram */
+		DEFINE_TAG(DCDH, DenseNorm);/**< Dense cache dense histogram */
+		DEFINE_TAG(DCSH, SparseNormSorted);/**< Dense cache sparse histogram */
+		DEFINE_TAG(SCSH, SparseNormUnsorted);/**< Sparse cache sparse histogram */
 
 	};
 
@@ -126,7 +126,7 @@ public:
 	 * The behaviour is undefined if this memory is not allocated with compatible launch description.
 	 * The compatibility depends on implementation of derived class.
 	 * 
-	 * @return The generated normalised single histogram for this region map.
+	 * @return The generated normalised blend histogram for this region map.
 	 * The memory is held by the `memory` input.
 	 * It's safe to cast away constness if the application wishes to.
 	 * However it is not recommended to destroys this memory

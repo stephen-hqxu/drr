@@ -69,7 +69,7 @@ nb::Bench createBenchmark(Tag) {
 		.performanceCounters(false)
 		//need to disable console output because we are running with multiple threads.
 		.output(nullptr);
-	if constexpr (!is_same_v<Tag, Utility::RMFT::DCacheDHist>) {
+	if constexpr (!is_same_v<Tag, Utility::RMFT::DCDH>) {
 		//sparse matrix requires incremental construction, and we are using dynamic array internally
 		//so warm up helps preallocating memory.
 		bench.warmup(1u);

@@ -1,6 +1,7 @@
-#include <DisRegRep/Filter/BruteForceFilter.hpp>
+#include <DisRegRep/Filter/ExplicitRegionAreaFilter.hpp>
 #include <DisRegRep/Filter/FilterTrait.hpp>
 
+#include <DisRegRep/Container/BlendHistogram.hpp>
 #include <DisRegRep/Container/HistogramCache.hpp>
 #include <DisRegRep/Maths/Arithmetic.hpp>
 
@@ -12,14 +13,14 @@ using std::shared_ptr;
 using std::views::iota;
 
 using namespace DisRegRep;
-namespace SH = SingleHistogram;
+namespace BH = BlendHistogram;
 namespace HC = HistogramCache;
 using Format::SSize_t, Format::SizeVec2, Format::Region_t, Format::Radius_t;
 
 namespace {
 
 template<typename TNormHist, typename TCache>
-struct BFFHistogram {
+struct ExRAHistogram {
 
 	TNormHist Histogram;
 	TCache Cache;
@@ -35,9 +36,9 @@ struct BFFHistogram {
 	}
 
 };
-using BFFdcdh = BFFHistogram<SH::DenseNorm, HC::Dense>;
-using BFFdcsh = BFFHistogram<SH::SparseNormSorted, HC::Dense>;
-using BFFscsh = BFFHistogram<SH::SparseNormUnsorted, HC::Sparse>;
+using ExRAdcdh = ExRAHistogram<BH::DenseNorm, HC::Dense>;
+using ExRAdcsh = ExRAHistogram<BH::SparseNormSorted, HC::Dense>;
+using ExRAscsh = ExRAHistogram<BH::SparseNormUnsorted, HC::Sparse>;
 
 template<typename THist>
 inline const auto& runFilter(const auto& desc, any& memory) {
@@ -49,10 +50,10 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 	const auto [ext_x, ext_y] = toSigned(extent);
 	const auto sradius = toSigned(radius);
 
-	THist& bff_histogram = *any_cast<shared_ptr<THist>&>(memory);
-	bff_histogram.clear();
+	THist& exra_histogram = *any_cast<shared_ptr<THist>&>(memory);
+	exra_histogram.clear();
 
-	auto& [histogram, cache] = bff_histogram;
+	auto& [histogram, cache] = exra_histogram;
 
 	const auto copy_cache_to_histogram = [&histogram, &cache = std::as_const(cache),
 		kernel_area = 1.0 * Arithmetic::kernelArea(radius)](const auto x, const auto y) -> void {
@@ -78,5 +79,5 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 
 }
 
-DEFINE_ALL_REGION_MAP_FILTER_ALLOC_FUNC(BruteForceFilter, ::BFF)
-DEFINE_ALL_REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(BruteForceFilter, ::BFF)
+DEFINE_ALL_REGION_MAP_FILTER_ALLOC_FUNC(ExplicitRegionAreaFilter, ::ExRA)
+DEFINE_ALL_REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(ExplicitRegionAreaFilter, ::ExRA)

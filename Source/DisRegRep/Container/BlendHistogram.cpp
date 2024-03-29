@@ -1,4 +1,4 @@
-#include <DisRegRep/Container/SingleHistogram.hpp>
+#include <DisRegRep/Container/BlendHistogram.hpp>
 #include <DisRegRep/Maths/Arithmetic.hpp>
 
 #include <algorithm>
@@ -14,7 +14,7 @@ using std::ranges::copy, std::ranges::fill, std::ranges::for_each, std::equal,
 
 using namespace DisRegRep;
 using Format::Region_t, Format::Bin_t, Format::NormBin_t, Format::SizeVec2, Format::SizeVec3;
-using SingleHistogram::BasicDense, SingleHistogram::BasicSparseInternalStorage, SingleHistogram::BasicSparse;
+using BlendHistogram::BasicDense, BlendHistogram::BasicSparseInternalStorage, BlendHistogram::BasicSparse;
 using Arithmetic::horizontalProduct;
 
 template<typename T>
@@ -114,7 +114,7 @@ INS_SPARSE(Bin_t);
 INS_SPARSE(NormBin_t);
 
 template<typename U>
-bool SingleHistogram::operator==(const BasicDense<U>& a, const BasicSparse<U, true>& b) {
+bool BlendHistogram::operator==(const BasicDense<U>& a, const BasicSparse<U, true>& b) {
 	//first compare their sizes
 	const auto [dense_x, dense_y, dense_region_count] = a.DenseIndexer.extent();
 	const auto [sparse_x, sparse_y] = b.OffsetIndexer.extent();
@@ -158,11 +158,12 @@ bool SingleHistogram::operator==(const BasicDense<U>& a, const BasicSparse<U, tr
 }
 
 template<typename U>
-bool SingleHistogram::operator==(const BasicSparse<U, true>& a, const BasicDense<U>& b) {
+bool BlendHistogram::operator==(const BasicSparse<U, true>& a, const BasicDense<U>& b) {
 	return b == a;
 }
 
-#define INS_EQ(TYPE) template bool SingleHistogram::operator==<TYPE>(const BasicDense<TYPE>&, const BasicSparse<TYPE, true>&); \
-template bool SingleHistogram::operator==<TYPE>(const BasicSparse<TYPE, true>&, const BasicDense<TYPE>&)
+#define INS_EQ(TYPE) \
+template bool BlendHistogram::operator==<TYPE>(const BasicDense<TYPE>&, const BasicSparse<TYPE, true>&); \
+template bool BlendHistogram::operator==<TYPE>(const BasicSparse<TYPE, true>&, const BasicDense<TYPE>&)
 INS_EQ(Bin_t);
 INS_EQ(NormBin_t);
