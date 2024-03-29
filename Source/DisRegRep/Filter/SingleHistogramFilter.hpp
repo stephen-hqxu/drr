@@ -7,7 +7,7 @@ namespace DisRegRep {
 /**
  * @brief Meet SHF, our proposed method for lightening fast filtering region map.
 */
-class DRR_API SingleHistogramFilter : public RegionMapFilter {
+class SingleHistogramFilter : public RegionMapFilter {
 public:
 
 	constexpr SingleHistogramFilter() noexcept = default;

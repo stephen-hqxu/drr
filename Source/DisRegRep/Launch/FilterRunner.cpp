@@ -1,8 +1,9 @@
 //WORKAROUND: MSVC's bug for not having constexpr mutex by default,
 //	their documentation says it will be fixed in 17.9
+//UPDATE: We are on 17.9 right now and it is still not fixed? Wtf Microsoft?
 #define _ENABLE_CONSTEXPR_MUTEX_CONSTRUCTOR
 
-#include "FilterRunner.hpp"
+#include <DisRegRep/Launch/FilterRunner.hpp>
 
 #include <DisRegRep/Factory/VoronoiRegionFactory.hpp>
 

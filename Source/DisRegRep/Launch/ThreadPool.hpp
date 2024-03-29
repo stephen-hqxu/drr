@@ -1,7 +1,5 @@
 #pragma once
 
-#include <DisRegRep/ProgramExport.hpp>
-
 #include <queue>
 #include <functional>
 
@@ -20,7 +18,7 @@ namespace DisRegRep {
 /**
  * @brief A pool of reusable threads.
 */
-class DRR_API ThreadPool {
+class ThreadPool {
 public:
 
 	/**

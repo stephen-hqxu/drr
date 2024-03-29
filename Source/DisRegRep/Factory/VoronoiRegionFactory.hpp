@@ -9,7 +9,7 @@ namespace DisRegRep {
 /**
  * @brief Generate a region map organised as a voronoi diagram.
 */
-class DRR_API VoronoiRegionFactory : public RegionMapFactory {
+class VoronoiRegionFactory : public RegionMapFactory {
 public:
 
 	std::uint64_t RandomSeed;/**< Seed used by random number generator */

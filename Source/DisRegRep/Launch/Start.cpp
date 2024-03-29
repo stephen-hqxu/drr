@@ -8,9 +8,9 @@
 #include <DisRegRep/Filter/BruteForceFilter.hpp>
 #include <DisRegRep/Filter/SingleHistogramFilter.hpp>
 
-#include "FilterRunner.hpp"
-#include "FilterTester.hpp"
-#include "Utility.hpp"
+#include <DisRegRep/Launch/FilterRunner.hpp>
+#include <DisRegRep/Launch/FilterTester.hpp>
+#include <DisRegRep/Launch/Utility.hpp>
 
 #include <string>
 #include <span>

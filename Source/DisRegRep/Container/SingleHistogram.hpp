@@ -1,6 +1,5 @@
 #pragma once
 
-#include <DisRegRep/ProgramExport.hpp>
 #include "ContainerTrait.hpp"
 #include "SparseBin.hpp"
 
@@ -38,15 +37,16 @@ class BasicDense;
 template<typename, bool>
 class BasicSparse;
 
-#define DENSE_EQ_SPARSE(QUAL) \
-template<typename U> \
-QUAL bool operator==(const BasicDense<U>&, const BasicSparse<U, true>&); \
-template<typename U> \
-QUAL bool operator==(const BasicSparse<U, true>&, const BasicDense<U>&)
+template<typename U>
+bool operator==(const BasicDense<U>&, const BasicSparse<U, true>&);
+template<typename U>
+bool operator==(const BasicSparse<U, true>&, const BasicDense<U>&);
 
-DENSE_EQ_SPARSE(DRR_API);
-
-#define FRIEND_DENSE_EQ_SPARSE DENSE_EQ_SPARSE(DRR_API friend)
+#define FRIEND_DENSE_EQ_SPARSE \
+template<typename U> \
+friend bool operator==(const BasicDense<U>&, const BasicSparse<U, true>&); \
+template<typename U> \
+friend bool operator==(const BasicSparse<U, true>&, const BasicDense<U>&)
 
 template<typename T>
 class BasicDense {
@@ -93,7 +93,7 @@ public:
 	 * 
 	 * @return True if two histograms are identical.
 	*/
-	DRR_API bool operator==(const BasicDense&) const;
+	bool operator==(const BasicDense&) const;
 
 	FRIEND_DENSE_EQ_SPARSE;
 
@@ -102,7 +102,7 @@ public:
 	 * 
 	 * @return The size in byte.
 	*/
-	DRR_API size_t sizeByte() const noexcept;
+	size_t sizeByte() const noexcept;
 
 	/**
 	 * @brief Resize the dimension of histogram.
@@ -111,7 +111,7 @@ public:
 	 * @param dimension The new dimension.
 	 * @param region_count The number of region per histogram.
 	*/
-	DRR_API void resize(const Format::SizeVec2&, Format::Region_t);
+	void resize(const Format::SizeVec2&, Format::Region_t);
 
 	/**
 	 * @brief This function must be called to reset internal state before commencing new computations.
@@ -217,7 +217,7 @@ public:
 	 * 
 	 * @return The size in byte.
 	*/
-	DRR_API size_t sizeByte() const noexcept;
+	size_t sizeByte() const noexcept;
 
 	/**
 	 * @brief Resize the histogram.
@@ -227,14 +227,14 @@ public:
 	 * @param region_count The number of region per histogram.
 	 * This argument is unused in sparse histogram, keeping this for API consistency.
 	*/
-	DRR_API void resize(Format::SizeVec2, Format::Region_t);
+	void resize(Format::SizeVec2, Format::Region_t);
 
 	/**
 	 * @brief Clear the sparse histogram for new computations.
 	 * This function must be called to reset internal state of the histogram
 	 * and clear old values before commencing any computations.
 	*/
-	DRR_API void clear();
+	void clear();
 
 	/**
 	 * @brief Push some bins from a dense histogram into the current sparse histogram.
@@ -300,7 +300,7 @@ public:
 
 	//Convert a unsorted sparse histogram to a sorted one.
 	//CONSIDER: Can add other constructors if needed.
-	DRR_API BasicSparse& operator=(BasicSparse<T, false>&&);
+	BasicSparse& operator=(BasicSparse<T, false>&&);
 
 	constexpr ~BasicSparse() = default;
 
@@ -311,7 +311,7 @@ public:
 	 *
 	 * @return True if two histograms are identical if all offsets and bins are equal.
 	*/
-	DRR_API bool operator==(const BasicSparse&) const;
+	bool operator==(const BasicSparse&) const;
 
 	FRIEND_DENSE_EQ_SPARSE;
 

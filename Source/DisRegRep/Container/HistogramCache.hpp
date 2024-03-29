@@ -1,6 +1,5 @@
 #pragma once
 
-#include <DisRegRep/ProgramExport.hpp>
 #include "ContainerTrait.hpp"
 #include "SparseBin.hpp"
 
@@ -202,8 +201,8 @@ public:
 	 * @param region The region to be added. It will be incremented by one.
 	 * @param input A range of bins to be incremented.
 	*/
-	DRR_API void increment(const bin_type&);
-	DRR_API void increment(Format::Region_t);
+	void increment(const bin_type&);
+	void increment(Format::Region_t);
 
 	template<SparseBin::SparseBinRangeValue<bin_type::value_type> R>
 	void increment(R&& input) {
@@ -224,8 +223,8 @@ public:
 	 * @param region The region to be removed. It will be decremented by one.
 	 * @param input The range of bins to be decremented.
 	*/
-	DRR_API void decrement(const bin_type&);
-	DRR_API void decrement(Format::Region_t);
+	void decrement(const bin_type&);
+	void decrement(Format::Region_t);
 
 	template<SparseBin::SparseBinRangeValue<bin_type::value_type> R>
 	void decrement(R&& input) {

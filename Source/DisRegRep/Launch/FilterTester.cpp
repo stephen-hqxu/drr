@@ -1,4 +1,4 @@
-#include "FilterTester.hpp"
+#include <DisRegRep/Launch/FilterTester.hpp>
 
 #include <DisRegRep/Format.hpp>
 #include <DisRegRep/Maths/Arithmetic.hpp>

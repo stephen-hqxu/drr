@@ -1,6 +1,5 @@
 #pragma once
 
-#include <DisRegRep/ProgramExport.hpp>
 #include "../Format.hpp"
 #include "../Maths/Indexer.hpp"
 
@@ -11,7 +10,7 @@ namespace DisRegRep {
 /**
  * @brief A 2D matrix of regions.
 */
-class DRR_API RegionMap {
+class RegionMap {
 private:
 
 	std::vector<Format::Region_t> Map;/**< Region map data. */

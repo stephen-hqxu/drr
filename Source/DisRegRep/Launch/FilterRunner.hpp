@@ -1,11 +1,11 @@
 #pragma once
 
-#include <DisRegRep/Format.hpp>
-#include <DisRegRep/ThreadPool.hpp>
-#include <DisRegRep/Container/RegionMap.hpp>
+#include "ThreadPool.hpp"
+#include "../Format.hpp"
+#include "../Container/RegionMap.hpp"
 
-#include <DisRegRep/Factory/RegionMapFactory.hpp>
-#include <DisRegRep/Filter/RegionMapFilter.hpp>
+#include "../Factory/RegionMapFactory.hpp"
+#include "../Filter/RegionMapFilter.hpp"
 
 #include "Utility.hpp"
 

@@ -162,7 +162,7 @@ bool SingleHistogram::operator==(const BasicSparse<U, true>& a, const BasicDense
 	return b == a;
 }
 
-#define INS_EQ(TYPE) template DRR_API bool SingleHistogram::operator==<TYPE>(const BasicDense<TYPE>&, const BasicSparse<TYPE, true>&); \
-template DRR_API bool SingleHistogram::operator==<TYPE>(const BasicSparse<TYPE, true>&, const BasicDense<TYPE>&)
+#define INS_EQ(TYPE) template bool SingleHistogram::operator==<TYPE>(const BasicDense<TYPE>&, const BasicSparse<TYPE, true>&); \
+template bool SingleHistogram::operator==<TYPE>(const BasicSparse<TYPE, true>&, const BasicDense<TYPE>&)
 INS_EQ(Bin_t);
 INS_EQ(NormBin_t);

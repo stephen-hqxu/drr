@@ -1,6 +1,5 @@
 #pragma once
 
-#include <DisRegRep/ProgramExport.hpp>
 #include "../Format.hpp"
 #include "../Container/RegionMap.hpp"
 
@@ -12,7 +11,7 @@ namespace DisRegRep {
 /**
  * @brief A base class for implementation to create a region map.
 */
-class DRR_API RegionMapFactory {
+class RegionMapFactory {
 public:
 
 	/**

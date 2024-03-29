@@ -1,4 +1,4 @@
-#include <DisRegRep/ThreadPool.hpp>
+#include <DisRegRep/Launch/ThreadPool.hpp>
 
 #include <algorithm>
 #include <ranges>

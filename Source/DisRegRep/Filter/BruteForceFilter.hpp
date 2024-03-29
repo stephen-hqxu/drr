@@ -7,7 +7,7 @@ namespace DisRegRep {
 /**
  * @brief A brute-force implementation of region map filter, which is expected to be very slow.
 */
-class DRR_API BruteForceFilter : public RegionMapFilter {
+class BruteForceFilter : public RegionMapFilter {
 public:
 
 	constexpr BruteForceFilter() noexcept = default;

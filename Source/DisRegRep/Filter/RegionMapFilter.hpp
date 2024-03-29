@@ -1,6 +1,5 @@
 #pragma once
 
-#include <DisRegRep/ProgramExport.hpp>
 #include "../Format.hpp"
 #include "../Container/RegionMap.hpp"
 #include "../Container/SingleHistogram.hpp"

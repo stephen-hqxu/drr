@@ -1,7 +1,7 @@
 #pragma once
 
-#include <DisRegRep/Factory/RegionMapFactory.hpp>
-#include <DisRegRep/Filter/RegionMapFilter.hpp>
+#include "../Factory/RegionMapFactory.hpp"
+#include "../Filter/RegionMapFilter.hpp"
 
 #include <span>
 
