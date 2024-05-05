@@ -2,8 +2,8 @@
 
 #include <array>
 
-#include <type_traits>
 #include <cstdint>
+#include <cstddef>
 
 namespace DisRegRep {
 
@@ -12,10 +12,10 @@ namespace DisRegRep {
 */
 namespace Format {
 
-using Size_t = std::size_t;/**< Represent a 1D size. */
-using SSize_t = std::make_signed_t<Size_t>;/**< Represent a signed 1D size. */
+using Size_t = std::uint64_t;/**< Represent a 1D size. */
+using SSize_t = std::int64_t;/**< Represent a signed 1D size. */
 
-template<size_t S>
+template<std::size_t S>
 using SizeVecN = std::array<Size_t, S>;/**< Represent an N-D size. */
 using SizeVec2 = SizeVecN<2u>;/**< Represent a 2D size. */
 using SizeVec3 = SizeVecN<3u>;/**< Represent a 3D size. */

@@ -32,7 +32,7 @@ public:
 
 private:
 
-	std::queue<std::function<void(const ThreadInfo&)>> Job;
+	std::queue<std::move_only_function<void(const ThreadInfo&)>> Job;
 
 	std::mutex Mutex;
 	std::condition_variable Signal;
@@ -55,13 +55,13 @@ public:
 	//The first argument in the function receives a thread info structure.
 	template<typename Func, typename... Arg, typename Ret = std::invoke_result_t<Func, ThreadInfo, Arg...>>
 	[[nodiscard]] std::future<Ret> enqueue(Func&& func, Arg&&... arg) {
-		using std::forward, std::invoke;
+		using std::invoke;
 		using namespace std::placeholders;
 
 		const auto pm = std::make_shared_for_overwrite<std::promise<Ret>>();
 		{
 			const auto lock = std::unique_lock(this->Mutex);
-			this->Job.emplace([pm, user_func = std::bind(forward<Func>(func), _1, forward<Arg>(arg)...)]
+			this->Job.emplace([pm, user_func = std::bind(std::forward<Func>(func), _1, std::forward<Arg>(arg)...)]
 			(const ThreadInfo& info) -> void {
 				try {
 					if constexpr (std::is_same_v<Ret, void>) {

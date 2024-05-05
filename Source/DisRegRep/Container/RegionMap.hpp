@@ -38,11 +38,11 @@ public:
 	 *
 	 * @return The region value.
 	*/
-	constexpr Format::Region_t& operator()(const auto x, const auto y) noexcept {
-		return this->Map[this->RegionMapIndexer(x, y)];
+	constexpr Format::Region_t& operator[](const auto x, const auto y) noexcept {
+		return this->Map[this->RegionMapIndexer[x, y]];
 	}
-	constexpr Format::Region_t operator()(const auto x, const auto y) const noexcept {
-		return this->Map[this->RegionMapIndexer(x, y)];
+	constexpr Format::Region_t operator[](const auto x, const auto y) const noexcept {
+		return this->Map[this->RegionMapIndexer[x, y]];
 	}
 
 	/**

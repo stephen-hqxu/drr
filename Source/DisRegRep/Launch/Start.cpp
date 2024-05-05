@@ -3,8 +3,8 @@
 #include <DisRegRep/Factory/VoronoiRegionFactory.hpp>
 
 #include <DisRegRep/Filter/RegionMapFilter.hpp>
-#include <DisRegRep/Filter/ExplicitRegionAreaFilter.hpp>
-#include <DisRegRep/Filter/ExplicitRegionAreaSAFilter.hpp>
+#include <DisRegRep/Filter/OriginalRegionAreaFilter.hpp>
+#include <DisRegRep/Filter/FastRegionAreaFilter.hpp>
 
 #include <DisRegRep/Launch/FilterRunner.hpp>
 #include <DisRegRep/Launch/FilterTester.hpp>
@@ -14,7 +14,6 @@
 #include <span>
 #include <array>
 
-#include <execution>
 #include <algorithm>
 #include <ranges>
 
@@ -26,6 +25,7 @@
 
 #include <exception>
 #include <cstdint>
+#include <cstdlib>
 
 using std::span, std::array, std::string;
 using std::ranges::copy, std::ranges::max_element,
@@ -45,7 +45,7 @@ namespace {
 //We store all benchmark settings here!
 constexpr struct BenchmarkContext {
 
-	constexpr static uint64_t Seed = 0x1CD4C39A662BF9CAull;
+	uint64_t Seed = 0x1CD4C39A662BF9CAull;
 
 	//Common parameters for sweeping a variable.
 	template<typename T>
@@ -187,7 +187,7 @@ template<size_t S1, size_t S2, size_t S3, size_t S4>
 void runRadius(const ::RunDescription<S1, S2>& regular_desc, const span<RegionMap, S1> regular_rm,
 	const ::RunDescription<S3, S4>& stress_desc, const span<RegionMap, S3> stress_rm) {
 	const auto run = [](const auto& desc, const auto& region_map_arr, const F::Region_t region_count,
-		const F::SizeVec2& extent, const auto& sweep_radius, const string& tag = { }) -> void {
+		const F::SizeVec2& extent, const auto& sweep_radius, const string& tag) static -> void {
 			const auto& [runner, factory_arr, filter_arr] = desc;
 			for (const auto [factory, region_map] : zip(factory_arr, region_map_arr)) {
 				Lnc::Utility::generateMinimumRegionMap(region_map, *factory, extent,
@@ -201,7 +201,7 @@ void runRadius(const ::RunDescription<S1, S2>& regular_desc, const span<RegionMa
 			}
 		};
 	{
-		run(regular_desc, regular_rm, ::DS.RegionCount, ::DS.Extent, ::RadiusVariation);
+		run(regular_desc, regular_rm, ::DS.RegionCount, ::DS.Extent, ::RadiusVariation, "Default");
 	}
 	{
 		constexpr auto& SRS = ::DS.SweepRadiusStress;
@@ -216,7 +216,8 @@ void runRegionCount(const ::RunDescription<S1, S2>& run_desc) {
 	for (const auto factory : factory_arr) {
 		runner.sweepRegionCount({
 			.Factory = factory,
-			.Filter = filter_arr
+			.Filter = filter_arr,
+			.UserTag = "Default"
 		}, ::DS.Extent, ::DS.Radius, ::RegionVariation);
 	}
 }
@@ -226,24 +227,25 @@ void runCentroidCount(const ::RunDescription<S1, S2>& run_desc) {
 	const auto& [runner, _, filter_arr] = run_desc;
 
 	runner.sweepCentroidCount({
-		.Filter = filter_arr
+		.Filter = filter_arr,
+		.UserTag = "Default"
 	}, ::DS.Extent, ::DS.Radius, ::DS.RegionCount, ::DS.Seed, ::CentroidVariation);
 }
 
 void run() {
 	println("Initialising test environment...");
 	//factory
-	const auto random_factory = RandomRegionFactory(::BenchmarkContext::Seed);
-	const auto voronoi_factory = VoronoiRegionFactory(::BenchmarkContext::Seed, ::DS.CentroidCount);
+	const auto random_factory = RandomRegionFactory(::DS.Seed);
+	const auto voronoi_factory = VoronoiRegionFactory(::DS.Seed, ::DS.CentroidCount);
 	//filter
-	const ExplicitRegionAreaFilter exra;
-	const ExplicitRegionAreaSAFilter exrasa;
+	const OriginalRegionAreaFilter original_filter;
+	const FastRegionAreaFilter fast_filter;
 
 	const array<const RegionMapFactory*, 2u> factory_array {
 		&random_factory, &voronoi_factory
 	};
 	const array<const RegionMapFilter*, 2u> filter_array {
-		&exra, &exrasa
+		&original_filter, &fast_filter
 	};
 	const span factory = factory_array;
 	const span filter = filter_array;
@@ -298,14 +300,12 @@ void run() {
 
 }
 
-int main() {
+int main() try {
 	println("Welcome to Discrete Region Representation filter benchmark system\n");
-	try {
-		::run();
-	} catch (const exception& e) {
-		::handleException(e);
-		return 1;
-	}
+	::run();
 	println("Program exit normally :)");
-	return 0;
+	return EXIT_SUCCESS;
+} catch (const exception& e) {
+	::handleException(e);
+	std::exit(EXIT_FAILURE);
 }

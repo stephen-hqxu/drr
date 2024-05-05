@@ -7,10 +7,12 @@
 #include "../Maths/Arithmetic.hpp"
 #include "../Maths/Indexer.hpp"
 
-#include <vector>
-#include <span>
-#include <utility>
 #include <ranges>
+#include <span>
+#include <vector>
+
+#include <concepts>
+#include <utility>
 
 #include <cstdint>
 
@@ -62,8 +64,8 @@ private:
 	using DenseIndexer_t = Indexer<1, 2, 0>;/**< Default indexing order of histogram. */
 	DenseIndexer_t DenseIndexer;
 
-	constexpr size_t getOffset(const auto x, const auto y) const noexcept {
-		return this->DenseIndexer(x, y, 0);
+	constexpr DenseIndexer_t::index_type getOffset(const auto x, const auto y) const noexcept {
+		return this->DenseIndexer[x, y, 0];
 	}
 
 	//Get the iterator to the histogram given 2D coordinate.
@@ -126,7 +128,7 @@ public:
 	 * @brief Set bins of a histogram from a range.
 	 * 
 	 * @tparam R The range type.
-	 * @tparam T The type of factor.
+	 * @tparam Factor The type of factor.
 	 * 
 	 * @param input The input range of bins to be filled into this histogram.
 	 * @param x, y The coordinates into this histogram.
@@ -134,11 +136,11 @@ public:
 	*/
 	template<ContainerTrait::ValueRange<value_type> R>
 	constexpr void operator()(R&& input, const auto x, const auto y) {
-		std::ranges::copy(input, this->getHistogramIterator(x, y));
+		std::ranges::copy(std::forward<R>(input), this->getHistogramIterator(x, y));
 	}
-	template<std::ranges::input_range R, typename T>
+	template<std::ranges::input_range R, typename Factor>
 	requires(std::floating_point<value_type>)
-	void operator()(R&& input, const auto x, const auto y, const T factor) {
+	void operator()(R&& input, const auto x, const auto y, const Factor factor) {
 		Arithmetic::scaleRange(std::forward<R>(input), this->getHistogramIterator(x, y), factor);
 	}
 
@@ -149,7 +151,7 @@ public:
 	 * 
 	 * @return The view of all bins in a histogram.
 	*/
-	constexpr ConstBinView operator()(const auto x, const auto y) const noexcept {
+	constexpr ConstBinView operator[](const auto x, const auto y) const noexcept {
 		return ConstBinView(this->getHistogramIterator(x, y), this->DenseIndexer.extent(2u));
 	}
 
@@ -187,16 +189,16 @@ protected:
 	template<typename R>
 	constexpr void insertBin(R&& input, const auto x, const auto y) {
 		auto& bin_y = this->Bin[y];
-		bin_y.append_range(input);
-		this->Offset[this->OffsetIndexer(x + 1, y)] = static_cast<offset_type>(bin_y.size());
+		bin_y.append_range(std::forward<R>(input));
+		this->Offset[this->OffsetIndexer[x + 1, y]] = static_cast<offset_type>(bin_y.size());
 	}
 
 	//Get the index bound of bins for a histogram.
 	constexpr auto getBinBound(const auto x, const auto y) const noexcept {
 		//as offset matrix is row-major linear, we are doing this to avoid recalculating the offset linear index twice
-		const size_t offset_idx = this->OffsetIndexer(x, y),
-			bin_start_idx = this->Offset[offset_idx],
-			//this is equivalent to `this->OffsetIndexer(x + 1, y)`
+		const BinOffsetIndexer_t::index_type offset_idx = this->OffsetIndexer[x, y];
+		const offset_type bin_start_idx = this->Offset[offset_idx],
+			//this is equivalent to `this->OffsetIndexer[x + 1, y]`
 			bin_end_idx = this->Offset[offset_idx + 1u];
 		return std::make_pair(bin_start_idx, bin_end_idx);
 	}
@@ -241,7 +243,7 @@ public:
 	 * @brief Push some bins from a dense histogram into the current sparse histogram.
 	 * 
 	 * @tparam R The type of input range.
-	 * @tparam T The type of factor.
+	 * @tparam Factor The type of factor.
 	 * 
 	 * @param input The input range containing bins to be pushed.
 	 * @param x, y The index to the histogram whose bins are belonging to.
@@ -252,11 +254,11 @@ public:
 	requires(!SparseBin::SparseBinRange<R>)
 	constexpr void operator()(R&& input, const auto x, const auto y) {
 		using Range_t = std::ranges::range_value_t<R>;
-		auto input_range = input
+		auto input_range = std::forward<R>(input)
 			| std::views::enumerate
-			| std::views::filter([](const auto& bin) constexpr noexcept {
+			| std::views::filter([](const auto& bin) constexpr static noexcept {
 				return std::get<1u>(bin) != Range_t { 0 };
-			}) | std::views::transform([](const auto& bin) constexpr noexcept {
+			}) | std::views::transform([](const auto& bin) constexpr static noexcept {
 				const auto [region, value] = bin;
 				return bin_type {
 					.Region = static_cast<Format::Region_t>(region),
@@ -265,11 +267,11 @@ public:
 			});
 		this->insertBin(input_range, x, y);
 	}
-	template<std::ranges::input_range R, typename T>
+	template<std::ranges::input_range R, typename Factor>
 	requires(!SparseBin::SparseBinRange<R> && std::floating_point<value_type>)
-	constexpr void operator()(R&& input, const auto x, const auto y, const T factor) {
+	constexpr void operator()(R&& input, const auto x, const auto y, const Factor factor) {
 		//resolves to the function above ^^^
-		(*this)(input | std::views::transform(
+		(*this)(std::forward<R>(input) | std::views::transform(
 			[factor](const auto value) constexpr noexcept { return SCALE_TRANSFORM; }), x, y);
 	}
 
@@ -280,7 +282,7 @@ public:
 	 * 
 	 * @return The view into the histogram bins for the current coordinate.
 	*/
-	constexpr ConstBinView operator()(const auto x, const auto y) const noexcept {
+	constexpr ConstBinView operator[](const auto x, const auto y) const noexcept {
 		const auto [first, last] = this->getBinBound(x, y);
 		const auto bin_it = this->Bin[y].cbegin();
 		return ConstBinView(bin_it + first, bin_it + last);
@@ -341,7 +343,7 @@ public:
 	 * @brief Push some bins from a sparse histogram into the current one.
 	 * 
 	 * @tparam R The type of input range.
-	 * @tparam T The type of factor.
+	 * @tparam Factor The type of factor.
 	 * 
 	 * @param input The input range containing bins to be pushed.
 	 * @param x,y The index to the histogram.
@@ -351,11 +353,11 @@ public:
 	constexpr void operator()(R&& input, const auto x, const auto y) {
 		this->insertBin(std::forward<R>(input), x, y);
 	}
-	template<SparseBin::SparseBinRange R, typename T>
+	template<SparseBin::SparseBinRange R, typename Factor>
 	requires(std::floating_point<value_type>)
-	constexpr void operator()(R&& input, const auto x, const auto y, const T factor) {
+	constexpr void operator()(R&& input, const auto x, const auto y, const Factor factor) {
 		//resolves to the function above ^^^
-		(*this)(input | std::views::transform([factor](const auto& bin) constexpr noexcept {
+		(*this)(std::forward<R>(input) | std::views::transform([factor](const auto& bin) constexpr noexcept {
 			const auto [region, value] = bin;
 			return bin_type {
 				.Region = region,

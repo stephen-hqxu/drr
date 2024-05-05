@@ -8,15 +8,15 @@ namespace DisRegRep {
  * @brief A unoptimised implementation to filter the region map and generate a region descriptor blend histogram, which is
  * expected to be very slow.
  */
-class ExplicitRegionAreaFilter : public RegionMapFilter {
+class OriginalRegionAreaFilter : public RegionMapFilter {
 public:
 
-	constexpr ExplicitRegionAreaFilter() noexcept = default;
+	constexpr OriginalRegionAreaFilter() noexcept = default;
 
-	constexpr ~ExplicitRegionAreaFilter() override = default;
+	constexpr ~OriginalRegionAreaFilter() override = default;
 
 	constexpr std::string_view name() const noexcept override {
-		return "ExRA";
+		return "ReAB";
 	}
 
 	REGION_MAP_FILTER_ALLOC_FUNC_ALL;

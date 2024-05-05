@@ -37,14 +37,14 @@ void BasicDense<T>::resize(const SizeVec2& dimension, const Region_t region_coun
 	this->DenseIndexer = DenseIndexer_t(dim_3);
 }
 
-#define INS_DENSE(TYPE) template class BasicDense<TYPE>
+#define INS_DENSE(TYPE) template class BlendHistogram::BasicDense<TYPE>
 INS_DENSE(Bin_t);
 INS_DENSE(NormBin_t);
 
 template<typename T>
 size_t BasicSparseInternalStorage<T>::sizeByte() const noexcept {
 	const auto bin_row = this->Bin | all | transform(
-		[](const auto& bin) constexpr noexcept { return bin.size(); });
+		[](const auto& bin) constexpr static noexcept { return bin.size(); });
 	return this->Offset.size() * sizeof(offset_type)
 		+ this->Bin.size() * sizeof(typename decltype(this->Bin)::value_type)
 		+ std::reduce(bin_row.cbegin(), bin_row.cend()) * sizeof(bin_type);
@@ -68,10 +68,10 @@ void BasicSparseInternalStorage<T>::clear() {
 	//initialise starting offset for each row in the new histogram
 	fill(this->Offset, offset_type { });
 	//we will be pushing new values into sparse bins, so need to clear the old ones
-	for_each(this->Bin, [](auto& bin_y) constexpr noexcept { bin_y.clear(); });
+	for_each(this->Bin, [](auto& bin_y) constexpr static noexcept { bin_y.clear(); });
 }
 
-#define INS_SPARSE_INTERNAL(TYPE) template class BasicSparseInternalStorage<TYPE>
+#define INS_SPARSE_INTERNAL(TYPE) template class BlendHistogram::BasicSparseInternalStorage<TYPE>
 INS_SPARSE_INTERNAL(Bin_t);
 INS_SPARSE_INTERNAL(NormBin_t);
 
@@ -84,17 +84,16 @@ void BasicSparse<T, true>::sortStorage() {
 		for (const auto x : iota(size_t { 0 }, dim_x - 1u)) {
 			const auto [first, last] = this->getBinBound(x, y);
 			std::ranges::sort(row_it + first, row_it + last, { },
-				[](const auto& bin) constexpr noexcept { return bin.Region; });
+				[](const auto& bin) constexpr static noexcept { return bin.Region; });
 		}
 	}
 }
 
 template<typename T>
 BasicSparse<T, true>& BasicSparse<T, true>::operator=(BasicSparse<T, false>&& unsorted) {
-	using std::move;
-	this->Offset = move(unsorted.Offset);
-	this->Bin = move(unsorted.Bin);
-	this->OffsetIndexer = move(unsorted.OffsetIndexer);
+	this->Offset = std::move(unsorted.Offset);
+	this->Bin = std::move(unsorted.Bin);
+	this->OffsetIndexer = std::move(unsorted.OffsetIndexer);
 
 	this->sortStorage();
 	return *this;
@@ -108,8 +107,8 @@ bool BasicSparse<T, true>::operator==(const BasicSparse& comp) const {
 		&& equal(unseq, left_bin.cbegin(), left_bin.cend(), right_bin.cbegin());
 }
 
-#define INS_SPARSE(TYPE) template class BasicSparse<TYPE, true>; \
-template class BasicSparse<TYPE, false>
+#define INS_SPARSE(TYPE) template class BlendHistogram::BasicSparse<TYPE, true>; \
+template class BlendHistogram::BasicSparse<TYPE, false>
 INS_SPARSE(Bin_t);
 INS_SPARSE(NormBin_t);
 
@@ -125,13 +124,13 @@ bool BlendHistogram::operator==(const BasicDense<U>& a, const BasicSparse<U, tru
 	using Format::Region_t;
 	for (const auto y : iota(size_t { 0 }, dense_y)) {
 		for (const auto x : iota(size_t { 0 }, dense_x)) {
-			const auto dense_hist = a(x, y);
-			const auto sparse_hist = b(x, y);
+			const auto dense_hist = a[x, y];
+			const auto sparse_hist = b[x, y];
 
 			//It should be sorted against region for every histogram
 			//	because of how we constructed the sparse histogram in first place (by enumerate).
 			assert(std::ranges::is_sorted(sparse_hist, { },
-				[](const auto& bin) constexpr noexcept { return bin.Region; }));
+				[](const auto& bin) constexpr static noexcept { return bin.Region; }));
 			const size_t expected_region_count = std::max<size_t>(sparse_hist.back().Region + 1u, dense_region_count);
 
 			//Basically we are forging a dense histogram from sparse, and compare two dense histograms as usual.

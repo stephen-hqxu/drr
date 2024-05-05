@@ -28,7 +28,7 @@ using Format::Size_t, Format::SizeVec2, Format::Region_t;
 namespace {
 
 float l2Distance(const SizeVec2& a, const SizeVec2& b) {
-	const auto it = zip(a, b) | transform([](const auto ab) constexpr noexcept {
+	const auto it = zip(a, b) | transform([](const auto ab) constexpr static noexcept {
 		const auto& [a, b] = ab;
 		return a - b;
 	});
@@ -74,7 +74,7 @@ void VoronoiRegionFactory::operator()(const CreateDescription& desc, RegionMap& 
 					min_element(unseq, it.cbegin(), it.cend())
 				);
 
-				map(x, y) = ra[min_idx];
+				map[x, y] = ra[min_idx];
 			}
 		});
 }

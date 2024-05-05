@@ -11,6 +11,7 @@
 #include <functional>
 
 #include <limits>
+#include <utility>
 
 namespace DisRegRep {
 
@@ -74,7 +75,7 @@ public:
 	}
 	template<ContainerTrait::ValueRange<bin_type> R>
 	void increment(R&& input) {
-		Arithmetic::addRange(this->Histogram, std::plus { }, input, this->Histogram.begin());
+		Arithmetic::addRange(this->Histogram, std::plus {}, std::forward<R>(input), this->Histogram.begin());
 	}
 
 	/**
@@ -91,7 +92,7 @@ public:
 	}
 	template<SparseBin::SparseBinRangeValue<bin_type> R>
 	void increment(R&& input) {
-		std::ranges::for_each(input, [this](const auto& bin) noexcept { this->increment(bin); });
+		std::ranges::for_each(std::forward<R>(input), [this](const auto& bin) noexcept { this->increment(bin); });
 	}
 
 	/**
@@ -107,7 +108,7 @@ public:
 	}
 	template<ContainerTrait::ValueRange<bin_type> R>
 	void decrement(R&& input) {
-		Arithmetic::addRange(this->Histogram, std::minus { }, input, this->Histogram.begin());
+		Arithmetic::addRange(this->Histogram, std::minus {}, std::forward<R>(input), this->Histogram.begin());
 	}
 
 	/**
@@ -124,7 +125,7 @@ public:
 	}
 	template<SparseBin::SparseBinRangeValue<bin_type> R>
 	void decrement(R&& input) {
-		std::ranges::for_each(input, [this](const auto& bin) noexcept { this->decrement(bin); });
+		std::ranges::for_each(std::forward<R>(input), [this](const auto& bin) noexcept { this->decrement(bin); });
 	}
 
 	//////////////////////////
@@ -206,7 +207,7 @@ public:
 
 	template<SparseBin::SparseBinRangeValue<bin_type::value_type> R>
 	void increment(R&& input) {
-		std::ranges::for_each(input, [this](const auto& bin) { this->increment(bin); });
+		std::ranges::for_each(std::forward<R>(input), [this](const auto& bin) { this->increment(bin); });
 	}
 
 	/**
@@ -228,7 +229,7 @@ public:
 
 	template<SparseBin::SparseBinRangeValue<bin_type::value_type> R>
 	void decrement(R&& input) {
-		std::ranges::for_each(input, [this](const auto& bin) { this->decrement(bin); });
+		std::ranges::for_each(std::forward<R>(input), [this](const auto& bin) { this->decrement(bin); });
 	}
 
 	/////////////////////////

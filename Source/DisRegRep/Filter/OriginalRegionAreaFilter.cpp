@@ -1,4 +1,4 @@
-#include <DisRegRep/Filter/ExplicitRegionAreaFilter.hpp>
+#include <DisRegRep/Filter/OriginalRegionAreaFilter.hpp>
 #include <DisRegRep/Filter/FilterTrait.hpp>
 
 #include <DisRegRep/Container/BlendHistogram.hpp>
@@ -20,7 +20,7 @@ using Format::SSize_t, Format::SizeVec2, Format::Region_t, Format::Radius_t;
 namespace {
 
 template<typename TNormHist, typename TCache>
-struct ExRAHistogram {
+struct ReABHistogram {
 
 	TNormHist Histogram;
 	TCache Cache;
@@ -36,9 +36,9 @@ struct ExRAHistogram {
 	}
 
 };
-using ExRAdcdh = ExRAHistogram<BH::DenseNorm, HC::Dense>;
-using ExRAdcsh = ExRAHistogram<BH::SparseNormSorted, HC::Dense>;
-using ExRAscsh = ExRAHistogram<BH::SparseNormUnsorted, HC::Sparse>;
+using ReABdcdh = ReABHistogram<BH::DenseNorm, HC::Dense>;
+using ReABdcsh = ReABHistogram<BH::SparseNormSorted, HC::Dense>;
+using ReABscsh = ReABHistogram<BH::SparseNormUnsorted, HC::Sparse>;
 
 template<typename THist>
 inline const auto& runFilter(const auto& desc, any& memory) {
@@ -65,7 +65,7 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 
 			for (const auto ry : iota(off_y - sradius, off_y + sradius + 1)) {
 				for (const auto rx : iota(off_x - sradius, off_x + sradius + 1)) {
-					const Region_t region = map(x + rx, y + ry);
+					const Region_t region = map[x + rx, y + ry];
 					cache.increment(region);
 				}
 			}
@@ -79,5 +79,5 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 
 }
 
-DEFINE_ALL_REGION_MAP_FILTER_ALLOC_FUNC(ExplicitRegionAreaFilter, ::ExRA)
-DEFINE_ALL_REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(ExplicitRegionAreaFilter, ::ExRA)
+DEFINE_ALL_REGION_MAP_FILTER_ALLOC_FUNC(OriginalRegionAreaFilter, ::ReAB)
+DEFINE_ALL_REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(OriginalRegionAreaFilter, ::ReAB)

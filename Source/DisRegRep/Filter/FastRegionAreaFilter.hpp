@@ -7,15 +7,15 @@ namespace DisRegRep {
 /**
  * @brief Our proposed method for blazing-fast filtering the region map.
 */
-class ExplicitRegionAreaSAFilter : public RegionMapFilter {
+class FastRegionAreaFilter : public RegionMapFilter {
 public:
 
-	constexpr ExplicitRegionAreaSAFilter() noexcept = default;
+	constexpr FastRegionAreaFilter() noexcept = default;
 
-	constexpr ~ExplicitRegionAreaSAFilter() override = default;
+	constexpr ~FastRegionAreaFilter() override = default;
 
 	constexpr std::string_view name() const noexcept override {
-		return "ExRA+SA";
+		return "ReAB+SA";
 	}
 
 	REGION_MAP_FILTER_ALLOC_FUNC_ALL;

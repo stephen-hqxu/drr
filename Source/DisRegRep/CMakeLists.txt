@@ -8,8 +8,8 @@ add_executable(${DRR_MAIN}
 	Factory/RegionMapFactory.cpp
 	Factory/VoronoiRegionFactory.cpp
 	# Filter/
-	Filter/ExplicitRegionAreaFilter.cpp
-	Filter/ExplicitRegionAreaSAFilter.cpp
+	Filter/FastRegionAreaFilter.cpp
+	Filter/OriginalRegionAreaFilter.cpp
 	# Launch/
 	Launch/FilterRunner.cpp
 	Launch/FilterTester.cpp
@@ -29,9 +29,9 @@ target_sources(${DRR_MAIN} PRIVATE
 	Factory/RegionMapFactory.hpp
 	Factory/VoronoiRegionFactory.hpp
 	# Filter/
-	Filter/ExplicitRegionAreaFilter.hpp
-	Filter/ExplicitRegionAreaSAFilter.hpp
+	Filter/FastRegionAreaFilter.hpp
 	Filter/FilterTrait.hpp
+	Filter/OriginalRegionAreaFilter.hpp
 	Filter/RegionMapFilter.hpp
 	# Launch/
 	Launch/FilterRunner.hpp

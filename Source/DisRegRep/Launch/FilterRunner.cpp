@@ -32,7 +32,7 @@
 using std::ranges::for_each;
 
 using std::string_view, std::span, std::array, std::any;
-using std::to_chars, std::as_const, std::move;
+using std::to_chars, std::as_const;
 using std::ofstream, std::runtime_error, std::format, std::unique_lock;
 
 namespace fs = std::filesystem;
@@ -116,7 +116,7 @@ void FilterRunner::renderReport(Tag, const RunDescription& desc, const auto& ben
 	const auto& [factory, filter, user_tag, _1, _2, result_set] = desc;
 
 	const fs::path report_file = this->ReportRoot / format("{0}({2},{4},{1},{3}).csv", bench.title(),
-		filter->name(), factory->name(), user_tag.empty() ? "Default" : user_tag, Tag::TagName);
+		filter->name(), factory->name(), user_tag, Tag::TagName);
 
 	const auto lock = unique_lock(::GlobalFilesystemLock);
 	auto csv = ofstream(report_file.string());
@@ -143,7 +143,7 @@ template<typename Func>
 void FilterRunner::runFilter(Func&& runner, const SweepDescription& sweep_desc) {
 	//It is very important to make sure to pass all captures by values
 	//	since this function will be run from another thread.
-	const auto invoke_runner = [this, runner = move(runner), sweep_desc](const ThreadPool::ThreadInfo& info,
+	const auto invoke_runner = [this, runner = std::move(runner), sweep_desc](const ThreadPool::ThreadInfo& info,
 		const auto tag, const size_t tag_idx, const size_t filter_idx) -> void {
 		const auto& [factory, filter, user_tag] = sweep_desc;
 			
@@ -208,7 +208,7 @@ void FilterRunner::sweepRadius(const SweepDescription& desc, const RegionMap& re
 
 		this->renderReport(filter_tag, run_desc, bench);
 	};
-	this->runFilter(move(run_radius), desc);
+	this->runFilter(std::move(run_radius), desc);
 }
 
 void FilterRunner::sweepRegionCount(const SweepDescription& desc, const SizeVec2& extent,
@@ -235,7 +235,7 @@ void FilterRunner::sweepRegionCount(const SweepDescription& desc, const SizeVec2
 
 		this->renderReport(filter_tag, run_desc, bench);
 	};
-	this->runFilter(move(run_region_count), desc);
+	this->runFilter(std::move(run_region_count), desc);
 
 }
 
@@ -267,5 +267,5 @@ void FilterRunner::sweepCentroidCount(const SweepDescription& desc, const SizeVe
 
 		this->renderReport(filter_tag, run_desc, bench);
 	};
-	this->runFilter(move(run_centroid_count), desc);
+	this->runFilter(std::move(run_centroid_count), desc);
 }

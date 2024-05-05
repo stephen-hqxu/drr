@@ -1,4 +1,4 @@
-#include <DisRegRep/Filter/ExplicitRegionAreaSAFilter.hpp>
+#include <DisRegRep/Filter/FastRegionAreaFilter.hpp>
 #include <DisRegRep/Filter/FilterTrait.hpp>
 
 #include <DisRegRep/Container/BlendHistogram.hpp>
@@ -32,7 +32,7 @@ constexpr SizeVec2 calcHorizontalHistogramDimension(SizeVec2 histogram_size, con
 }
 
 template<typename THist, typename TNormHist, typename TCache>
-struct ExRASAHistogram {
+struct ReABSAHistogram {
 
 	struct {
 
@@ -57,9 +57,9 @@ struct ExRASAHistogram {
 	}
 
 };
-using ExRASAdcdh = ExRASAHistogram<BH::Dense, BH::DenseNorm, HC::Dense>;
-using ExRASAdcsh = ExRASAHistogram<BH::SparseSorted, BH::SparseNormSorted, HC::Dense>;
-using ExRASAscsh = ExRASAHistogram<BH::SparseUnsorted, BH::SparseNormUnsorted, HC::Sparse>;
+using ReABSAdcdh = ReABSAHistogram<BH::Dense, BH::DenseNorm, HC::Dense>;
+using ReABSAdcsh = ReABSAHistogram<BH::SparseSorted, BH::SparseNormSorted, HC::Dense>;
+using ReABSAscsh = ReABSAHistogram<BH::SparseUnsorted, BH::SparseNormUnsorted, HC::Sparse>;
 
 template<typename THist>
 inline const auto& runFilter(const auto& desc, any& memory) {
@@ -92,7 +92,7 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 		cache.clear();
 		//compute initialise bin for the current row
 		for (const auto rx : iota(off_x - sradius, off_x + sradius + 1)) {
-			const Region_t region = map(rx, rg_y);
+			const Region_t region = map[rx, rg_y];
 			cache.increment(region);
 		}
 		copy_to_histogram_h(0, y);
@@ -101,8 +101,8 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 		for (const auto x : iota(SSize_t { 1 }, ext_x)) {
 			const auto rg_x = off_x + x;
 
-			const Region_t removing_region = map(rg_x - sradius - 1, rg_y),
-				adding_region = map(rg_x + sradius, rg_y);
+			const Region_t removing_region = map[rg_x - sradius - 1, rg_y],
+				adding_region = map[rg_x + sradius, rg_y];
 			cache.decrement(removing_region);
 			cache.increment(adding_region);
 
@@ -117,7 +117,7 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 		<typename Op>(const auto x, const auto y, Op) -> void {
 		//basically add everything from existing histogram into the cache
 		//also remember that axes are swapped
-		const auto bin_view = histogram_h(y, x);
+		const auto bin_view = histogram_h[y, x];
 		if constexpr (is_same_v<Op, plus<void>>) {
 			cache.increment(bin_view);
 		} else {
@@ -157,5 +157,5 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 
 }
 
-DEFINE_ALL_REGION_MAP_FILTER_ALLOC_FUNC(ExplicitRegionAreaSAFilter, ::ExRASA)
-DEFINE_ALL_REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(ExplicitRegionAreaSAFilter, ::ExRASA)
+DEFINE_ALL_REGION_MAP_FILTER_ALLOC_FUNC(FastRegionAreaFilter, ::ReABSA)
+DEFINE_ALL_REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(FastRegionAreaFilter, ::ReABSA)

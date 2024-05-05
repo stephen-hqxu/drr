@@ -150,7 +150,7 @@ bool FilterTester::test(const TestDescription<TestSize>& desc) {
 	/*************************
 	 * Ground truth test
 	 ************************/
-	constexpr static auto deref = [](const auto* const ptr) constexpr noexcept -> const auto& {
+	constexpr static auto deref = [](const auto* const ptr) constexpr static noexcept -> const auto& {
 		return *ptr;
 	};
 

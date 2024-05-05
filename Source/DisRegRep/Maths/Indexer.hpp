@@ -8,6 +8,8 @@
 #include <concepts>
 
 #include <cassert>
+#include <cstddef>
+#include <cstdint>
 
 namespace DisRegRep {
 
@@ -20,13 +22,18 @@ namespace DisRegRep {
 template<size_t... Prec>
 requires(sizeof...(Prec) > 0u)
 class Indexer {
+public:
+
+	using index_type = std::size_t;
+	using rank_type = std::uint8_t;
+
 private:
 
-	constexpr static size_t AxisCount = sizeof...(Prec);
+	constexpr static rank_type AxisCount = sizeof...(Prec);
 	constexpr static std::array AxisPrecedence = { Prec... },
 		//This array basically tells which axis has the highest precedence, and so on.
-		AxisOrder = []() consteval noexcept -> auto {
-			std::array<size_t, AxisCount> order { };
+		AxisOrder = []() consteval static noexcept {
+			std::array<rank_type, AxisCount> order { };
 			for (const auto axis : std::views::iota(0u, AxisCount)) {
 				order[AxisPrecedence[axis]] = axis;
 			}
@@ -34,14 +41,14 @@ private:
 		}();
 	
 	//Stride of each axis based on precedence.
-	std::array<size_t, AxisCount> Extent, CumSumExtent;
+	std::array<index_type, AxisCount> Extent, CumSumExtent;
 
 	//Calculate extent cumulative sum.
 	template<typename T>
 	constexpr static T calcExtentCumulativeSum(const T& extent) {
 		T cum_sum_ext { };
 
-		size_t cum_ext = 1u;
+		index_type cum_ext = 1u;
 		cum_sum_ext[AxisOrder.front()] = 1u;
 		for (const auto [prev, curr] : AxisOrder | std::views::adjacent<2u>) {
 			cum_ext *= extent[prev];
@@ -59,12 +66,16 @@ public:
 	/**
 	 * @brief Initialise indexer with array of extent length.
 	 * 
-	 * @tparam TExt Type of extent.
-	 * @param extent The array containing extent length.
+	 * @tparam R The type of range of extent.
+	 * @param extent The range containing extent lengths.
 	*/
-	constexpr Indexer(const std::array<size_t, AxisCount>& extent) :
-		Extent(extent), CumSumExtent(Indexer::calcExtentCumulativeSum(this->Extent)) {
-		assert(std::ranges::all_of(extent, [](const auto ext) constexpr noexcept { return std::cmp_greater(ext, 0); }));
+	template<std::ranges::input_range R>
+	requires std::convertible_to<std::ranges::range_value_t<R>, index_type>
+	constexpr Indexer(R&& extent) {
+		std::ranges::copy(std::forward<R>(extent), this->Extent.begin());
+		this->CumSumExtent = Indexer::calcExtentCumulativeSum(this->Extent);
+
+		assert(std::ranges::all_of(extent, [](const auto ext) constexpr static noexcept { return std::cmp_greater(ext, 0); }));
 	}
 
 	/**
@@ -76,7 +87,7 @@ public:
 	*/
 	template<std::integral... TExt>
 	requires(sizeof...(TExt) == AxisCount)
-	constexpr Indexer(const TExt... extent) : Indexer(std::array { static_cast<size_t>(extent)... }) {
+	constexpr Indexer(const TExt... extent) : Indexer(std::array { static_cast<index_type>(extent)... }) {
 		
 	}
 
@@ -90,7 +101,7 @@ public:
 	 * 
 	 * @return The axis extent.
 	*/
-	constexpr size_t extent(const size_t axis) const noexcept {
+	constexpr index_type extent(const rank_type axis) const noexcept {
 		return this->Extent[axis];
 	}
 	constexpr const auto& extent() const noexcept {
@@ -105,20 +116,20 @@ public:
 	*/
 	template<std::integral... TIdx>
 	requires(sizeof...(TIdx) == AxisCount)
-	constexpr size_t operator()(const TIdx... idx) const noexcept {
+	constexpr index_type operator[](const TIdx... idx) const noexcept {
 		using std::index_sequence;
-		constexpr static auto axis_idx = std::make_index_sequence<AxisCount> { };
+		constexpr static auto AxisIdx = std::make_index_sequence<AxisCount> {};
 
 		//extent range check
 		assert((std::cmp_greater_equal(idx, 0) && ...));
-		assert(([&extent = this->Extent, idx...]<size_t... Idx>(index_sequence<Idx...>) {
+		assert(([&extent = this->Extent, idx...]<index_type... Idx>(index_sequence<Idx...>) {
 			return (std::cmp_less(idx, extent[Idx]) && ...);
-		}(axis_idx)));
+		}(AxisIdx)));
 
-		const auto calc = [&stride = this->CumSumExtent, idx...]<size_t... Idx>(index_sequence<Idx...>) noexcept -> size_t {
+		const auto calc = [&stride = this->CumSumExtent, idx...]<index_type... Idx>(index_sequence<Idx...>) noexcept -> index_type {
 			return ((idx * stride[Idx]) + ...);
 		};
-		return calc(axis_idx);
+		return calc(AxisIdx);
 	}
 
 };

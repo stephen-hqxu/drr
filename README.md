@@ -16,8 +16,6 @@ This repository contains the implementation of the magic filter. We keep all of 
 - A **C++23** capable compiler
 - CMake **v3.20 or higher**
 
-As of February 2024, the only compiler supporting a good range of C++23 features is the **MSVC v19.39 or higher** (corresponds to **Visual Studio 2022 17.9 or higher**). Therefore, we have only tested our code with said compiler on Windows. We may update our build script and conduct more testing in the future once more compilers are supported.
-
 This project makes use of [nanobench](https://github.com/martinus/nanobench/tree/v4.3.11) for measuring execution time in our experiment. We have included all dependencies in the repository and no additional setup is required.
 
 ### Compilation
