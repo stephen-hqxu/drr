@@ -3,11 +3,9 @@
 #include "RegionMapFilter.hpp"
 #include "../Format.hpp"
 
-#include <memory>
-
 #include <any>
-
 #include <concepts>
+#include <memory>
 
 //No trailing semicolon is allowed
 #define DEFINE_ALL_REGION_MAP_FILTER_ALLOC_FUNC(FILTER, SHORT_PREFIX) \

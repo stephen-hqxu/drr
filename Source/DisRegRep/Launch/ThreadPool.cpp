@@ -35,7 +35,6 @@ ThreadPool::ThreadPool(const size_t thread_count) :
 }
 
 ThreadPool::~ThreadPool() {
-	std::ranges::for_each_n(this->Worker.get(), this->WorkerCount,
-		[](auto& thread) { thread.request_stop(); });
+	std::ranges::for_each_n(this->Worker.get(), this->WorkerCount, [](auto& thread) static { thread.request_stop(); });
 	this->Signal.notify_all();
 }

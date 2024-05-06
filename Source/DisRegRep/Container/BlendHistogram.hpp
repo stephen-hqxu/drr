@@ -7,6 +7,7 @@
 #include "../Maths/Arithmetic.hpp"
 #include "../Maths/Indexer.hpp"
 
+#include <algorithm>
 #include <ranges>
 #include <span>
 #include <vector>
@@ -14,6 +15,7 @@
 #include <concepts>
 #include <utility>
 
+#include <cstddef>
 #include <cstdint>
 
 namespace DisRegRep {

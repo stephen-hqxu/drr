@@ -114,8 +114,8 @@ public:
 	 * @tparam TIdx... Type of index.
 	 * @param idx... Index into each axis.
 	*/
-	template<std::integral... TIdx>
-	requires(sizeof...(TIdx) == AxisCount)
+	template<typename... TIdx>
+	requires(sizeof...(TIdx) == AxisCount && (std::convertible_to<TIdx, rank_type> && ...))
 	constexpr index_type operator[](const TIdx... idx) const noexcept {
 		using std::index_sequence;
 		constexpr static auto AxisIdx = std::make_index_sequence<AxisCount> {};

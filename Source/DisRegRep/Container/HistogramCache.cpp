@@ -31,7 +31,7 @@ void Sparse::increment(const bin_type& bin) {
 }
 
 void Sparse::increment(const Region_t region) {
-	return this->increment(::createSingleValueBin(region));
+	this->increment(::createSingleValueBin(region));
 }
 
 void Sparse::decrement(const bin_type& bin) {
@@ -54,5 +54,5 @@ void Sparse::decrement(const bin_type& bin) {
 }
 
 void Sparse::decrement(const Region_t region) {
-	return this->decrement(::createSingleValueBin(region));
+	this->decrement(::createSingleValueBin(region));
 }

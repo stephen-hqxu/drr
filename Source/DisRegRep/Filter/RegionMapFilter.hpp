@@ -7,10 +7,6 @@
 #include <any>
 #include <string_view>
 
-#include <algorithm>
-#include <type_traits>
-#include <concepts>
-
 #define DEFINE_TAG(NAME, HIST_TYPE) struct NAME { \
 	using HistogramType = BlendHistogram::HIST_TYPE; \
 	constexpr static std::string_view TagName = #NAME; \

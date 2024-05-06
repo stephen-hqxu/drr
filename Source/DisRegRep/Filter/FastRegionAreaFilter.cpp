@@ -12,7 +12,7 @@
 #include <type_traits>
 
 using std::any, std::any_cast;
-using std::shared_ptr, std::make_shared_for_overwrite;
+using std::shared_ptr;
 using std::views::iota;
 
 using namespace DisRegRep;

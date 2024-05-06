@@ -10,6 +10,8 @@
 #include <DisRegRep/Launch/FilterTester.hpp>
 #include <DisRegRep/Launch/Utility.hpp>
 
+#include <DisRegRep/Format.hpp>
+
 #include <string>
 #include <span>
 #include <array>

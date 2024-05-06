@@ -1,17 +1,19 @@
 #pragma once
 
-#include <queue>
 #include <functional>
-
 #include <memory>
-#include <thread>
-#include <mutex>
-#include <future>
-#include <condition_variable>
+#include <queue>
 
-#include <utility>
+#include <condition_variable>
+#include <future>
+#include <mutex>
+#include <thread>
+
 #include <exception>
 #include <type_traits>
+#include <utility>
+
+#include <cstddef>
 
 namespace DisRegRep {
 
@@ -58,7 +60,7 @@ public:
 		using std::invoke;
 		using namespace std::placeholders;
 
-		const auto pm = std::make_shared_for_overwrite<std::promise<Ret>>();
+		const auto pm = std::make_shared<std::promise<Ret>>();
 		{
 			const auto lock = std::unique_lock(this->Mutex);
 			this->Job.emplace([pm, user_func = std::bind(std::forward<Func>(func), _1, std::forward<Arg>(arg)...)]

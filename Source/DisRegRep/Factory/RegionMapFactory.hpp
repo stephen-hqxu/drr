@@ -3,7 +3,6 @@
 #include "../Format.hpp"
 #include "../Container/RegionMap.hpp"
 
-#include <array>
 #include <string_view>
 
 namespace DisRegRep {

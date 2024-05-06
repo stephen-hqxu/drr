@@ -4,6 +4,7 @@
 #include "../Maths/Indexer.hpp"
 
 #include <vector>
+#include <cstddef>
 
 namespace DisRegRep {
 

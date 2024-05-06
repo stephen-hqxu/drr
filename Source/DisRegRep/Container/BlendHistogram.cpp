@@ -43,8 +43,7 @@ INS_DENSE(NormBin_t);
 
 template<typename T>
 size_t BasicSparseInternalStorage<T>::sizeByte() const noexcept {
-	const auto bin_row = this->Bin | all | transform(
-		[](const auto& bin) constexpr static noexcept { return bin.size(); });
+	const auto bin_row = this->Bin | all | transform([](const auto& bin) constexpr static noexcept { return bin.size(); });
 	return this->Offset.size() * sizeof(offset_type)
 		+ this->Bin.size() * sizeof(typename decltype(this->Bin)::value_type)
 		+ std::reduce(bin_row.cbegin(), bin_row.cend()) * sizeof(bin_type);
@@ -83,8 +82,7 @@ void BasicSparse<T, true>::sortStorage() {
 
 		for (const auto x : iota(size_t { 0 }, dim_x - 1u)) {
 			const auto [first, last] = this->getBinBound(x, y);
-			std::ranges::sort(row_it + first, row_it + last, { },
-				[](const auto& bin) constexpr static noexcept { return bin.Region; });
+			std::ranges::sort(row_it + first, row_it + last, {}, [](const auto& bin) constexpr static noexcept { return bin.Region; });
 		}
 	}
 }
@@ -129,8 +127,7 @@ bool BlendHistogram::operator==(const BasicDense<U>& a, const BasicSparse<U, tru
 
 			//It should be sorted against region for every histogram
 			//	because of how we constructed the sparse histogram in first place (by enumerate).
-			assert(std::ranges::is_sorted(sparse_hist, { },
-				[](const auto& bin) constexpr static noexcept { return bin.Region; }));
+			assert(std::ranges::is_sorted(sparse_hist, {}, [](const auto& bin) constexpr static noexcept { return bin.Region; }));
 			const size_t expected_region_count = std::max<size_t>(sparse_hist.back().Region + 1u, dense_region_count);
 
 			//Basically we are forging a dense histogram from sparse, and compare two dense histograms as usual.
