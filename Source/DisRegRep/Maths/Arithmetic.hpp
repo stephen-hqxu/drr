@@ -76,7 +76,7 @@ inline void scaleRange(R&& input, const O output, const T scalar) {
 
 	std::transform(std::execution::unseq, cbegin(input), cend(input), output,
 		[factor = T { 1 } / scalar](const auto v) constexpr noexcept
-			{ return static_cast<iterator_traits<O>::value_type>(v * factor); });
+			{ return static_cast<typename iterator_traits<O>::value_type>(v * factor); });
 }
 
 /**

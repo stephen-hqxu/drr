@@ -50,10 +50,10 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 	const auto [ext_x, ext_y] = toSigned(extent);
 	const auto sradius = toSigned(radius);
 
-	THist& exra_histogram = *any_cast<shared_ptr<THist>&>(memory);
-	exra_histogram.clear();
+	THist& original_histogram = *any_cast<shared_ptr<THist>&>(memory);
+	original_histogram.clear();
 
-	auto& [histogram, cache] = exra_histogram;
+	auto& [histogram, cache] = original_histogram;
 
 	const auto copy_cache_to_histogram = [&histogram, &cache = std::as_const(cache),
 		kernel_area = 1.0 * Arithmetic::kernelArea(radius)](const auto x, const auto y) -> void {
@@ -80,4 +80,4 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 }
 
 DEFINE_ALL_REGION_MAP_FILTER_ALLOC_FUNC(OriginalRegionAreaFilter, ::ReAB)
-DEFINE_ALL_REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(OriginalRegionAreaFilter, ::ReAB)
+DEFINE_ALL_REGION_MAP_FILTER_FILTER_FUNC_DEF(OriginalRegionAreaFilter, ::ReAB)

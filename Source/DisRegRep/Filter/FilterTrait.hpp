@@ -12,7 +12,7 @@
 REGION_MAP_FILTER_ALLOC_FUNC_DCDH_DEF(FILTER) { DisRegRep::FilterTrait::makeAllocation<SHORT_PREFIX##dcdh>(desc, output); } \
 REGION_MAP_FILTER_ALLOC_FUNC_DCSH_DEF(FILTER) { DisRegRep::FilterTrait::makeAllocation<SHORT_PREFIX##dcsh>(desc, output); } \
 REGION_MAP_FILTER_ALLOC_FUNC_SCSH_DEF(FILTER) { DisRegRep::FilterTrait::makeAllocation<SHORT_PREFIX##scsh>(desc, output); }
-#define DEFINE_ALL_REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(FILTER, SHORT_PREFIX) \
+#define DEFINE_ALL_REGION_MAP_FILTER_FILTER_FUNC_DEF(FILTER, SHORT_PREFIX) \
 REGION_MAP_FILTER_FILTER_FUNC_DCDH_DEF(FILTER) { return ::runFilter<SHORT_PREFIX##dcdh>(desc, output); } \
 REGION_MAP_FILTER_FILTER_FUNC_DCSH_DEF(FILTER) { return ::runFilter<SHORT_PREFIX##dcsh>(desc, output); } \
 REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(FILTER) { return ::runFilter<SHORT_PREFIX##scsh>(desc, output); }

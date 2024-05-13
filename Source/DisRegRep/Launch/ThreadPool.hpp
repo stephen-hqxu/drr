@@ -9,6 +9,7 @@
 #include <mutex>
 #include <thread>
 
+#include <concepts>
 #include <exception>
 #include <type_traits>
 #include <utility>
@@ -34,7 +35,67 @@ public:
 
 private:
 
-	std::queue<std::move_only_function<void(const ThreadInfo&)>> Job;
+	/**
+	 * @brief A type-erased job submitted by the application.
+	 */
+	class JobEntry {
+	public:
+
+		constexpr JobEntry() noexcept = default;
+
+		constexpr virtual ~JobEntry() = default;
+
+		/**
+		 * @brief Execute the job.
+		 *
+		 * @param thread_info The information regarding the executing thread.
+		 */
+		virtual void execute(const ThreadInfo&) = 0;
+
+	};
+
+	/**
+	 * @brief The job entry submitted by the user.
+	 *
+	 * @tparam Func The function to be executed.
+	 */
+	template<typename Func>
+	class UserJobEntry final : public JobEntry {
+	public:
+
+		using return_type = std::invoke_result_t<Func, ThreadInfo>;
+
+		std::promise<return_type> Promise;
+		Func Function;
+
+		/**
+		 * @brief Initialise a user job entry.
+		 *
+		 * @tparam T The type of the wrapped function.
+		 * @param func The wrapped function that takes a thread info as the first argument.
+		 */
+		template<std::same_as<Func> T>
+		UserJobEntry(T&& func) noexcept(std::is_nothrow_move_constructible_v<Func>) : Function(std::forward<T>(func)) { }
+
+		~UserJobEntry() override = default;
+
+		void execute(const ThreadInfo& thread_info) override {
+			using std::invoke;
+			try {
+				if constexpr (std::is_same_v<return_type, void>) {
+					invoke(this->Function, thread_info);
+					this->Promise.set_value();
+				} else {
+					this->Promise.set_value(invoke(this->Function, thread_info));
+				}
+			} catch (...) {
+				this->Promise.set_exception(std::current_exception());
+			}
+		}
+
+	};
+
+	std::queue<std::unique_ptr<JobEntry>> Job;
 
 	std::mutex Mutex;
 	std::condition_variable Signal;
@@ -49,7 +110,11 @@ public:
 	 * 
 	 * @param thread_count The number of thread to hold.
 	*/
-	ThreadPool(size_t);
+	explicit ThreadPool(size_t);
+
+	ThreadPool(ThreadPool&&) = delete;
+
+	ThreadPool& operator=(ThreadPool&&) = delete;
 
 	~ThreadPool();
 
@@ -57,28 +122,20 @@ public:
 	//The first argument in the function receives a thread info structure.
 	template<typename Func, typename... Arg, typename Ret = std::invoke_result_t<Func, ThreadInfo, Arg...>>
 	[[nodiscard]] std::future<Ret> enqueue(Func&& func, Arg&&... arg) {
-		using std::invoke;
 		using namespace std::placeholders;
 
-		const auto pm = std::make_shared<std::promise<Ret>>();
+		std::future<Ret> future;
 		{
 			const auto lock = std::unique_lock(this->Mutex);
-			this->Job.emplace([pm, user_func = std::bind(std::forward<Func>(func), _1, std::forward<Arg>(arg)...)]
-			(const ThreadInfo& info) -> void {
-				try {
-					if constexpr (std::is_same_v<Ret, void>) {
-						invoke(user_func, info);
-						pm->set_value();
-					} else {
-						pm->set_value(invoke(user_func, info));
-					}
-				} catch (...) {
-					pm->set_exception(std::current_exception());
-				}
-			});
+
+			auto user_job = std::make_unique<
+				UserJobEntry<decltype(std::bind(std::forward<Func>(func), _1, std::forward<Arg>(arg)...))>
+			>(std::bind(std::forward<Func>(func), _1, std::forward<Arg>(arg)...));
+			future = user_job->Promise.get_future();
+			this->Job.emplace(std::move(user_job));
 		}
 		this->Signal.notify_one();
-		return pm->get_future();
+		return future;
 	}
 
 };

@@ -9,14 +9,12 @@ namespace DisRegRep {
 /**
  * @brief Create a region map with random number generator.
 */
-class RandomRegionFactory : public RegionMapFactory {
+class RandomRegionFactory final : public RegionMapFactory {
 public:
 
-	std::uint64_t RandomSeed;/**< Set random seed to be effected in the next generation call. */
+	std::uint64_t RandomSeed; /**< Set random seed to be effected in the next generation call. */
 
-	constexpr RandomRegionFactory(const std::uint64_t seed = 0u) noexcept : RandomSeed(seed) {
-
-	}
+	explicit constexpr RandomRegionFactory(const std::uint64_t seed = 0u) noexcept : RandomSeed(seed) { }
 
 	constexpr ~RandomRegionFactory() override = default;
 

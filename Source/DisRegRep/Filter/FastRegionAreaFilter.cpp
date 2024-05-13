@@ -72,10 +72,10 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 	const auto sradius = toSigned(radius);
 	const auto sradius_2 = 2 * sradius;
 
-	THist& exrasa_histogram = *any_cast<shared_ptr<THist>&>(memory);
-	exrasa_histogram.clear();
+	THist& fast_histogram = *any_cast<shared_ptr<THist>&>(memory);
+	fast_histogram.clear();
 
-	auto& [histogram, cache] = exrasa_histogram;
+	auto& [histogram, cache] = fast_histogram;
 	auto& [histogram_h, histogram_full] = histogram;
 
 	const auto copy_to_histogram_h = [&cache = as_const(cache), &histogram_h](const auto x, const auto y) -> void {
@@ -158,4 +158,4 @@ inline const auto& runFilter(const auto& desc, any& memory) {
 }
 
 DEFINE_ALL_REGION_MAP_FILTER_ALLOC_FUNC(FastRegionAreaFilter, ::ReABSA)
-DEFINE_ALL_REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(FastRegionAreaFilter, ::ReABSA)
+DEFINE_ALL_REGION_MAP_FILTER_FILTER_FUNC_DEF(FastRegionAreaFilter, ::ReABSA)

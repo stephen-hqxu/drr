@@ -252,7 +252,7 @@ void run() {
 	const span factory = factory_array;
 	const span filter = filter_array;
 
-	array<RegionMap, filter_array.size()> rm_radius_regular_array;
+	array<RegionMap, factory_array.size()> rm_radius_regular_array;
 	array<RegionMap, 1u> rm_radius_stress_array;
 	const span rm_radius_regular = rm_radius_regular_array;
 	const span rm_radius_stress = rm_radius_stress_array;

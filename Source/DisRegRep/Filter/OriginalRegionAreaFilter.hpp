@@ -8,7 +8,7 @@ namespace DisRegRep {
  * @brief A unoptimised implementation to filter the region map and generate a region descriptor blend histogram, which is
  * expected to be very slow.
  */
-class OriginalRegionAreaFilter : public RegionMapFilter {
+class OriginalRegionAreaFilter final : public RegionMapFilter {
 public:
 
 	constexpr OriginalRegionAreaFilter() noexcept = default;

@@ -172,7 +172,7 @@ void FilterRunner::runFilter(Func&& runner, const SweepDescription& sweep_desc) 
 }
 
 void FilterRunner::waitAll() {
-	for_each(this->PendingTask, [](auto& future) { future.get(); });
+	for_each(this->PendingTask, [](auto& future) static { future.get(); });
 	this->PendingTask.clear();
 }
 

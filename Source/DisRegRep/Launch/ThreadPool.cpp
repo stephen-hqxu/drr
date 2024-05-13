@@ -28,7 +28,7 @@ ThreadPool::ThreadPool(const size_t thread_count) :
 				this->Job.pop();
 
 				lock.unlock();
-				std::invoke(task, info);
+				task->execute(info);
 			}
 		}, thread_idx);
 	});

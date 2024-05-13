@@ -7,7 +7,7 @@ namespace DisRegRep {
 /**
  * @brief Our proposed method for blazing-fast filtering the region map.
 */
-class FastRegionAreaFilter : public RegionMapFilter {
+class FastRegionAreaFilter final : public RegionMapFilter {
 public:
 
 	constexpr FastRegionAreaFilter() noexcept = default;
