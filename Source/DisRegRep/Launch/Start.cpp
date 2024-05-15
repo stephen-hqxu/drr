@@ -6,6 +6,7 @@
 #include <DisRegRep/Filter/OriginalRegionAreaFilter.hpp>
 #include <DisRegRep/Filter/FastRegionAreaFilter.hpp>
 
+#include <DisRegRep/Launch/System/ProcessThreadControl.hpp>
 #include <DisRegRep/Launch/FilterRunner.hpp>
 #include <DisRegRep/Launch/FilterTester.hpp>
 #include <DisRegRep/Launch/Utility.hpp>
@@ -303,6 +304,8 @@ void run() {
 }
 
 int main() try {
+	//this is for the main thread, the benchmark is run on other threads, so lower its priority to vacate the system resources
+	ProcessThreadControl::setPriority(ProcessThreadControl::Priority::Low);
 	println("Welcome to Discrete Region Representation filter benchmark system\n");
 	::run();
 	println("Program exit normally :)");

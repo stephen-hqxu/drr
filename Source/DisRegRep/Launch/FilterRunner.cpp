@@ -7,6 +7,8 @@
 
 #include <DisRegRep/Factory/VoronoiRegionFactory.hpp>
 
+#include <DisRegRep/Launch/System/ProcessThreadControl.hpp>
+
 #include <nb/nanobench.h>
 
 #include <string_view>
@@ -109,6 +111,9 @@ FilterRunner::FilterRunner(const fs::path& test_report_dir) :
 	ReportRoot(test_report_dir), Worker(ThreadCount) {
 	const auto fs_lock = unique_lock(::GlobalFilesystemLock);
 	fs::create_directory(this->ReportRoot);
+
+	//we need to measure time, so better the OS does not do random schedule for the threads until we are done
+	this->Worker.setPriority(ProcessThreadControl::Priority::Max);
 }
 
 template<typename Tag>

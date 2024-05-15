@@ -10,6 +10,9 @@ add_executable(${DRR_MAIN}
 	# Filter/
 	Filter/FastRegionAreaFilter.cpp
 	Filter/OriginalRegionAreaFilter.cpp
+	# Launch/System/
+	Launch/System/Platform.hpp
+	Launch/System/ProcessThreadControl.hpp
 	# Launch/
 	Launch/FilterRunner.cpp
 	Launch/FilterTester.cpp
@@ -33,6 +36,8 @@ target_sources(${DRR_MAIN} PRIVATE
 	Filter/FilterTrait.hpp
 	Filter/OriginalRegionAreaFilter.hpp
 	Filter/RegionMapFilter.hpp
+	# Launch/System/
+	Launch/System/ProcessThreadControl.cpp
 	# Launch/
 	Launch/FilterRunner.hpp
 	Launch/FilterTester.hpp

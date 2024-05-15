@@ -1,5 +1,7 @@
 #pragma once
 
+#include "System/ProcessThreadControl.hpp"
+
 #include <functional>
 #include <memory>
 #include <queue>
@@ -117,6 +119,13 @@ public:
 	ThreadPool& operator=(ThreadPool&&) = delete;
 
 	~ThreadPool();
+
+	/**
+	 * @brief Set the priority for all threads in the thread pool.
+	 *
+	 * @param priority The priority value for all threads.
+	 */
+	void setPriority(ProcessThreadControl::Priority) const;
 
 	//Enqueue a function for thread pool execution.
 	//The first argument in the function receives a thread info structure.

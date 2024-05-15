@@ -4,11 +4,12 @@
 #include <ranges>
 
 using std::jthread, std::stop_token, std::unique_lock;
+using std::ranges::for_each_n;
 
 using namespace DisRegRep;
 
 ThreadPool::ThreadPool(const size_t thread_count) :
-	Worker(std::make_unique_for_overwrite<jthread[]>(thread_count)), WorkerCount(thread_count) {
+	Worker(std::make_unique<jthread[]>(thread_count)), WorkerCount(thread_count) {
 	std::ranges::transform(std::views::iota(size_t { 0 }, thread_count), this->Worker.get(), [this](const auto thread_idx) {
 		return jthread([this](const stop_token should_stop, const size_t thread_idx) {
 			const auto info = ThreadInfo {
@@ -35,6 +36,11 @@ ThreadPool::ThreadPool(const size_t thread_count) :
 }
 
 ThreadPool::~ThreadPool() {
-	std::ranges::for_each_n(this->Worker.get(), this->WorkerCount, [](auto& thread) static { thread.request_stop(); });
+	for_each_n(this->Worker.get(), this->WorkerCount, [](auto& thread) static { thread.request_stop(); });
 	this->Signal.notify_all();
+}
+
+void ThreadPool::setPriority(const ProcessThreadControl::Priority priority) const {
+	for_each_n(
+		this->Worker.get(), this->WorkerCount, [priority](auto& thread) { ProcessThreadControl::setPriority(thread, priority); });
 }
