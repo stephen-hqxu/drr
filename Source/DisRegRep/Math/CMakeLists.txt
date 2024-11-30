@@ -1,0 +1,4 @@
+addMainComponent(
+HEADER
+	Arithmetic
+)

@@ -1,0 +1,10 @@
+addMainComponent(
+HEADER
+	Base
+	FastFullOccupancy
+	Trait
+	VanillaFullOccupancy
+SOURCE
+	FastFullOccupancy
+	VanillaFullOccupancy
+)

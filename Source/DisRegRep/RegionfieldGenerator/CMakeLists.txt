@@ -1,0 +1,9 @@
+addMainComponent(
+HEADER
+	Base
+	Uniform
+	VoronoiDiagram
+SOURCE
+	Uniform
+	VoronoiDiagram
+)

@@ -1,0 +1,12 @@
+addMainComponent(
+HEADER
+	Importance
+	ImportanceCache
+	Regionfield
+	SparseImportanceEntry
+	Trait
+SOURCE
+	Importance
+	ImportanceCache
+	Regionfield
+)

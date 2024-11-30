@@ -1,70 +1,49 @@
-add_executable(${DRR_MAIN}
-	# Container/
-	Container/BlendHistogram.cpp
-	Container/HistogramCache.cpp
-	Container/RegionMap.cpp
-	# Factory/
-	Factory/RandomRegionFactory.cpp
-	Factory/RegionMapFactory.cpp
-	Factory/VoronoiRegionFactory.cpp
-	# Filter/
-	Filter/FastRegionAreaFilter.cpp
-	Filter/OriginalRegionAreaFilter.cpp
-	# Launch/System/
-	Launch/System/Platform.hpp
-	Launch/System/ProcessThreadControl.hpp
-	# Launch/
-	Launch/FilterRunner.cpp
-	Launch/FilterTester.cpp
-	Launch/Start.cpp
-	Launch/ThreadPool.cpp
-)
+cmake_path(GET CMAKE_CURRENT_SOURCE_DIR PARENT_PATH INCLUDE_DIR)
 
-target_sources(${DRR_MAIN} PRIVATE
-	# Container/
-	Container/BlendHistogram.hpp
-	Container/ContainerTrait.hpp
-	Container/HistogramCache.hpp
-	Container/RegionMap.hpp
-	Container/SparseBin.hpp
-	# Factory/
-	Factory/RandomRegionFactory.hpp
-	Factory/RegionMapFactory.hpp
-	Factory/VoronoiRegionFactory.hpp
-	# Filter/
-	Filter/FastRegionAreaFilter.hpp
-	Filter/FilterTrait.hpp
-	Filter/OriginalRegionAreaFilter.hpp
-	Filter/RegionMapFilter.hpp
-	# Launch/System/
-	Launch/System/ProcessThreadControl.cpp
-	# Launch/
-	Launch/FilterRunner.hpp
-	Launch/FilterTester.hpp
-	Launch/ThreadPool.hpp
-	Launch/Utility.hpp
-	# Maths/
-	Maths/Arithmetic.hpp
-	Maths/Indexer.hpp
-	# /
-	Format.hpp
-)
+function(addMainComponent)
+	cmake_parse_arguments(COMPONENT "" "" "HEADER;SOURCE" ${ARGV})
 
-cmake_path(GET CMAKE_CURRENT_SOURCE_DIR PARENT_PATH inc)
-target_include_directories(${DRR_MAIN}
-	PRIVATE ${inc}
-)
-target_link_libraries(${DRR_MAIN}
-	PRIVATE ${DRR_EXTERNAL}
-)
+	list(TRANSFORM COMPONENT_HEADER APPEND .hpp)
+	list(TRANSFORM COMPONENT_SOURCE APPEND .cpp)
 
-get_target_property(src ${DRR_MAIN} SOURCES)
-source_group(
-	TREE ${CMAKE_CURRENT_SOURCE_DIR}
-	FILES ${src}
+	target_sources(${DRR_MAIN} PRIVATE
+	FILE_SET header
+		TYPE HEADERS
+		BASE_DIRS ${INCLUDE_DIR}
+		FILES ${COMPONENT_HEADER}
+	)
+	target_sources(${DRR_MAIN} PRIVATE ${COMPONENT_SOURCE})
+endfunction()
+
+#######################
+### Target Creation ###
+#######################
+add_executable(${DRR_MAIN})
+
+add_subdirectory(Container)
+add_subdirectory(ImportanceComputer)
+add_subdirectory(Math)
+add_subdirectory(Profiler)
+add_subdirectory(RegionfieldGenerator)
+
+target_link_libraries(${DRR_MAIN} PRIVATE
+	argparse::argparse glm::glm nanobench::nanobench yaml-cpp::yaml-cpp
 )
 
 set_target_properties(${DRR_MAIN} PROPERTIES
-	OUTPUT_NAME ${PROJECT_NAME}-Profiler
-	VS_DEBUGGER_WORKING_DIRECTORY $<TARGET_FILE_DIR:${DRR_MAIN}>
+	RUNTIME_OUTPUT_NAME drr
+	VS_DEBUGGER_WORKING_DIRECTORY $<TARGET_FILE:${DRR_MAIN}>
 )
+
+####################
+### Source Group ###
+####################
+get_target_property(DRR_SOURCE ${DRR_MAIN} SOURCES)
+get_target_property(DRR_HEADER ${DRR_MAIN} HEADER_SET_header)
+
+function(addMainSourceGroup)
+	cmake_parse_arguments(GROUP "" "PREFIX" "FILE" ${ARGV})
+	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX ${GROUP_PREFIX} FILES ${GROUP_FILE})
+endfunction()
+addMainSourceGroup(PREFIX Source FILE ${DRR_SOURCE})
+addMainSourceGroup(PREFIX Header FILE ${DRR_HEADER})
