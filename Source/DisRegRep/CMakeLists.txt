@@ -25,6 +25,12 @@ add_subdirectory(ImportanceComputer)
 add_subdirectory(Math)
 add_subdirectory(Profiler)
 add_subdirectory(RegionfieldGenerator)
+addMainComponent(
+HEADER
+	Type
+SOURCE
+	Main
+)
 
 target_link_libraries(${DRR_MAIN} PRIVATE
 	argparse::argparse glm::glm nanobench::nanobench yaml-cpp::yaml-cpp
@@ -32,7 +38,7 @@ target_link_libraries(${DRR_MAIN} PRIVATE
 
 set_target_properties(${DRR_MAIN} PROPERTIES
 	RUNTIME_OUTPUT_NAME drr
-	VS_DEBUGGER_WORKING_DIRECTORY $<TARGET_FILE:${DRR_MAIN}>
+	VS_DEBUGGER_WORKING_DIRECTORY $<TARGET_FILE_DIR:${DRR_MAIN}>
 )
 
 ####################

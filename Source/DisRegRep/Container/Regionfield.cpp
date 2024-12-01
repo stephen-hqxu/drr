@@ -1,19 +1,18 @@
-#include <DisRegRep/Container/RegionMap.hpp>
-#include <DisRegRep/Maths/Arithmetic.hpp>
+#include <DisRegRep/Container/Regionfield.hpp>
 
-#include <cassert>
+#include <DisRegRep/Math/Arithmetic.hpp>
+#include <DisRegRep/Type.hpp>
 
-using namespace DisRegRep;
-using Format::SizeVec2;
+using namespace DisRegRep::Container;
+using DisRegRep::Math::Arithmetic::horizontalProduct;
+using DisRegRep::Type::SizeVec2;
 
-void RegionMap::reshape(const SizeVec2& dimension) {
-	this->Map.resize(Arithmetic::horizontalProduct(dimension));
-	this->Dimension = dimension;
-	this->RegionMapIndexer = RegionMapIndexer_t(dimension);
+void Regionfield::reshape(const SizeVec2 dim) {
+	this->Data.resize(horizontalProduct(dim));
+	this->View = MdSpanType(this->Data.data(), dim.x, dim.y);
 }
 
-size_t RegionMap::size() const noexcept {
-	const size_t s = this->Map.size();
-	assert(s == Arithmetic::horizontalProduct(this->Dimension));
-	return s;
+SizeVec2 Regionfield::dimension() const noexcept {
+	const auto& ext = this->View.extents();
+	return { ext.extent(0U), ext.extent(1U) };
 }

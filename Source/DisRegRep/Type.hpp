@@ -1,30 +1,27 @@
 #pragma once
 
-#include <array>
+#include <glm/fwd.hpp>
+
+#include <type_traits>
 
 #include <cstdint>
-#include <cstddef>
-
-namespace DisRegRep {
 
 /**
- * @brief Standard type for filter format.
-*/
-namespace Format {
+ * @brief Standard types defined to be used in the discrete region representation project.
+ */
+namespace DisRegRep::Type {
 
-using Size_t = std::uint64_t;/**< Represent a 1D size. */
-using SSize_t = std::int64_t;/**< Represent a signed 1D size. */
+using Size = std::uint32_t; /**< Represent an unsigned 1D size. */
+using SignedSize = std::make_signed_t<Size>; /**< Represent a signed 1D size. */
 
-template<std::size_t S>
-using SizeVecN = std::array<Size_t, S>;/**< Represent an N-D size. */
-using SizeVec2 = SizeVecN<2u>;/**< Represent a 2D size. */
-using SizeVec3 = SizeVecN<3u>;/**< Represent a 3D size. */
+template<glm::length_t L>
+using SizeVecN = glm::vec<L, Size>; /**< Represent an N-D size. */
+using SizeVec2 = SizeVecN<2U>; /**< Represent a 2D size. */
+using SizeVec3 = SizeVecN<3U>; /**< Represent a 3D size. */
 
-using Radius_t = std::uint16_t;/**< Type of radius. */
-using Region_t = std::uint8_t;/**< Type of region, which is also the pixel format of region map. */
-using Bin_t = std::uint32_t;/**< Format of bin that stores region count. */
-using NormBin_t = float;/**< Format of bin that stores normalised weight. */
-
-}
+using Radius = std::uint16_t;
+using RegionIdentifier = std::uint8_t; /**< An integer to uniquely identify a region. */
+using RegionImportance = std::uint32_t; /**< Region importance is defined as the frequency of occurence of a region. */
+using RegionMask = glm::float32_t; /**< L1-normalised importance among all regions at the same coordinate. */
 
 }

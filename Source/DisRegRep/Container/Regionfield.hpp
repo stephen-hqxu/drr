@@ -1,84 +1,94 @@
 #pragma once
 
-#include "../Format.hpp"
-#include "../Maths/Indexer.hpp"
+#include <DisRegRep/Type.hpp>
 
+#include <mdspan>
 #include <vector>
-#include <cstddef>
 
-namespace DisRegRep {
+#include <cstdint>
+
+namespace DisRegRep::Container {
 
 /**
- * @brief A 2D matrix of regions.
-*/
-class RegionMap {
+ * @brief Regionfield is a function that tells which region a given point belongs to. In this project regionfield is constructed as a
+ * 2D matrix of region identifiers. The storage uses column-major order.
+ */
+class Regionfield {
+public:
+
+	using ValueType = Type::RegionIdentifier;
+	using IndexType = std::uint16_t;
+
 private:
 
-	std::vector<Format::Region_t> Map;/**< Region map data. */
-	Format::SizeVec2 Dimension { };/**< The dimension of region map. */
+	using MdSpanType = std::mdspan<ValueType, std::dextents<IndexType, 2U>, std::layout_left>;
 
-	using RegionMapIndexer_t = Indexer<0, 1>;
-	RegionMapIndexer_t RegionMapIndexer;/**< Default indexing order of region map. */
+	std::vector<ValueType> Data;
+	MdSpanType View;
 
 public:
 
-	Format::Region_t RegionCount { };/**< The total number of contiguous region presented on region map. */
+	/**
+	 * @brief The total number of regions that are supposed to present in the regionfield. Note that it is likely that not all regions
+	 * are on the regionfield.
+	 */
+	Type::RegionIdentifier RegionCount {};
 
-	constexpr RegionMap() noexcept = default;
+	constexpr Regionfield() = default;
 
-	RegionMap(const RegionMap&) = delete;
+	Regionfield(const Regionfield&) = delete;
 
-	constexpr RegionMap(RegionMap&&) noexcept = default;
+	Regionfield(Regionfield&&) = delete;
 
-	constexpr ~RegionMap() = default;
+	Regionfield& operator=(const Regionfield&) = delete;
+
+	Regionfield& operator=(Regionfield&&) = delete;
+
+	~Regionfield() = default;
 
 	/**
-	 * @brief Get the region value by pixel coordinate.
+	 * @brief Get the region identifier by matrix indices.
 	 *
-	 * @param x, y The axis indices into the region map.
+	 * @param x, y The matrix indices into the regionfield.
 	 *
-	 * @return The region value.
-	*/
-	constexpr Format::Region_t& operator[](const auto x, const auto y) noexcept {
-		return this->Map[this->RegionMapIndexer[x, y]];
+	 * @return The region identifier.
+	 */
+	[[nodiscard]] constexpr ValueType& operator[](const auto x, const auto y) noexcept {
+		return this->View[x, y];
 	}
-	constexpr Format::Region_t operator[](const auto x, const auto y) const noexcept {
-		return this->Map[this->RegionMapIndexer[x, y]];
+	[[nodiscard]] constexpr ValueType operator[](const auto x, const auto y) const noexcept {
+		return this->View[x, y];
 	}
 
 	/**
-	 * @brief Reshape region map to new dimension.
+	 * @brief Reshape regionfield matrix to a new dimension.
 	 *
-	 * @param dimension The new dimension of region map.
-	 * If dimension is shrunken, region map will be trimmed linearly.
-	*/
-	void reshape(const Format::SizeVec2&);
+	 * @param dim The new dimension of the regionfield matrix.
+	 * If dimension is shrunken, the matrix will be trimmed linearly.
+	 */
+	void reshape(Type::SizeVec2);
 
 	/**
-	 * @brief Get the size of region map.
+	 * @brief Get the linear size of the regionfield matrix.
 	 *
-	 * @return The total number of pixel this region map has.
-	*/
-	size_t size() const noexcept;
+	 * @return The total number of region identifiers stored.
+	 */
+	[[nodiscard]] constexpr auto size() const noexcept {
+		return this->Data.size();
+	}
 
 	/**
-	 * @brief Get the dimension of region map.
+	 * @brief Get the dimension of the regionfield matrix.
 	 *
 	 * @return The dimension.
-	*/
-	constexpr const Format::SizeVec2& dimension() const noexcept {
-		return this->Dimension;
-	}
+	 */
+	[[nodiscard]] Type::SizeVec2 dimension() const noexcept;
 
-	////////////////////////////
-	/// Container functions
-	///////////////////////////
-
-	constexpr auto begin() noexcept {
-		return this->Map.begin();
+	[[nodiscard]] constexpr auto begin() noexcept {
+		return this->Data.begin();
 	}
-	constexpr auto end() noexcept {
-		return this->Map.end();
+	[[nodiscard]] constexpr auto end() noexcept {
+		return this->Data.end();
 	}
 
 };

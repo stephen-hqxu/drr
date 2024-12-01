@@ -4,6 +4,7 @@ HEADER
 	Uniform
 	VoronoiDiagram
 SOURCE
+	Base
 	Uniform
 	VoronoiDiagram
 )

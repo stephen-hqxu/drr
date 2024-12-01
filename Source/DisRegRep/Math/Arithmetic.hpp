@@ -1,63 +1,101 @@
 #pragma once
 
-#include "../Format.hpp"
+#include <DisRegRep/Type.hpp>
 
-#include <array>
+#include <glm/fwd.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
 #include <iterator>
+#include <span>
 
 #include <execution>
 #include <algorithm>
 #include <ranges>
-#include <numeric>
 
 #include <utility>
 #include <type_traits>
 #include <concepts>
 
+#include <cstddef>
 #include <cstdint>
 
-namespace DisRegRep {
+/**
+ * @brief Standard algebraic operations.
+ */
+namespace DisRegRep::Math::Arithmetic {
 
 /**
- * @brief Just some helps to do fundamental calculations.
-*/
-namespace Arithmetic {
-
+ * @brief Convert an integer to signed.
+ *
+ * @tparam I Integer type.
+ * @param i Integer to be converted to signed.
+ *
+ * @return Signed version of `i` if it is unsigned; otherwise unmodified.
+ */
 template<std::integral I>
-constexpr auto toSigned(const I num) noexcept {
-	return static_cast<std::make_signed_t<I>>(num);
-}
-template<std::integral T, size_t S>
-constexpr auto toSigned(const std::array<T, S>& nums) {
-	std::array<std::make_signed_t<T>, S> snums { };
-	std::ranges::transform(nums, snums.begin(), toSigned<T>);
-	return snums;
-}
-
-template<std::integral I>
-constexpr auto toUnsigned(const I num) noexcept {
-	return static_cast<std::make_unsigned_t<I>>(num);
+[[nodiscard]] constexpr auto toSigned(const I i) noexcept {
+	return static_cast<std::make_signed_t<I>>(i);
 }
 
 /**
- * @brief Perform `output` = `a` `op` `b`.
+ * @brief Convert an integral vector to signed.
+ *
+ * @tparam L Vector length.
+ * @tparam T Vector type.
+ * @tparam Q Vector qualifier.
+ *
+ * @param v Vector to be converted to signed.
+ *
+ * @return Signed version of `v` if it is unsigned; otherwise unmodified.
+ */
+template<glm::length_t L, std::integral T, glm::qualifier Q>
+[[nodiscard]] constexpr auto toSigned(const glm::vec<L, T, Q>& v) {
+	using glm::value_ptr;
+	using std::span, std::transform, std::execution::unseq;
+
+	glm::vec<L, std::make_signed_t<T>, Q> signed_v;
+	const auto it = span(value_ptr(v), L);
+	transform(unseq, it.cbegin(), it.cend(), value_ptr(signed_v), toSigned<T>);
+	return signed_v;
+}
+
+/**
+ * @brief Convert an integer to unsigned.
  * 
- * @tparam Op The type of operator.
+ * @tparam I Integer type.
+ * @param i Integer to be converted to unsigned.
+ * 
+ * @return Unsigned version of `i` if it is signed; otherwise unmodified.
+ */
+template<std::integral I>
+[[nodiscard]] constexpr auto toUnsigned(const I i) noexcept {
+	return static_cast<std::make_unsigned_t<I>>(i);
+}
+
+/**
+ * @brief Perform `output = f(a, b)`.
+ * 
  * @tparam R1 The range type of `a`.
+ * @tparam F The type of operator.
  * @tparam R2 The range type of `b`.
- * @tparam RO The output iterator type.
+ * @tparam O The output iterator type.
  * 
  * @param a The first range.
- * @param op The range operator.
+ * @param f The range operator.
  * @param b The second range.
  * @param output The output iterator.
 */
-template<typename Op, std::ranges::input_range R1, std::ranges::input_range R2,
-	std::weakly_incrementable O>
-inline void addRange(R1&& a, Op&& op, R2&& b, O&& output) {
-	using std::ranges::cbegin, std::ranges::cend;
-	
-	std::transform(std::execution::unseq, cbegin(a), cend(a), cbegin(b), output, std::forward<Op>(op));
+template<
+	std::ranges::input_range R1,
+	std::invocable F,
+	std::ranges::input_range R2,
+	std::output_iterator<std::indirect_result_t<F, std::ranges::range_reference_t<R1>, std::ranges::range_reference_t<R2>>> O
+>
+void addRange(const R1& a, F&& f, const R2& b, const O output) {
+	using std::transform, std::execution::unseq,
+		std::ranges::cbegin, std::ranges::cend;
+
+	transform(unseq, cbegin(a), cend(a), cbegin(b), output, std::forward<F>(f));
 }
 
 /**
@@ -66,32 +104,43 @@ inline void addRange(R1&& a, Op&& op, R2&& b, O&& output) {
  * @tparam R The input range type.
  * @tparam O The output iterator type.
  * @tparam T The scalar type.
+ * 
  * @param input The input range.
  * @param output The output iterator.
  * @param scalar The scalar.
 */
-template<std::floating_point T, std::ranges::input_range R, std::weakly_incrementable O>
-inline void scaleRange(R&& input, const O output, const T scalar) {
-	using std::ranges::cbegin, std::ranges::cend, std::iterator_traits;
+template<
+	std::floating_point T,
+	std::ranges::input_range R,
+	std::output_iterator<T> O
+>
+void scaleRange(const R& input, const O output, const T scalar) {
+	using std::transform, std::execution::unseq,
+		std::ranges::cbegin, std::ranges::cend, std::iterator_traits;
 
-	std::transform(std::execution::unseq, cbegin(input), cend(input), output,
-		[factor = T { 1 } / scalar](const auto v) constexpr noexcept
-			{ return static_cast<typename iterator_traits<O>::value_type>(v * factor); });
+	transform(unseq, cbegin(input), cend(input), output, [factor = T { 1 } / scalar](const auto v) constexpr noexcept {
+		return static_cast<typename iterator_traits<O>::value_type>(v * factor);
+	});
 }
 
 /**
- * @brief Calculate product of all numbers in an array.
- * 
- * @tparam T Type of number.
- * @tparam S The size of array.
- * @param r The range whose horizontal product is calculated.
+ * @brief Calculate product of all numbers in a vector.
+ *
+ * @tparam L Vector length.
+ * @tparam T Vector type.
+ * @tparam Q Vector qualifier.
+ *
+ * @param v Input vector whose horizontal product is to be calculated.
+ *
+ * @return The horizontal product of `v`.
 */
-template<typename T, size_t S>
-constexpr T horizontalProduct(const std::array<T, S>& num) noexcept {
-	const auto product = [&num]<size_t... Idx>(std::index_sequence<Idx...>) noexcept -> T {
-		return (T { 1 } * ... * num[Idx]);
+template<glm::length_t L, typename T, glm::qualifier Q>
+[[nodiscard]] constexpr T horizontalProduct(const glm::vec<L, T, Q>& v) noexcept {
+	using std::index_sequence, std::make_index_sequence;
+	const auto product = [&v]<std::size_t... I>(index_sequence<I...>) constexpr noexcept -> T {
+		return (T { 1 } * ... * v[I]);
 	};
-	return product(std::make_index_sequence<S> { });
+	return product(make_index_sequence<L> {});
 }
 
 /**
@@ -102,11 +151,9 @@ constexpr T horizontalProduct(const std::array<T, S>& num) noexcept {
  * 
  * @return The kernel area.
 */
-constexpr uint32_t kernelArea(const Format::Radius_t radius) noexcept {
-	const uint32_t diameter = 2u * radius + 1u;
+[[nodiscard]] constexpr std::uint32_t kernelArea(const Type::Radius radius) noexcept {
+	const std::uint32_t diameter = 2U * radius + 1U;
 	return diameter * diameter;
 }
 
-}
-
-}
+}//namespace DisRegRep::Math::Arithmetic
