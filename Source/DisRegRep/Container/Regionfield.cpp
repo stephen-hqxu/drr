@@ -1,18 +1,22 @@
 #include <DisRegRep/Container/Regionfield.hpp>
 
-#include <DisRegRep/Math/Arithmetic.hpp>
-#include <DisRegRep/Type.hpp>
+#include <DisRegRep/Exception.hpp>
+
+#include <glm/vec2.hpp>
+#include <glm/vector_relational.hpp>
+
+#include <memory>
 
 using namespace DisRegRep::Container;
-using DisRegRep::Math::Arithmetic::horizontalProduct;
-using DisRegRep::Type::SizeVec2;
 
-void Regionfield::reshape(const SizeVec2 dim) {
-	this->Data.resize(horizontalProduct(dim));
-	this->View = MdSpanType(this->Data.data(), dim.x, dim.y);
-}
+using glm::vec;
 
-SizeVec2 Regionfield::dimension() const noexcept {
-	const auto& ext = this->View.extents();
-	return { ext.extent(0U), ext.extent(1U) };
+using std::make_unique_for_overwrite;
+
+Regionfield::Regionfield(const DimensionType dim, const ValueType region_count) :
+	Mapping(ExtentType(dim.x, dim.y)),
+	Data(make_unique_for_overwrite<ValueType[]>(this->Mapping.required_span_size())),
+	RegionCount(region_count) {
+	DRR_ASSERT(glm::all(glm::greaterThan(dim, DimensionType(0U))));
+	DRR_ASSERT(region_count > 0U);
 }

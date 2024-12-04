@@ -1,4 +1,0 @@
-addMainComponent(
-HEADER
-	Arithmetic
-)

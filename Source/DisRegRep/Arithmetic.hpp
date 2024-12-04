@@ -22,7 +22,7 @@
 /**
  * @brief Standard algebraic operations.
  */
-namespace DisRegRep::Math::Arithmetic {
+namespace DisRegRep::Arithmetic {
 
 /**
  * @brief Convert an integer to signed.
@@ -156,4 +156,4 @@ template<glm::length_t L, typename T, glm::qualifier Q>
 	return diameter * diameter;
 }
 
-}//namespace DisRegRep::Math::Arithmetic
+}

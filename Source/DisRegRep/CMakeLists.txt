@@ -22,18 +22,25 @@ add_executable(${DRR_MAIN})
 
 add_subdirectory(Container)
 add_subdirectory(ImportanceComputer)
-add_subdirectory(Math)
 add_subdirectory(Profiler)
 add_subdirectory(RegionfieldGenerator)
 addMainComponent(
 HEADER
+	Arithmetic
+	Exception
 	Type
 SOURCE
+	Exception
 	Main
 )
 
-target_link_libraries(${DRR_MAIN} PRIVATE
-	argparse::argparse glm::glm nanobench::nanobench yaml-cpp::yaml-cpp
+target_link_libraries(${DRR_MAIN}
+PRIVATE
+	CLI11::CLI11
+	glm::glm
+	nanobench::nanobench
+	std::mdspan
+	yaml-cpp::yaml-cpp
 )
 
 set_target_properties(${DRR_MAIN} PROPERTIES
