@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <stacktrace>
 
-using namespace DisRegRep;
+using DisRegRep::Exception;
 
 using std::string_view, std::format;
 using std::source_location, std::stacktrace, std::runtime_error;

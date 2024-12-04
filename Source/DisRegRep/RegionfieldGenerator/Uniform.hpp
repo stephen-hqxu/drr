@@ -1,28 +1,28 @@
 #pragma once
 
-#include "RegionMapFactory.hpp"
+#include "Base.hpp"
 
-#include <cstdint>
+#include <DisRegRep/Container/Regionfield.hpp>
 
-namespace DisRegRep {
+#include <string_view>
+
+namespace DisRegRep::RegionfieldGenerator {
 
 /**
- * @brief Create a region map with random number generator.
+ * @brief Generate a regionfield where region identifiers are distributed uniformly random.
 */
-class RandomRegionFactory final : public RegionMapFactory {
+class Uniform final : public Base {
 public:
 
-	std::uint64_t RandomSeed; /**< Set random seed to be effected in the next generation call. */
+	constexpr Uniform() noexcept = default;
 
-	explicit constexpr RandomRegionFactory(const std::uint64_t seed = 0u) noexcept : RandomSeed(seed) { }
+	constexpr ~Uniform() override = default;
 
-	constexpr ~RandomRegionFactory() override = default;
-
-	constexpr std::string_view name() const noexcept override {
-		return "Random";
+	[[nodiscard]] constexpr std::string_view name() const noexcept override {
+		return "Uniform";
 	}
 
-	void operator()(const CreateDescription&, RegionMap&) const override;
+	void operator()(Container::Regionfield&) override;
 
 };
 

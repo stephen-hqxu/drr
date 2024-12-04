@@ -2,14 +2,11 @@
 
 #include <DisRegRep/Exception.hpp>
 
-#include <glm/vec2.hpp>
 #include <glm/vector_relational.hpp>
 
 #include <memory>
 
-using namespace DisRegRep::Container;
-
-using glm::vec;
+using DisRegRep::Container::Regionfield;
 
 using std::make_unique_for_overwrite;
 

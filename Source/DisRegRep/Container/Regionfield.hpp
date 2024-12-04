@@ -2,7 +2,7 @@
 
 #include <DisRegRep/Type.hpp>
 
-#include <glm/fwd.hpp>
+#include <glm/vec2.hpp>
 #include <mdspan/mdspan.hpp>
 
 #include <span>

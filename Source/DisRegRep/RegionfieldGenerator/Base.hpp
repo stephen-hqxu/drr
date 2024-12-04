@@ -1,80 +1,74 @@
 #pragma once
 
-#include "../Format.hpp"
-#include "../Container/RegionMap.hpp"
+#include <DisRegRep/Container/Regionfield.hpp>
 
+#include <random>
 #include <string_view>
 
-namespace DisRegRep {
+#include <cstdint>
+
+namespace DisRegRep::RegionfieldGenerator {
 
 /**
- * @brief A base class for implementation to create a region map.
+ * @brief Base of all regionfield generators.
 */
-class RegionMapFactory {
+class Base {
 public:
 
-	/**
-	 * @brief Description about a region map.
-	*/
-	struct CreateDescription {
+	using SeedType = std::uint32_t;
 
-		Format::Region_t RegionCount;/**< The number of region to be used. */
+protected:
 
-	};
-
-	constexpr RegionMapFactory() noexcept = default;
-
-	RegionMapFactory(const RegionMapFactory&) = delete;
-
-	RegionMapFactory(RegionMapFactory&&) = delete;
-
-	constexpr virtual ~RegionMapFactory() = default;
+	using RandomIntType = std::uint16_t;
+	using RandomEngineType =
+		std::shuffle_order_engine<std::linear_congruential_engine<RandomIntType, 10621U, 210U, (1U << 15U) - 1U>, 16U>;
+	using UniformDistributionType = std::uniform_int_distribution<RandomIntType>;
 
 	/**
-	 * @brief Allocate a region map with given dimension.
-	 * 
-	 * @param dimension The dimension of region map.
-	 * 
-	 * @return The allocated region map. The content of this map is undefined.
-	*/
-	[[nodiscard]] static RegionMap allocate(const Format::SizeVec2&);
+	 * @brief Create a new random engine using the currently set seed.
+	 *
+	 * @return Random engine with current seed.
+	 */
+	[[nodiscard]] RandomEngineType createRandomEngine() const noexcept;
 
 	/**
-	 * @brief Reshape the region map with a new dimension.
-	 * A reallocation happens if new dimension is bigger than the region map.
-	 * No allocation happens otherwise, but region map dimension will be set to the new dimension.
+	 * @brief Create a new distribution based on the region count specified in a regionfield.
+	 *
+	 * @param regionfield A regionfield whose distribution is to be created.
 	 * 
-	 * @param region_map The region map to be reshaped.
-	 * The content of region map becomes undefined after this function returns if reallocation or enlargement happens.
-	 * Otherwise, content will be trimmed.
-	 * @param dimension The new dimension to be set.
-	*/
-	static void reshape(RegionMap&, const Format::SizeVec2&);
+	 * @return Uniform integer distribution with range [0, region count).
+	 */
+	[[nodiscard]] static UniformDistributionType createDistribution(const Container::Regionfield&) noexcept;
+
+public:
+
+	SeedType Seed {}; /**< A seed used by random number generators. */
+
+	constexpr Base() noexcept = default;
+
+	Base(const Base&) = delete;
+
+	Base(Base&&) noexcept = delete;
+
+	Base& operator=(const Base&) = delete;
+
+	Base& operator=(Base&&) noexcept = delete;
+
+	virtual constexpr ~Base() = default;
 
 	/**
-	 * @brief Get an identifying name for the factory implementation.
-	 * 
-	 * @return The factory name.
-	*/
-	constexpr virtual std::string_view name() const noexcept = 0;
+	 * @brief Get an identifying name for the regionfield generator.
+	 *
+	 * @return The generator name.
+	 */
+	[[nodiscard]] virtual constexpr std::string_view name() const noexcept = 0;
 
 	/**
-	 * @brief Create a region map.
-	 * 
-	 * @param desc The generation description.
-	 * @param output Created region map.
-	*/
-	virtual void operator()(const CreateDescription&, RegionMap&) const = 0;
-
-	/**
-	 * @brief This is a shortcut function. Allocate a new region map, and fill region map with content.
-	 * 
-	 * @param desc The generation description.
-	 * @param dimension The dimension of region map.
-	 * 
-	 * @return The created region map.
-	*/
-	[[nodiscard]] RegionMap operator()(const CreateDescription&, const Format::SizeVec2&) const;
+	 * @brief Generate regionfield.
+	 *
+	 * @param[Out] regionfield A regionfield matrix where generated contents are stored.
+	 */
+	virtual void operator()(Container::Regionfield&) = 0;
 
 };
 

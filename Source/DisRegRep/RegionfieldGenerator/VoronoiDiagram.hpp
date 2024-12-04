@@ -1,31 +1,32 @@
 #pragma once
 
-#include "RegionMapFactory.hpp"
+#include "Base.hpp"
 
-#include <cstdint>
+#include <DisRegRep/Container/Regionfield.hpp>
 
-namespace DisRegRep {
+#include <string_view>
+
+#include <cstddef>
+
+namespace DisRegRep::RegionfieldGenerator {
 
 /**
- * @brief Generate a region map organised as a voronoi diagram.
+ * @brief Generate a regionfield where each region are placed in a Voronoi cell.
 */
-class VoronoiRegionFactory final : public RegionMapFactory {
+class VoronoiDiagram final : public Base {
 public:
 
-	std::uint64_t RandomSeed;/**< Seed used by random number generator */
-	size_t CentroidCount; /**< The number of centroid. */
+	std::size_t CentroidCount {}; /**< Number of centroids in the Voronoi Diagram. */
 
-	explicit constexpr VoronoiRegionFactory(const std::uint64_t seed = 0u, const size_t centroid_count = 0u) noexcept :
-		RandomSeed(seed),
-		CentroidCount(centroid_count) { }
+	constexpr VoronoiDiagram() noexcept = default;
 
-	constexpr ~VoronoiRegionFactory() override = default;
+	constexpr ~VoronoiDiagram() override = default;
 
-	constexpr std::string_view name() const noexcept override {
+	[[nodiscard]] constexpr std::string_view name() const noexcept override {
 		return "Voronoi";
 	}
 
-	void operator()(const CreateDescription&, RegionMap&) const override;
+	void operator()(Container::Regionfield&) override;
 
 };
 

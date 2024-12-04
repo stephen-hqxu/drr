@@ -1,80 +1,68 @@
-#include <DisRegRep/Factory/VoronoiRegionFactory.hpp>
+#include <DisRegRep/RegionfieldGenerator/VoronoiDiagram.hpp>
 
-#include <nb/nanobench.h>
+#include <DisRegRep/Container/Regionfield.hpp>
 
+#include <DisRegRep/Exception.hpp>
+#include <DisRegRep/Type.hpp>
+
+#include <glm/fwd.hpp>
+#include <glm/geometric.hpp>
+#include <glm/vec2.hpp>
+
+#include <array>
 #include <vector>
 
-#include <execution>
 #include <algorithm>
-#include <ranges>
-#include <numeric>
-
+#include <execution>
+#include <functional>
 #include <iterator>
-#include <utility>
+#include <ranges>
 
-#include <cmath>
+using DisRegRep::RegionfieldGenerator::VoronoiDiagram, DisRegRep::Container::Regionfield;
 
-using std::vector;
-using std::ranges::generate, std::min_element, std::for_each,
-	std::views::iota, std::views::transform, std::views::zip,
-	std::execution::par_unseq, std::execution::unseq;
-using std::as_const;
+using glm::vec, glm::f32vec2;
 
-using ankerl::nanobench::Rng;
+using std::array, std::vector, std::from_range;
+using std::execution::par_unseq;
+using std::for_each, std::ranges::min_element, std::ranges::distance;
+using std::bind, std::views::iota, std::views::repeat, std::views::transform, std::views::cartesian_product;
 
-using namespace DisRegRep;
-using Format::Size_t, Format::SizeVec2, Format::Region_t;
+void VoronoiDiagram::operator()(Regionfield& regionfield) {
+	DRR_ASSERT(this->CentroidCount > 0U);
+	const Regionfield::MdSpanType rf_mdspan = regionfield.mdspan();
 
-namespace {
+	using RandomIntVec2 = vec<2U, RandomIntType>;
 
-float l2Distance(const SizeVec2& a, const SizeVec2& b) {
-	const auto it = zip(a, b) | transform([](const auto ab) constexpr static noexcept {
-		const auto& [a, b] = ab;
-		return a - b;
+	array<UniformDistributionType, 2U> dist;
+	std::ranges::transform(iota(0U, dist.size()), dist.begin(),
+		[&rf_mdspan](const auto ext) { return UniformDistributionType(0U, rf_mdspan.extent(ext) - 1U); });
+
+	const auto region_centroid = vector(from_range,
+		repeat(nullptr, this->CentroidCount) |
+		transform([rng = this->createRandomEngine(), &dist](auto) mutable {
+			return RandomIntVec2(dist[0](rng), dist[1](rng));
+		})
+	);
+	const auto region_assignment = vector<Type::RegionIdentifier>(from_range,
+		repeat(nullptr, this->CentroidCount) |
+		transform(bind(Base::createDistribution(regionfield), this->createRandomEngine()))
+	);
+
+	/*
+	 * Find the nearest centroid for every point in the regionfield.
+	 * This is a pretty Naive algorithm, in practice it is better to use a quad tree or KD tree to find K-NN;
+	 *	omitted here for simplicity.
+	 */
+	const auto it = cartesian_product(iota(0U, rf_mdspan.extent(1U)), iota(0U, rf_mdspan.extent(0U)));
+	for_each(par_unseq, it.cbegin(), it.cend(), [&rf_mdspan, &region_centroid, &region_assignment](const auto& idx) noexcept {
+		const auto [y, x] = idx;
+
+		const auto centroid_distance =
+			region_centroid | transform([current_coord = f32vec2(x, y)](const auto& centroid_coord) noexcept {
+				return glm::distance(current_coord, f32vec2(centroid_coord));
+			});
+		const auto argmin = distance(centroid_distance.cbegin(), min_element(centroid_distance));
+
+		rf_mdspan[x, y] = region_assignment[argmin];
 	});
-	return std::sqrt(std::inner_product(it.cbegin(), it.cend(), it.cbegin(), 0.0f));
-}
-
-}
-
-void VoronoiRegionFactory::operator()(const CreateDescription& desc, RegionMap& output) const {
-	const auto [region_count] = desc;
-	const auto [dim_x, dim_y] = output.dimension();
-	output.RegionCount = region_count;
-
-	auto rng = Rng(this->RandomSeed);
-	//generate all the centroids with random region assignment
-	auto region_centroid = vector<SizeVec2>(this->CentroidCount);
-	auto region_assignment = vector<Region_t>(this->CentroidCount);
-	
-	generate(region_centroid,
-		[&rng, x = static_cast<uint32_t>(dim_x), y = static_cast<uint32_t>(dim_y)]() noexcept {
-			return SizeVec2 {
-				rng.bounded(x),
-				rng.bounded(y)
-			};
-		});
-	generate(region_assignment, [&rng, rc = static_cast<uint32_t>(region_count)]() {
-		return static_cast<Region_t>(rng.bounded(rc));
-	});
-
-	//find the nearest centroid for every point
-	//This is a pretty naive algorithm,
-	//	in practice it is better to do with either Quad-Tree or KD-Tree to find K-NN;
-	//	omitted here for simplicity.
-	const auto y_it = iota(Size_t { 0 }, dim_y);
-	for_each(par_unseq, y_it.cbegin(), y_it.cend(),
-		[dim_x, &map = output, &rc = as_const(region_centroid), &ra = as_const(region_assignment)](const auto y) {
-			for (const auto x : iota(Size_t { 0 }, dim_x)) {
-				const auto it = rc | transform([curr_position = SizeVec2 { x, y }](const auto& centroid) {
-					return ::l2Distance(curr_position, centroid);
-				});
-				const auto min_idx = std::distance(
-					it.cbegin(),
-					min_element(unseq, it.cbegin(), it.cend())
-				);
-
-				map[x, y] = ra[min_idx];
-			}
-		});
 }
