@@ -1,48 +1,46 @@
 #pragma once
 
-#include "ContainerTrait.hpp"
-#include "../Format.hpp"
+#include <DisRegRep/Type.hpp>
 
 #include <ranges>
-#include <concepts>
-
-namespace DisRegRep {
+#include <type_traits>
 
 /**
- * @brief A data structure for holding histogram bin in a sparse data structure.
-*/
-namespace SparseBin {
+ * @brief Represent an element in a sparse matrix for storing data related to a region.
+ */
+namespace DisRegRep::Container::SparseMatrixElement {
 
 /**
- * @brief The bin type for all sparse histogram implementations.
+ * @brief Generic data structure of one element in a sparse matrix for storing region data.
  * 
- * @tparam V The type of histogram bin value.
-*/
+ * @tparam V Sparse matrix element value type.
+ */
 template<typename V>
-struct BasicSparseBin {
+struct Basic {
 
-	using value_type = V;
+	using ValueType = V;
 
-	Format::Region_t Region;/**< The region this bin is storing. */
-	value_type Value;/**< Bin value for this region. */
+	Type::RegionIdentifier Identifier; /**< Identifier of the region this element is for. */
+	ValueType Value; /**< Data stored in this element for this region. */
 
-	constexpr bool operator==(const BasicSparseBin&) const noexcept = default;
+	[[nodiscard]] constexpr bool operator==(const Basic&) const = default;
 
 };
-using Bin = BasicSparseBin<Format::Bin_t>;
-using NormBin = BasicSparseBin<Format::NormBin_t>;
 
-//Check if a range is sparse bin.
+using Importance = Basic<Type::RegionImportance>; /**< Sparse region importance matrix element. */
+using Mask = Basic<Type::RegionMask>; /**< Sparse region mask matrix element. */
+
+/**
+ * @brief Concept supports for sparse matrix element.
+ */
+namespace Concept {
+
+/**
+ * Type `R` models an input range of sparse matrix element.
+ */
 template<typename R>
-concept SparseBinRange = ContainerTrait::ValueRange<
-	R,
-	BasicSparseBin<typename std::ranges::range_value_t<R>::value_type>
->;
-
-//Check if a range is sparse bin with a specific value type.
-template<typename R, typename T>
-concept SparseBinRangeValue = SparseBinRange<R>
-	&& std::same_as<typename std::ranges::range_value_t<R>::value_type, T>;
+concept ImportanceInputRange =
+	std::ranges::input_range<R> && std::is_same_v<std::ranges::range_value_t<R>, Importance>;
 
 }
 

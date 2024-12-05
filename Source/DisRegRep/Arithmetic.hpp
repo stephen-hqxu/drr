@@ -87,11 +87,11 @@ template<std::integral I>
 */
 template<
 	std::ranges::input_range R1,
-	std::invocable F,
+	std::copy_constructible F,
 	std::ranges::input_range R2,
-	std::output_iterator<std::indirect_result_t<F, std::ranges::range_reference_t<R1>, std::ranges::range_reference_t<R2>>> O
+	std::output_iterator<std::indirect_result_t<F, std::ranges::const_iterator_t<R1>, std::ranges::const_iterator_t<R2>>> O
 >
-void addRange(const R1& a, F&& f, const R2& b, const O output) {
+void addRange(R1&& a, F&& f, R2&& b, const O output) {
 	using std::transform, std::execution::unseq,
 		std::ranges::cbegin, std::ranges::cend;
 
@@ -114,13 +114,14 @@ template<
 	std::ranges::input_range R,
 	std::output_iterator<T> O
 >
-void scaleRange(const R& input, const O output, const T scalar) {
+requires std::is_convertible_v<std::ranges::range_value_t<R>, T>
+void scaleRange(R&& input, const O output, const T scalar) {
 	using std::transform, std::execution::unseq,
 		std::ranges::cbegin, std::ranges::cend, std::iterator_traits;
 
-	transform(unseq, cbegin(input), cend(input), output, [factor = T { 1 } / scalar](const auto v) constexpr noexcept {
-		return static_cast<typename iterator_traits<O>::value_type>(v * factor);
-	});
+	using OutputType = typename iterator_traits<O>::value_type;
+	transform(unseq, cbegin(input), cend(input), output,
+		[factor = T { 1 } / scalar](const OutputType v) constexpr noexcept { return v * factor; });
 }
 
 /**

@@ -1,251 +1,342 @@
 #pragma once
 
-#include "ContainerTrait.hpp"
-#include "SparseBin.hpp"
+#include "SparseMatrixElement.hpp"
 
-#include "../Format.hpp"
-#include "../Maths/Arithmetic.hpp"
+#include <DisRegRep/Arithmetic.hpp>
+#include <DisRegRep/Type.hpp>
 
 #include <vector>
+
 #include <algorithm>
+#include <execution>
 #include <functional>
+#include <ranges>
 
 #include <limits>
 #include <utility>
 
-namespace DisRegRep {
+#include <concepts>
+#include <type_traits>
 
 /**
- * @brief A cache for generation of blend histogram.
-*/
-namespace HistogramCache {
+ * @brief Cache intermediate values of region importance before writing to the output.
+ */
+namespace DisRegRep::Container::ImportanceCache {
+
+namespace Internal_ {
+
+using DenseEntryType = Type::RegionImportance; /**< Type of entry in dense importance cache. */
 
 /**
- * @brief Dense histogram cache.
-*/
+ * `Op` is a binary operator on dense entry values.
+ */
+template<typename Op>
+concept DenseEntryBinaryOperator = std::is_convertible_v<std::invoke_result_t<Op, DenseEntryType, DenseEntryType>, DenseEntryType>;
+
+/**
+ * `Modifier` modifies `Cache` in-place given a sparse importance matrix element `Importance`.
+ */
+template<typename Modifier, typename Cache, typename Importance>
+concept CacheModifier = SparseMatrixElement::Concept::ImportanceInputRange<Importance>
+					 && std::invocable<Modifier, std::add_lvalue_reference_t<Cache>, std::ranges::range_const_reference_t<Importance>>;
+
+//In-place modifies cache with a modifier member function given a range of sparse importance matrix element.
+template<
+	typename Cache,
+	SparseMatrixElement::Concept::ImportanceInputRange Importance,
+	CacheModifier<Cache, Importance> Modifier
+>
+void modify(Cache& cache, Importance&& importance, Modifier&& modifier) {
+	using std::ranges::cbegin, std::ranges::cend,
+		std::for_each, std::execution::unseq,
+		std::invoke;
+	for_each(unseq, cbegin(importance), cend(importance),
+		[&cache, &modifier](const auto& element) noexcept { invoke(modifier, cache, element); });
+}
+
+}
+
+/**
+ * @brief A dense cache is a contiguous linear array that stores importance of each region at the corresponding index based on region
+ * identifier.
+ */
 class Dense {
 public:
 
-	using bin_type = Format::Bin_t;
+	using EntryType = Internal_::DenseEntryType;
+	using SizeType = Type::RegionIdentifier;
 
 private:
 
-	using Histogram_t = std::vector<bin_type>;
-	Histogram_t Histogram;
+	using ContainerType = std::vector<EntryType>;
+
+	ContainerType Importance;
+
+	//Modify one region by some amount.
+	template<Internal_::DenseEntryBinaryOperator Op>
+	constexpr void modify(const SizeType region_id, Op&& op, const SizeType amount) noexcept {
+		EntryType& importance = this->Importance[region_id];
+		importance = std::invoke(std::forward<Op>(op), importance, amount);
+	}
+
+	//Modify one region by a given sparse importance matrix element.
+	template<Internal_::DenseEntryBinaryOperator Op>
+	constexpr void modify(const SparseMatrixElement::Importance& importance, Op&& op) noexcept {
+		const auto [region_id, value] = importance;
+		this->modify(region_id, std::forward<Op>(op), value);
+	}
+
+	//Modify all regions by some amount.
+	template<Internal_::DenseEntryBinaryOperator Op, Type::Concept::RegionImportanceInputRange Amount>
+	void modify(Op&& op, Amount&& amount) {
+		Arithmetic::addRange(this->Importance, std::forward<Op>(op), std::forward<Amount>(amount), this->Importance.begin());
+	}
+
+	//Modify some regions by some amount.
+	template<
+		SparseMatrixElement::Concept::ImportanceInputRange Importance,
+		Internal_::CacheModifier<Dense&, Importance> Modifier
+	>
+	void modify(Importance&& importance, Modifier&& modifier) {
+		Internal_::modify(*this, std::forward<Importance>(importance), std::forward<Modifier>(modifier));
+	}
 
 public:
 
-	using const_iterator = Histogram_t::const_iterator;
+	using ConstIterator = ContainerType::const_iterator;
 
 	constexpr Dense() noexcept = default;
 
 	Dense(const Dense&) = delete;
 
-	constexpr Dense(Dense&&) noexcept = default;
+	Dense(Dense&&) = delete;
+
+	Dense& operator=(const Dense&) = delete;
+
+	Dense& operator=(Dense&&) = delete;
 
 	constexpr ~Dense() = default;
 
 	/**
 	 * @brief Resize dense cache.
-	 * 
-	 * @param region_count The maximum number of region to be held by this cache.
-	*/
-	constexpr void resize(const Format::Region_t region_count) {
-		this->Histogram.resize(region_count);
+	 *
+	 * @param region_count The maximum number of region identifiers to be held by this cache.
+	 */
+	constexpr void resize(const SizeType region_count) {
+		this->Importance.resize(region_count);
 	}
 
 	/**
-	 * @brief Clear all contents in the cache.
-	*/
+	 * @brief Clear all contents in the cache and reset importance of all regions to zero.
+	 */
 	constexpr void clear() noexcept {
-		std::ranges::fill(this->Histogram, bin_type { });
+		std::ranges::fill(this->Importance, EntryType {});
 	}
 
 	/**
-	 * @brief Increment the count of a bin.
-	 * 
-	 * @tparam R The input range type.
-	 * 
-	 * @param region The region to be incremented by one.
-	 * @param input A range of dense bins that have the same number of region count as this cache,
-	 * each corresponding bin will be incremented.
-	*/
-	constexpr void increment(const Format::Region_t region) noexcept {
-		this->Histogram[region]++;
-	}
-	template<ContainerTrait::ValueRange<bin_type> R>
-	void increment(R&& input) {
-		Arithmetic::addRange(this->Histogram, std::plus {}, std::forward<R>(input), this->Histogram.begin());
-	}
-
-	/**
-	 * @brief Increment the count with sparse bins.
-	 * 
-	 * @tparam R The input range type.
-	 * 
-	 * @param bin The sparse bin to be incremented.
-	 * @param input A range of sparse bins to be incremented.
-	*/
-	constexpr void increment(const SparseBin::Bin& bin) noexcept {
-		const auto [region, value] = bin;
-		this->Histogram[region] += value;
-	}
-	template<SparseBin::SparseBinRangeValue<bin_type> R>
-	void increment(R&& input) {
-		std::ranges::for_each(std::forward<R>(input), [this](const auto& bin) noexcept { this->increment(bin); });
-	}
-
-	/**
-	 * @brief Decrement the count of a bin.
-	 * 
-	 * @tparam R The input range type.
-	 * 
-	 * @param region The region to be decremented by one.
-	 * @param input A range of dense bins to be decremented.
-	*/
-	constexpr void decrement(const Format::Region_t region) noexcept {
-		this->Histogram[region]--;
-	}
-	template<ContainerTrait::ValueRange<bin_type> R>
-	void decrement(R&& input) {
-		Arithmetic::addRange(this->Histogram, std::minus {}, std::forward<R>(input), this->Histogram.begin());
-	}
-
-	/**
-	 * @brief Decrement the count with sparse bins.
+	 * @brief Increment the importance of a region by one.
 	 *
-	 * @tparam R The input range type.
+	 * @param region_id Identifier of region whose importance is to be incremented.
+	 */
+	constexpr void increment(const SizeType region_id) noexcept {
+		this->modify(region_id, std::plus {}, 1U);
+	}
+
+	/**
+	 * @brief Increment the importance of a region by some amount.
 	 *
-	 * @param bin The sparse bin to be decremented.
-	 * @param input A range of sparse bins to be decremented.
-	*/
-	constexpr void decrement(const SparseBin::Bin& bin) noexcept {
-		const auto [region, value] = bin;
-		this->Histogram[region] -= value;
-	}
-	template<SparseBin::SparseBinRangeValue<bin_type> R>
-	void decrement(R&& input) {
-		std::ranges::for_each(std::forward<R>(input), [this](const auto& bin) noexcept { this->decrement(bin); });
+	 * @param importance A sparse importance matrix element used for incrementation.
+	 */
+	constexpr void increment(const SparseMatrixElement::Importance& importance) noexcept {
+		this->modify(importance, std::plus {});
 	}
 
-	//////////////////////////
-	/// Container function
-	/////////////////////////
-
-	constexpr const_iterator begin() const noexcept {
-		return this->Histogram.cbegin();
+	/**
+	 * @brief Increment the importance of all regions by some amount.
+	 *
+	 * @tparam Amount A range of importance for region at each index.
+	 *
+	 * @param amount The size of this range must be no less than the size of the cache.
+	 */
+	template<Type::Concept::RegionImportanceInputRange Amount>
+	void increment(Amount&& amount) {
+		this->modify(std::plus {}, std::forward<Amount>(amount));
 	}
 
-	constexpr const_iterator end() const noexcept {
-		return this->Histogram.cend();
+	/**
+	 * @brief Increment the importance of some regions by some amount.
+	 *
+	 * @tparam Importance A range of sparse importance matrix element.
+	 *
+	 * @param importance Each specifies the region identifier and the amount of importance to increment.
+	 */
+	template<SparseMatrixElement::Concept::ImportanceInputRange Importance>
+	void increment(Importance&& importance) {
+		this->modify(std::forward<Importance>(importance),
+			std::mem_fn(static_cast<void (Dense::*)(const SparseMatrixElement::Importance&)>(&Dense::increment)));
+	}
+
+	/**
+	 * @brief Decrement the importance of a region by one.
+	 *
+	 * @param region_id Identifier of region whose importance is to be decremented.
+	 */
+	constexpr void decrement(const SizeType region_id) noexcept {
+		this->modify(region_id, std::minus {}, 1U);
+	}
+
+	/**
+	 * @brief Decrement the importance of a region by some amount.
+	 *
+	 * @param importance A sparse importance matrix element used for decrementation.
+	 */
+	constexpr void decrement(const SparseMatrixElement::Importance& importance) noexcept {
+		this->modify(importance, std::minus {});
+	}
+
+	/**
+	 * @brief Decrement the importance of all regions by some amount.
+	 *
+	 * @tparam Amount A range of importance for region at each index.
+	 *
+	 * @param amount  The size of this range must be no less than the size of the cache.
+	 */
+	template<Type::Concept::RegionImportanceInputRange Amount>
+	void decrement(Amount&& amount) {
+		this->modify(std::minus {}, std::forward<Amount>(amount));
+	}
+
+	/**
+	 * @brief Decrement the importance of some regions by some amount.
+	 *
+	 * @tparam Importance A range of sparse importance matrix element.
+	 *
+	 * @param importance Each specifies the region identifier and the amount of importance to decrement.
+	 */
+	template<SparseMatrixElement::Concept::ImportanceInputRange Importance>
+	void decrement(Importance&& importance) {
+		this->modify(std::forward<Importance>(importance),
+			std::mem_fn(static_cast<void (Dense::*)(const SparseMatrixElement::Importance&)>(&Dense::decrement)));
 	}
 
 };
 
 /**
- * @brief Sparse histogram cache, utilises sparse set data structure.
-*/
+ * @brief A sparse cache collects two contiguous arrays, one stores sparse importance entries, the other stores offsets into the sparse
+ * array given region identifier.
+ */
 class Sparse {
 public:
 
-	using bin_type = SparseBin::Bin;
-	using index_type = Format::Region_t;
+	using EntryType = SparseMatrixElement::Importance;
+	using OffsetType = Dense::SizeType;
+	using SizeType = OffsetType;
 
 private:
 
-	using Dense_t = std::vector<bin_type>;
-	using Sparse_t = std::vector<index_type>;
+	using EntryContainerType = std::vector<EntryType>;
+	using OffsetContainerType = std::vector<OffsetType>;
 
-	//This will be used to indicate if a region exists in the dense array.
-	constexpr static auto NoEntryIndex = std::numeric_limits<index_type>::max();
+	//A special offset to indicate a region identifier does not exist in the cache.
+	static constexpr auto NoEntryOffset = std::numeric_limits<OffsetType>::max();
 
-	//The dense array stores different regions.
-	Dense_t DenseSet;
-	//The sparse arrays stores offsets into the dense array given region ID.
-	Sparse_t SparseSet;
+	EntryContainerType Importance;
+	OffsetContainerType Offset;
+
+	//Modify some regions by some amount.
+	template<
+		SparseMatrixElement::Concept::ImportanceInputRange Importance,
+		Internal_::CacheModifier<Sparse&, Importance> Modifier
+	>
+	void modify(Importance&& importance, Modifier&& modifier) {
+		Internal_::modify(*this, std::forward<Importance>(importance), std::forward<Modifier>(modifier));
+	}
 
 public:
 
-	using const_iterator = Dense_t::const_iterator;
+	using ConstIterator = EntryContainerType::const_iterator;
 
 	constexpr Sparse() noexcept = default;
 
 	Sparse(const Sparse&) = delete;
 
-	constexpr Sparse(Sparse&&) noexcept = default;
+	Sparse(Sparse&&) = delete;
+
+	Sparse& operator=(const Sparse&) = delete;
+
+	Sparse& operator=(Sparse&&) = delete;
 
 	constexpr ~Sparse() = default;
 
 	/**
-	 * @brief Resize the sparse cache.
+	 * @brief Resize sparse cache.
 	 *
-	 * @param region_count The region count to be used.
-	*/
-	constexpr void resize(const Format::Region_t region_count) {
-		this->SparseSet.resize(region_count, Sparse::NoEntryIndex);
+	 * @param region_count The maximum number of region identifiers to be held by this cache.
+	 */
+	constexpr void resize(const SizeType region_count) {
+		this->Offset.resize(region_count, Sparse::NoEntryOffset);
 	}
 
 	/**
-	 * @brief Clear all content in the cache.
-	*/
+	 * @brief Clear all contents in the cache.
+	 */
 	constexpr void clear() noexcept {
-		this->DenseSet.clear();
-		std::ranges::fill(this->SparseSet, Sparse::NoEntryIndex);
+		this->Importance.clear();
+		std::ranges::fill(this->Offset, Sparse::NoEntryOffset);
 	}
 
 	/**
-	 * @brief Add a bin entry.
+	 * @brief Increment importance of a region by a given amount specified in a sparse importance matrix element.
 	 *
-	 * @tparam R The range type.
-	 *
-	 * @param bin The bin that will be added.
-	 * @param region The region to be added. It will be incremented by one.
-	 * @param input A range of bins to be incremented.
-	*/
-	void increment(const bin_type&);
-	void increment(Format::Region_t);
-
-	template<SparseBin::SparseBinRangeValue<bin_type::value_type> R>
-	void increment(R&& input) {
-		std::ranges::for_each(std::forward<R>(input), [this](const auto& bin) { this->increment(bin); });
-	}
+	 * @param importance An element used for incrementation.
+	 */
+	void increment(const EntryType&);
 
 	/**
-	 * @brief Remove a bin entry.
-	 * If the bin will become empty after decrementing, bin will be erased from the cache and dictionary will
-	 * be rehashed. Those operations are expensive, so don't call this function too often. In our implementation
-	 * erasure rarely happens, benchmark shows this is still the best method.
+	 * @brief Increment importance of a region by one.
+	 *
+	 * @param region_id Identifier of region whose importance is to be incremented.
+	 */
+	void increment(SizeType);
+
+	/**
+	 * @brief Increment importance of some regions by some amount.
 	 * 
-	 * The behaviour is undefined if bin does not exist.
-	 *
-	 * @tparam R The range type.
-	 *
-	 * @param bin The bin that will be removed.
-	 * @param region The region to be removed. It will be decremented by one.
-	 * @param input The range of bins to be decremented.
-	*/
-	void decrement(const bin_type&);
-	void decrement(Format::Region_t);
-
-	template<SparseBin::SparseBinRangeValue<bin_type::value_type> R>
-	void decrement(R&& input) {
-		std::ranges::for_each(std::forward<R>(input), [this](const auto& bin) { this->decrement(bin); });
+	 * @tparam Importance A range of sparse importance matrix element.
+	 * @param importance Each specifies the region identifier and the amount of importance to increment.
+	 */
+	template<SparseMatrixElement::Concept::ImportanceInputRange Importance>
+	void increment(Importance&& importance) {
+		this->modify(
+			std::forward<Importance>(importance), std::mem_fn(static_cast<void (Sparse::*)(const EntryType&)>(&Sparse::increment)));
 	}
 
-	/////////////////////////
-	/// Container function
-	////////////////////////
+	/**
+	 * @brief Decrement importance of a region by a given amount specified in a sparse importance matrix element.
+	 *
+	 * @param importance An element used for decrementation.
+	 */
+	void decrement(const EntryType&);
 
-	constexpr const_iterator begin() const noexcept {
-		return this->DenseSet.cbegin();
-	}
+	/**
+	 * @brief Decrement importance of a region by one.
+	 *
+	 * @param region_id Identifier of region whose importance is to be decremented.
+	 */
+	void decrement(SizeType);
 
-	constexpr const_iterator end() const noexcept {
-		return this->DenseSet.cend();
+	/**
+	 * @brief Decrement importance of some regions by some amount.
+	 * 
+	 * @tparam Importance A range of sparse importance matrix element.
+	 * @param importance Each specifies the region identifier and the amount of importance to decrement.
+	 */
+	template<SparseMatrixElement::Concept::ImportanceInputRange Importance>
+	void decrement(Importance&& importance) {
+		this->modify(
+			std::forward<Importance>(importance), std::mem_fn(static_cast<void (Sparse::*)(const EntryType&)>(&Sparse::decrement)));
 	}
 
 };
-
-}
 
 }

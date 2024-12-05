@@ -48,11 +48,11 @@ public:
 
 	Base(const Base&) = delete;
 
-	Base(Base&&) noexcept = delete;
+	Base(Base&&) = delete;
 
 	Base& operator=(const Base&) = delete;
 
-	Base& operator=(Base&&) noexcept = delete;
+	Base& operator=(Base&&) = delete;
 
 	virtual constexpr ~Base() = default;
 

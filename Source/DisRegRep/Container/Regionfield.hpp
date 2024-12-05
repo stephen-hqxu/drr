@@ -64,7 +64,7 @@ public:
 
 	constexpr Regionfield& operator=(Regionfield&&) noexcept = default;
 
-	~Regionfield() = default;
+	constexpr ~Regionfield() = default;
 
 	/**
 	 * @brief Get the linear size of the regionfield matrix.

@@ -1,58 +1,63 @@
-#include <DisRegRep/Container/HistogramCache.hpp>
+#include <DisRegRep/Container/ImportanceCache.hpp>
+#include <DisRegRep/Container/SparseMatrixElement.hpp>
+
+#include <DisRegRep/Type.hpp>
+
+#include <algorithm>
+#include <execution>
 
 #include <cassert>
 
-using std::for_each;
+using DisRegRep::Container::ImportanceCache::Sparse, DisRegRep::Container::SparseMatrixElement::Importance,
+	DisRegRep::Type::RegionIdentifier;
 
-using namespace DisRegRep;
-using Format::Bin_t, Format::Region_t;
-using HistogramCache::Dense, HistogramCache::Sparse;
+using std::for_each, std::execution::unseq;
 
 namespace {
 
-constexpr Sparse::bin_type createSingleValueBin(const Region_t region) noexcept {
+[[nodiscard]] constexpr Importance makeSingleImportance(const RegionIdentifier region_id) noexcept {
 	return {
-		.Region = region,
-		.Value = 1u
+		.Identifier = region_id,
+		.Value = 1U
 	};
 }
 
 }
 
-void Sparse::increment(const bin_type& bin) {
-	const auto [region, value] = bin;
-	if (index_type& region_idx = this->SparseSet[region];
-		region_idx == Sparse::NoEntryIndex) {
-		region_idx = static_cast<index_type>(this->DenseSet.size());
-		this->DenseSet.push_back(bin);
-	} else {
-		this->DenseSet[region_idx].Value += value;
+void Sparse::increment(const EntryType& importance) {
+	const auto [region_id, value] = importance;
+	if (OffsetType& offset = this->Offset[region_id];
+		offset == Sparse::NoEntryOffset) {
+		offset = this->Importance.size();
+		this->Importance.push_back(importance);
+	} else [[likely]] {
+		this->Importance[region_id].Value += value;
 	}
 }
 
-void Sparse::increment(const Region_t region) {
-	this->increment(::createSingleValueBin(region));
+void Sparse::increment(const SizeType region_id) {
+	this->increment(makeSingleImportance(region_id));
 }
 
-void Sparse::decrement(const bin_type& bin) {
-	const auto [region, value] = bin;
-	index_type& region_idx = this->SparseSet[region];
-	assert(region_idx != Sparse::NoEntryIndex);
+void Sparse::decrement(const EntryType& importance) {
+	const auto [region_id, value] = importance;
+	OffsetType& offset = this->Offset[region_id];
+	assert(offset != Sparse::NoEntryOffset);
 
-	if (const auto removing_bin_it = this->DenseSet.begin() + region_idx;
-		removing_bin_it->Value <= value) {
-		//need to fully remove this bin and update indices of all following entries
-		const auto following_bin_it = this->DenseSet.erase(removing_bin_it);
-		for_each(following_bin_it, this->DenseSet.end(), [&sparse = this->SparseSet](const auto& bin) constexpr noexcept {
-			sparse[bin.Region]--;
-		});
+	if (const auto erasing_entry_it = this->Importance.begin() + offset;
+		erasing_entry_it->Value <= value) {
+		//Need to fully remove this cache entry and update offsets of all following entries.
+		//i.e. maintaining sparsity.
+		const auto following_entry_it = this->Importance.erase(erasing_entry_it);
+		for_each(unseq, following_entry_it, this->Importance.end(),
+			[&offset = this->Offset](const auto& entry) constexpr noexcept { --offset[entry.Identifier]; });
 
-		region_idx = Sparse::NoEntryIndex;
-	} else {
-		removing_bin_it->Value -= value;
+		offset = Sparse::NoEntryOffset;
+	} else [[likely]] {
+		erasing_entry_it->Value -= value;
 	}
 }
 
-void Sparse::decrement(const Region_t region) {
-	this->decrement(::createSingleValueBin(region));
+void Sparse::decrement(const SizeType region_id) {
+	this->decrement(makeSingleImportance(region_id));
 }
