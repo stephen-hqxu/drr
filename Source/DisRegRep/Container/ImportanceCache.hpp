@@ -18,6 +18,8 @@
 #include <concepts>
 #include <type_traits>
 
+#include <cassert>
+
 /**
  * @brief Cache intermediate values of region importance before writing to the output.
  */
@@ -37,13 +39,13 @@ concept DenseEntryBinaryOperator = std::is_convertible_v<std::invoke_result_t<Op
  * `Modifier` modifies `Cache` in-place given a sparse importance matrix element `Importance`.
  */
 template<typename Modifier, typename Cache, typename Importance>
-concept CacheModifier = SparseMatrixElement::Concept::ImportanceInputRange<Importance>
+concept CacheModifier = SparseMatrixElement::ImportanceInputRange<Importance>
 					 && std::invocable<Modifier, std::add_lvalue_reference_t<Cache>, std::ranges::range_const_reference_t<Importance>>;
 
 //In-place modifies cache with a modifier member function given a range of sparse importance matrix element.
 template<
 	typename Cache,
-	SparseMatrixElement::Concept::ImportanceInputRange Importance,
+	SparseMatrixElement::ImportanceInputRange Importance,
 	CacheModifier<Cache, Importance> Modifier
 >
 void modify(Cache& cache, Importance&& importance, Modifier&& modifier) {
@@ -76,6 +78,9 @@ private:
 	template<Internal_::DenseEntryBinaryOperator Op>
 	constexpr void modify(const SizeType region_id, Op&& op, const SizeType amount) noexcept {
 		EntryType& importance = this->Importance[region_id];
+		if constexpr (std::is_same_v<Op, std::minus<>>) {
+			assert(importance >= amount);
+		}
 		importance = std::invoke(std::forward<Op>(op), importance, amount);
 	}
 
@@ -87,14 +92,18 @@ private:
 	}
 
 	//Modify all regions by some amount.
-	template<Internal_::DenseEntryBinaryOperator Op, Type::Concept::RegionImportanceInputRange Amount>
+	template<Internal_::DenseEntryBinaryOperator Op, Type::RegionImportanceInputRange Amount>
 	void modify(Op&& op, Amount&& amount) {
+		if constexpr (std::is_same_v<Op, std::minus<>>) {
+			using std::ranges::all_of, std::views::zip;
+			assert(all_of(zip(this->Importance, amount), std::ranges::greater_equal {}));
+		}
 		Arithmetic::addRange(this->Importance, std::forward<Op>(op), std::forward<Amount>(amount), this->Importance.begin());
 	}
 
 	//Modify some regions by some amount.
 	template<
-		SparseMatrixElement::Concept::ImportanceInputRange Importance,
+		SparseMatrixElement::ImportanceInputRange Importance,
 		Internal_::CacheModifier<Dense&, Importance> Modifier
 	>
 	void modify(Importance&& importance, Modifier&& modifier) {
@@ -102,8 +111,6 @@ private:
 	}
 
 public:
-
-	using ConstIterator = ContainerType::const_iterator;
 
 	constexpr Dense() noexcept = default;
 
@@ -158,7 +165,7 @@ public:
 	 *
 	 * @param amount The size of this range must be no less than the size of the cache.
 	 */
-	template<Type::Concept::RegionImportanceInputRange Amount>
+	template<Type::RegionImportanceInputRange Amount>
 	void increment(Amount&& amount) {
 		this->modify(std::plus {}, std::forward<Amount>(amount));
 	}
@@ -170,7 +177,7 @@ public:
 	 *
 	 * @param importance Each specifies the region identifier and the amount of importance to increment.
 	 */
-	template<SparseMatrixElement::Concept::ImportanceInputRange Importance>
+	template<SparseMatrixElement::ImportanceInputRange Importance>
 	void increment(Importance&& importance) {
 		this->modify(std::forward<Importance>(importance),
 			std::mem_fn(static_cast<void (Dense::*)(const SparseMatrixElement::Importance&)>(&Dense::increment)));
@@ -201,7 +208,7 @@ public:
 	 *
 	 * @param amount  The size of this range must be no less than the size of the cache.
 	 */
-	template<Type::Concept::RegionImportanceInputRange Amount>
+	template<Type::RegionImportanceInputRange Amount>
 	void decrement(Amount&& amount) {
 		this->modify(std::minus {}, std::forward<Amount>(amount));
 	}
@@ -213,7 +220,7 @@ public:
 	 *
 	 * @param importance Each specifies the region identifier and the amount of importance to decrement.
 	 */
-	template<SparseMatrixElement::Concept::ImportanceInputRange Importance>
+	template<SparseMatrixElement::ImportanceInputRange Importance>
 	void decrement(Importance&& importance) {
 		this->modify(std::forward<Importance>(importance),
 			std::mem_fn(static_cast<void (Dense::*)(const SparseMatrixElement::Importance&)>(&Dense::decrement)));
@@ -245,7 +252,7 @@ private:
 
 	//Modify some regions by some amount.
 	template<
-		SparseMatrixElement::Concept::ImportanceInputRange Importance,
+		SparseMatrixElement::ImportanceInputRange Importance,
 		Internal_::CacheModifier<Sparse&, Importance> Modifier
 	>
 	void modify(Importance&& importance, Modifier&& modifier) {
@@ -253,8 +260,6 @@ private:
 	}
 
 public:
-
-	using ConstIterator = EntryContainerType::const_iterator;
 
 	constexpr Sparse() noexcept = default;
 
@@ -305,7 +310,7 @@ public:
 	 * @tparam Importance A range of sparse importance matrix element.
 	 * @param importance Each specifies the region identifier and the amount of importance to increment.
 	 */
-	template<SparseMatrixElement::Concept::ImportanceInputRange Importance>
+	template<SparseMatrixElement::ImportanceInputRange Importance>
 	void increment(Importance&& importance) {
 		this->modify(
 			std::forward<Importance>(importance), std::mem_fn(static_cast<void (Sparse::*)(const EntryType&)>(&Sparse::increment)));
@@ -331,7 +336,7 @@ public:
 	 * @tparam Importance A range of sparse importance matrix element.
 	 * @param importance Each specifies the region identifier and the amount of importance to decrement.
 	 */
-	template<SparseMatrixElement::Concept::ImportanceInputRange Importance>
+	template<SparseMatrixElement::ImportanceInputRange Importance>
 	void decrement(Importance&& importance) {
 		this->modify(
 			std::forward<Importance>(importance), std::mem_fn(static_cast<void (Sparse::*)(const EntryType&)>(&Sparse::decrement)));

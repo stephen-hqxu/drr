@@ -28,6 +28,7 @@ addMainComponent(
 HEADER
 	Arithmetic
 	Exception
+	Range
 	Type
 SOURCE
 	Exception
@@ -36,11 +37,14 @@ SOURCE
 
 target_link_libraries(${DRR_MAIN}
 PRIVATE
-	CLI11::CLI11
 	glm::glm
 	nanobench::nanobench
-	std::mdspan
+	# Command Line API
+	CLI11::CLI11
 	yaml-cpp::yaml-cpp
+	# Standard Library Extension
+	range-v3::range-v3
+	std::mdspan
 )
 
 set_target_properties(${DRR_MAIN} PROPERTIES

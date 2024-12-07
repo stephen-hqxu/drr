@@ -9,12 +9,13 @@
 #include <glm/geometric.hpp>
 #include <glm/vec2.hpp>
 
+#include <range/v3/view/generate_n.hpp>
+
 #include <array>
 #include <vector>
 
 #include <algorithm>
 #include <execution>
-#include <functional>
 #include <iterator>
 #include <ranges>
 
@@ -22,10 +23,13 @@ using DisRegRep::RegionfieldGenerator::VoronoiDiagram, DisRegRep::Container::Reg
 
 using glm::vec, glm::f32vec2;
 
-using std::array, std::vector, std::from_range;
+using ranges::views::generate_n;
+
+using std::array, std::vector;
 using std::execution::par_unseq;
 using std::for_each, std::ranges::min_element, std::ranges::distance;
-using std::bind, std::views::iota, std::views::repeat, std::views::transform, std::views::cartesian_product;
+using std::ranges::to,
+	std::views::iota, std::views::cartesian_product;
 
 void VoronoiDiagram::operator()(Regionfield& regionfield) {
 	DRR_ASSERT(this->CentroidCount > 0U);
@@ -33,20 +37,17 @@ void VoronoiDiagram::operator()(Regionfield& regionfield) {
 
 	using RandomIntVec2 = vec<2U, RandomIntType>;
 
+	auto rng = this->createRandomEngine();
 	array<UniformDistributionType, 2U> dist;
 	std::ranges::transform(iota(0U, dist.size()), dist.begin(),
 		[&rf_mdspan](const auto ext) { return UniformDistributionType(0U, rf_mdspan.extent(ext) - 1U); });
 
-	const auto region_centroid = vector(from_range,
-		repeat(nullptr, this->CentroidCount) |
-		transform([rng = this->createRandomEngine(), &dist](auto) mutable {
-			return RandomIntVec2(dist[0](rng), dist[1](rng));
-		})
-	);
-	const auto region_assignment = vector<Type::RegionIdentifier>(from_range,
-		repeat(nullptr, this->CentroidCount) |
-		transform(bind(Base::createDistribution(regionfield), this->createRandomEngine()))
-	);
+	const auto region_centroid =
+		generate_n([&rng, &dist]() mutable { return RandomIntVec2(dist[0](rng), dist[1](rng)); }, this->CentroidCount)
+		| to<vector>();
+	const auto region_assignment =
+		generate_n([&rng, dist = Base::createDistribution(regionfield)]() mutable { return dist(rng); }, this->CentroidCount)
+		| to<vector<Type::RegionIdentifier>>();
 
 	/*
 	 * Find the nearest centroid for every point in the regionfield.
@@ -58,7 +59,7 @@ void VoronoiDiagram::operator()(Regionfield& regionfield) {
 		const auto [y, x] = idx;
 
 		const auto centroid_distance =
-			region_centroid | transform([current_coord = f32vec2(x, y)](const auto& centroid_coord) noexcept {
+			region_centroid | std::views::transform([current_coord = f32vec2(x, y)](const auto& centroid_coord) noexcept {
 				return glm::distance(current_coord, f32vec2(centroid_coord));
 			});
 		const auto argmin = distance(centroid_distance.cbegin(), min_element(centroid_distance));

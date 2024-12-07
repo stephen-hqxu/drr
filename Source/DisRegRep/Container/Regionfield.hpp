@@ -5,9 +5,10 @@
 #include <glm/vec2.hpp>
 #include <mdspan/mdspan.hpp>
 
+#include <memory>
 #include <span>
 
-#include <memory>
+#include <type_traits>
 
 #include <cstdint>
 
@@ -21,16 +22,17 @@ class Regionfield {
 public:
 
 	using ValueType = Type::RegionIdentifier;
+	using ConstValue = std::add_const_t<ValueType>;
 	using IndexType = std::uint32_t;
 	using DimensionType = glm::vec<2U, IndexType>;
 
 	using SpanType = std::span<ValueType>;
-	using ConstSpanType = std::span<const ValueType>;
+	using ConstSpanType = std::span<ConstValue>;
 
 	using ExtentType = Kokkos::dextents<IndexType, 2U>;
 	using LayoutType = Kokkos::layout_left;
 	using MdSpanType = Kokkos::mdspan<ValueType, ExtentType, LayoutType>;
-	using ConstMdSpanType = Kokkos::mdspan<const ValueType, ExtentType, LayoutType>;
+	using ConstMdSpanType = Kokkos::mdspan<ConstValue, ExtentType, LayoutType>;
 	using MappingType = MdSpanType::mapping_type;
 
 private:
