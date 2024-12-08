@@ -93,7 +93,8 @@ inline constexpr auto ToDense = Range::RangeAdaptorClosure(
 					 if (it == end) {
 						 return fill_value;
 					 }
-					 if (const auto [sparse_region_id, value] = *it; sparse_region_id == dense_region_id) [[unlikely]] {
+					 if (const auto [sparse_region_id, value] = *it;
+						 sparse_region_id == dense_region_id) [[unlikely]] {
 						 ++it;
 						 return value;
 					 }

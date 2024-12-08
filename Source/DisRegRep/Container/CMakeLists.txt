@@ -1,11 +1,11 @@
 addMainComponent(
 HEADER
 	Combinator
-	ImportanceCache
+	CombineKernel
 	Regionfield
 	SparseMatrixElement
 SOURCE
 	Combinator
-	ImportanceCache
+	CombineKernel
 	Regionfield
 )

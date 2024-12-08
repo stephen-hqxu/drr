@@ -1,4 +1,4 @@
-#include <DisRegRep/Container/ImportanceCache.hpp>
+#include <DisRegRep/Container/CombineKernel.hpp>
 #include <DisRegRep/Container/SparseMatrixElement.hpp>
 
 #include <DisRegRep/Type.hpp>
@@ -8,7 +8,7 @@
 
 #include <cassert>
 
-using DisRegRep::Container::ImportanceCache::Sparse, DisRegRep::Container::SparseMatrixElement::Importance,
+using DisRegRep::Container::CombineKernel::Sparse, DisRegRep::Container::SparseMatrixElement::Importance,
 	DisRegRep::Type::RegionIdentifier;
 
 using std::for_each, std::execution::unseq;
@@ -24,10 +24,10 @@ namespace {
 
 }
 
-void Sparse::increment(const EntryType& importance) {
+void Sparse::increment(const ValueType& importance) {
 	const auto [region_id, value] = importance;
 	if (OffsetType& offset = this->Offset[region_id];
-		offset == Sparse::NoEntryOffset) {
+		offset == Sparse::NoValueOffset) {
 		offset = this->Importance.size();
 		this->Importance.push_back(importance);
 	} else [[likely]] {
@@ -39,22 +39,22 @@ void Sparse::increment(const SizeType region_id) {
 	this->increment(makeSingleImportance(region_id));
 }
 
-void Sparse::decrement(const EntryType& importance) {
+void Sparse::decrement(const ValueType& importance) {
 	const auto [region_id, value] = importance;
 	OffsetType& offset = this->Offset[region_id];
-	assert(offset != Sparse::NoEntryOffset);
+	assert(offset != Sparse::NoValueOffset);
 
-	if (const auto erasing_entry_it = this->Importance.begin() + offset;
-		erasing_entry_it->Value <= value) {
-		//Need to fully remove this cache entry and update offsets of all following entries.
+	if (const auto erasing_value_it = this->Importance.begin() + offset;
+		erasing_value_it->Value <= value) {
+		//Need to fully remove this value from the array and update offsets of all following entries.
 		//i.e. maintaining sparsity.
-		const auto following_entry_it = this->Importance.erase(erasing_entry_it);
-		for_each(unseq, following_entry_it, this->Importance.end(),
+		const auto following_value_it = this->Importance.erase(erasing_value_it);
+		for_each(unseq, following_value_it, this->Importance.end(),
 			[&offset = this->Offset](const auto& entry) constexpr noexcept { --offset[entry.Identifier]; });
 
-		offset = Sparse::NoEntryOffset;
+		offset = Sparse::NoValueOffset;
 	} else [[likely]] {
-		erasing_entry_it->Value -= value;
+		erasing_value_it->Value -= value;
 	}
 }
 

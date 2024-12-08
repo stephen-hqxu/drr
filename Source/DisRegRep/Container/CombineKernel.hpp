@@ -21,63 +21,63 @@
 #include <cassert>
 
 /**
- * @brief Cache intermediate values of region importance before writing to the output.
+ * @brief Stores region importance of the convolution kernel for combining region features.
  */
-namespace DisRegRep::Container::ImportanceCache {
+namespace DisRegRep::Container::CombineKernel {
 
 namespace Internal_ {
 
-using DenseEntryType = Type::RegionImportance; /**< Type of entry in dense importance cache. */
+using DenseValueType = Type::RegionImportance; /**< Value type of kernel using dense matrix. */
 
 /**
- * `Op` is a binary operator on dense entry values.
+ * `Op` is a binary operator on dense kernel values.
  */
 template<typename Op>
-concept DenseEntryBinaryOperator = std::is_convertible_v<std::invoke_result_t<Op, DenseEntryType, DenseEntryType>, DenseEntryType>;
+concept DenseKernelBinaryOperator = std::is_convertible_v<std::invoke_result_t<Op, DenseValueType, DenseValueType>, DenseValueType>;
 
 /**
- * `Modifier` modifies `Cache` in-place given a sparse importance matrix element `Importance`.
+ * `Modifier` modifies `Kernel` in-place given a sparse importance matrix element `Importance`.
  */
-template<typename Modifier, typename Cache, typename Importance>
-concept CacheModifier = SparseMatrixElement::ImportanceInputRange<Importance>
-					 && std::invocable<Modifier, std::add_lvalue_reference_t<Cache>, std::ranges::range_const_reference_t<Importance>>;
+template<typename Modifier, typename Kernel, typename Importance>
+concept KernelModifier = SparseMatrixElement::ImportanceInputRange<Importance>
+					 && std::invocable<Modifier, std::add_lvalue_reference_t<Kernel>, std::ranges::range_const_reference_t<Importance>>;
 
-//In-place modifies cache with a modifier member function given a range of sparse importance matrix element.
+//In-place modifies kernel with a modifier member function given a range of sparse importance matrix element.
 template<
-	typename Cache,
+	typename Kernel,
 	SparseMatrixElement::ImportanceInputRange Importance,
-	CacheModifier<Cache, Importance> Modifier
+	KernelModifier<Kernel, Importance> Modifier
 >
-void modify(Cache& cache, Importance&& importance, Modifier&& modifier) {
+void modify(Kernel& kernel, Importance&& importance, Modifier&& modifier) {
 	using std::ranges::cbegin, std::ranges::cend,
 		std::for_each, std::execution::unseq,
 		std::invoke;
 	for_each(unseq, cbegin(importance), cend(importance),
-		[&cache, &modifier](const auto& element) noexcept { invoke(modifier, cache, element); });
+		[&kernel, &modifier](const auto& element) noexcept { invoke(modifier, kernel, element); });
 }
 
 }
 
 /**
- * @brief A dense cache is a contiguous linear array that stores importance of each region at the corresponding index based on region
+ * @brief A dense kernel is a contiguous linear array that stores importance of each region at the corresponding index based on region
  * identifier.
  */
 class Dense {
 public:
 
-	using EntryType = Internal_::DenseEntryType;
+	using ValueType = Internal_::DenseValueType;
 	using SizeType = Type::RegionIdentifier;
 
 private:
 
-	using ContainerType = std::vector<EntryType>;
+	using ContainerType = std::vector<ValueType>;
 
 	ContainerType Importance;
 
 	//Modify one region by some amount.
-	template<Internal_::DenseEntryBinaryOperator Op>
+	template<Internal_::DenseKernelBinaryOperator Op>
 	constexpr void modify(const SizeType region_id, Op&& op, const SizeType amount) noexcept {
-		EntryType& importance = this->Importance[region_id];
+		ValueType& importance = this->Importance[region_id];
 		if constexpr (std::is_same_v<Op, std::minus<>>) {
 			assert(importance >= amount);
 		}
@@ -85,14 +85,14 @@ private:
 	}
 
 	//Modify one region by a given sparse importance matrix element.
-	template<Internal_::DenseEntryBinaryOperator Op>
+	template<Internal_::DenseKernelBinaryOperator Op>
 	constexpr void modify(const SparseMatrixElement::Importance& importance, Op&& op) noexcept {
 		const auto [region_id, value] = importance;
 		this->modify(region_id, std::forward<Op>(op), value);
 	}
 
 	//Modify all regions by some amount.
-	template<Internal_::DenseEntryBinaryOperator Op, Type::RegionImportanceInputRange Amount>
+	template<Internal_::DenseKernelBinaryOperator Op, Type::RegionImportanceInputRange Amount>
 	void modify(Op&& op, Amount&& amount) {
 		if constexpr (std::is_same_v<Op, std::minus<>>) {
 			using std::ranges::all_of, std::views::zip;
@@ -104,7 +104,7 @@ private:
 	//Modify some regions by some amount.
 	template<
 		SparseMatrixElement::ImportanceInputRange Importance,
-		Internal_::CacheModifier<Dense&, Importance> Modifier
+		Internal_::KernelModifier<Dense&, Importance> Modifier
 	>
 	void modify(Importance&& importance, Modifier&& modifier) {
 		Internal_::modify(*this, std::forward<Importance>(importance), std::forward<Modifier>(modifier));
@@ -125,19 +125,19 @@ public:
 	constexpr ~Dense() = default;
 
 	/**
-	 * @brief Resize dense cache.
+	 * @brief Resize dense kernel.
 	 *
-	 * @param region_count The maximum number of region identifiers to be held by this cache.
+	 * @param region_count The maximum number of region identifiers to be held by this kernel.
 	 */
 	constexpr void resize(const SizeType region_count) {
 		this->Importance.resize(region_count);
 	}
 
 	/**
-	 * @brief Clear all contents in the cache and reset importance of all regions to zero.
+	 * @brief Clear all contents in the kernel and reset importance of all regions to zero.
 	 */
 	constexpr void clear() noexcept {
-		std::ranges::fill(this->Importance, EntryType {});
+		std::ranges::fill(this->Importance, ValueType {});
 	}
 
 	/**
@@ -163,7 +163,7 @@ public:
 	 *
 	 * @tparam Amount A range of importance for region at each index.
 	 *
-	 * @param amount The size of this range must be no less than the size of the cache.
+	 * @param amount The size of this range must be no less than the size of the kernel.
 	 */
 	template<Type::RegionImportanceInputRange Amount>
 	void increment(Amount&& amount) {
@@ -206,7 +206,7 @@ public:
 	 *
 	 * @tparam Amount A range of importance for region at each index.
 	 *
-	 * @param amount  The size of this range must be no less than the size of the cache.
+	 * @param amount The size of this range must be no less than the size of the kernel.
 	 */
 	template<Type::RegionImportanceInputRange Amount>
 	void decrement(Amount&& amount) {
@@ -229,31 +229,31 @@ public:
 };
 
 /**
- * @brief A sparse cache collects two contiguous arrays, one stores sparse importance entries, the other stores offsets into the sparse
+ * @brief A sparse kernel collects two contiguous arrays, one stores sparse importance entries, the other stores offsets into the sparse
  * array given region identifier.
  */
 class Sparse {
 public:
 
-	using EntryType = SparseMatrixElement::Importance;
+	using ValueType = SparseMatrixElement::Importance;
 	using OffsetType = Dense::SizeType;
 	using SizeType = OffsetType;
 
 private:
 
-	using EntryContainerType = std::vector<EntryType>;
+	using ValueContainerType = std::vector<ValueType>;
 	using OffsetContainerType = std::vector<OffsetType>;
 
-	//A special offset to indicate a region identifier does not exist in the cache.
-	static constexpr auto NoEntryOffset = std::numeric_limits<OffsetType>::max();
+	//A special offset to indicate a region identifier does not exist in the kernel.
+	static constexpr auto NoValueOffset = std::numeric_limits<OffsetType>::max();
 
-	EntryContainerType Importance;
+	ValueContainerType Importance;
 	OffsetContainerType Offset;
 
 	//Modify some regions by some amount.
 	template<
 		SparseMatrixElement::ImportanceInputRange Importance,
-		Internal_::CacheModifier<Sparse&, Importance> Modifier
+		Internal_::KernelModifier<Sparse&, Importance> Modifier
 	>
 	void modify(Importance&& importance, Modifier&& modifier) {
 		Internal_::modify(*this, std::forward<Importance>(importance), std::forward<Modifier>(modifier));
@@ -274,20 +274,20 @@ public:
 	constexpr ~Sparse() = default;
 
 	/**
-	 * @brief Resize sparse cache.
+	 * @brief Resize sparse kernel.
 	 *
-	 * @param region_count The maximum number of region identifiers to be held by this cache.
+	 * @param region_count The maximum number of region identifiers to be held by this kernel.
 	 */
 	constexpr void resize(const SizeType region_count) {
-		this->Offset.resize(region_count, Sparse::NoEntryOffset);
+		this->Offset.resize(region_count, Sparse::NoValueOffset);
 	}
 
 	/**
-	 * @brief Clear all contents in the cache.
+	 * @brief Clear all contents in the kernel.
 	 */
 	constexpr void clear() noexcept {
 		this->Importance.clear();
-		std::ranges::fill(this->Offset, Sparse::NoEntryOffset);
+		std::ranges::fill(this->Offset, Sparse::NoValueOffset);
 	}
 
 	/**
@@ -295,7 +295,7 @@ public:
 	 *
 	 * @param importance An element used for incrementation.
 	 */
-	void increment(const EntryType&);
+	void increment(const ValueType&);
 
 	/**
 	 * @brief Increment importance of a region by one.
@@ -313,7 +313,7 @@ public:
 	template<SparseMatrixElement::ImportanceInputRange Importance>
 	void increment(Importance&& importance) {
 		this->modify(
-			std::forward<Importance>(importance), std::mem_fn(static_cast<void (Sparse::*)(const EntryType&)>(&Sparse::increment)));
+			std::forward<Importance>(importance), std::mem_fn(static_cast<void (Sparse::*)(const ValueType&)>(&Sparse::increment)));
 	}
 
 	/**
@@ -321,7 +321,7 @@ public:
 	 *
 	 * @param importance An element used for decrementation.
 	 */
-	void decrement(const EntryType&);
+	void decrement(const ValueType&);
 
 	/**
 	 * @brief Decrement importance of a region by one.
@@ -339,7 +339,7 @@ public:
 	template<SparseMatrixElement::ImportanceInputRange Importance>
 	void decrement(Importance&& importance) {
 		this->modify(
-			std::forward<Importance>(importance), std::mem_fn(static_cast<void (Sparse::*)(const EntryType&)>(&Sparse::decrement)));
+			std::forward<Importance>(importance), std::mem_fn(static_cast<void (Sparse::*)(const ValueType&)>(&Sparse::decrement)));
 	}
 
 };
