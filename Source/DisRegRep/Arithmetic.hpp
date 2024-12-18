@@ -54,7 +54,7 @@ template<glm::length_t L, std::integral T, glm::qualifier Q>
 	using std::span, std::transform, std::execution::unseq;
 
 	glm::vec<L, std::make_signed_t<T>, Q> signed_v;
-	const auto it = span(value_ptr(v), L);
+	const auto it = span<T, L>(value_ptr(v), L);
 	transform(unseq, it.cbegin(), it.cend(), value_ptr(signed_v), toSigned<T>);
 	return signed_v;
 }
@@ -74,28 +74,22 @@ template<std::integral I>
 
 /**
  * @brief Perform `output = f(a, b)`.
- * 
- * @tparam R1 The range type of `a`.
- * @tparam F The type of operator.
- * @tparam R2 The range type of `b`.
- * @tparam O The output iterator type.
- * 
+ *
  * @param a The first range.
  * @param f The range operator.
  * @param b The second range.
  * @param output The output iterator.
-*/
-template<
-	std::ranges::input_range R1,
-	std::copy_constructible F,
-	std::ranges::input_range R2,
-	std::output_iterator<std::indirect_result_t<F, std::ranges::const_iterator_t<R1>, std::ranges::const_iterator_t<R2>>> O
->
-void addRange(R1&& a, F&& f, R2&& b, const O output) {
+ */
+void addRange(
+	std::ranges::forward_range auto&& a,
+	std::move_constructible auto f,
+	std::ranges::forward_range auto&& b,
+	std::forward_iterator auto output
+) {
 	using std::transform, std::execution::unseq,
 		std::ranges::cbegin, std::ranges::cend;
 
-	transform(unseq, cbegin(a), cend(a), cbegin(b), output, std::forward<F>(f));
+	transform(unseq, cbegin(a), cend(a), cbegin(b), std::move(output), std::move(f));
 }
 
 /**

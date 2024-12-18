@@ -49,11 +49,10 @@ template<typename T>
 concept Is = std::is_same_v<T, Basic<typename T::ValueType>>;
 
 /**
- * Type `R` models an input range of sparse matrix element.
+ * Type `R` models a range whose values are sparse importance elements.
  */
 template<typename R>
-concept ImportanceInputRange =
-	std::ranges::input_range<R> && std::is_same_v<std::ranges::range_value_t<R>, Importance>;
+concept ImportanceRange = std::is_same_v<std::ranges::range_value_t<R>, Importance>;
 
 /**
  * @brief Format a range that contains region data in sparse matrix to use dense matrix for storage.
@@ -117,8 +116,8 @@ inline constexpr auto ToDense = Range::RangeAdaptorClosure(
  * @return A range of sparse matrix element.
  */
 inline constexpr auto ToSparse =
-	Range::RangeAdaptorClosure([]<std::ranges::input_range Dense, typename Value = std::ranges::range_value_t<Dense>>
-		requires std::equality_comparable<Value> && std::is_nothrow_copy_constructible_v<Value>
+	Range::RangeAdaptorClosure([]<std::ranges::viewable_range Dense, typename Value = std::ranges::range_value_t<Dense>>
+		requires std::ranges::input_range<Dense> && std::equality_comparable<Value> && std::is_nothrow_copy_constructible_v<Value>
 		(Dense&& dense, const Value ignore_value = {}) static constexpr noexcept -> auto {
 			using std::make_from_tuple;
 			using std::views::enumerate, std::views::filter, std::views::transform;

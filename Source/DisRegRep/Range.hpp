@@ -106,7 +106,7 @@ public:
  * @return Transformed range.
  */
 inline constexpr auto ImpureTransform = RangeAdaptorClosure([]<std::ranges::viewable_range R, RangeApplicator F>
-	requires std::indirectly_unary_invocable<F, std::ranges::iterator_t<R>>
+	requires std::ranges::input_range<R> && std::indirectly_unary_invocable<F, std::ranges::iterator_t<R>>
 	(R&& r, F f) static constexpr noexcept(std::is_nothrow_move_constructible_v<F>) -> auto {
 		//This cache views force the range to be an input range, and each element in the preceding range will be dereferenced exactly
 		//	once, thus eliminating the possibility of calling the impure function more than once per iteration.
@@ -126,8 +126,8 @@ inline constexpr auto ImpureTransform = RangeAdaptorClosure([]<std::ranges::view
  *
  * @return Normalised range.
  */
-inline constexpr auto Normalise = RangeAdaptorClosure([]<std::ranges::input_range R, std::floating_point V>
-	requires std::is_convertible_v<std::ranges::range_value_t<R>, V>
+inline constexpr auto Normalise = RangeAdaptorClosure([]<std::ranges::viewable_range R, std::floating_point V>
+	requires std::ranges::input_range<R> && std::is_convertible_v<std::ranges::range_value_t<R>, V>
 	(R&& r, const V factor) static constexpr noexcept -> auto {
 		using std::views::repeat, std::views::zip_transform, std::multiplies;
 		return zip_transform(multiplies {}, std::forward<R>(r), repeat(V { 1 } / factor));

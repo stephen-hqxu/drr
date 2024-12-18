@@ -46,7 +46,7 @@ void VoronoiDiagram::operator()(Regionfield& regionfield) {
 
 	const auto region_centroid =
 		generate_n(
-			[&rng, &dist] mutable {
+			[&rng, &dist] {
 				auto& [dist0, dist1] = dist;
 				return RandomIntVec2(dist0(rng), dist1(rng));
 			}, this->CentroidCount)

@@ -18,10 +18,9 @@ using RegionImportance = std::uint32_t; /**< Region importance is defined as the
 using RegionMask = glm::float32_t; /**< L1-normalised importance among all regions at the same coordinate. */
 
 /**
- * Type `R` models an input range and the range value is convertible to region importance.
+ * Type `R` models is a range whose value is convertible to region importance.
  */
 template<typename R>
-concept RegionImportanceInputRange =
-	std::ranges::input_range<R> && std::is_convertible_v<std::ranges::range_value_t<R>, RegionImportance>;
+concept RegionImportanceRange = std::is_convertible_v<std::ranges::range_value_t<R>, RegionImportance>;
 
 }
