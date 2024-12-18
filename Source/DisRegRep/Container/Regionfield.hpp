@@ -1,12 +1,13 @@
 #pragma once
 
 #include <DisRegRep/Type.hpp>
+#include <DisRegRep/UninitialisedAllocator.hpp>
 
 #include <glm/vec2.hpp>
 #include <mdspan/mdspan.hpp>
 
-#include <memory>
 #include <span>
+#include <vector>
 
 #include <type_traits>
 
@@ -38,25 +39,20 @@ public:
 private:
 
 	MappingType Mapping;
-	std::unique_ptr<ValueType[]> Data;
-
-	ValueType RegionCount {};
+	std::vector<ValueType, UninitialisedAllocator<ValueType>> Data;
 
 public:
+
+	/**
+	 * @brief The total number of regions that are supposed to present in the regionfield. Note that it is likely that not all regions
+	 * are on the regionfield. This is purely informational and does not affect the content of the regionfield.
+	 */
+	ValueType RegionCount {};
 
 	/**
 	 * @brief Initialise an empty regionfield matrix.
 	 */
 	constexpr Regionfield() = default;
-
-	/**
-	 * @brief Allocate a regionfield matrix with uninitialised data.
-	 *
-	 * @param dim The width and height of the matrix.
-	 * @param region_count The total number of regions that are supposed to present in the regionfield. Note that it is likely that not
-	 * all regions are on the regionfield.
-	 */
-	Regionfield(DimensionType, ValueType);
 
 	Regionfield(const Regionfield&) = delete;
 
@@ -69,21 +65,22 @@ public:
 	constexpr ~Regionfield() = default;
 
 	/**
+	 * @brief Resize the regionfield matrix. After this call returns, all existing contents become undefined regardless of whether
+	 * reallocation took place. This function provides a performance benefits of reusing existing memory whenever possible.
+	 *
+	 * @param dim The width and height of the matrix.
+	 *
+	 * @exception Exception When any component of `dim` is not positive.
+	 */
+	void resize(DimensionType);
+
+	/**
 	 * @brief Get the linear size of the regionfield matrix.
 	 *
 	 * @return The total number of region identifiers stored.
 	 */
 	[[nodiscard]] constexpr IndexType size() const noexcept {
-		return this->Mapping.required_span_size();
-	}
-
-	/**
-	 * @brief Get the total number of regions.
-	 * 
-	 * @return Total number of regions.
-	 */
-	[[nodiscard]] constexpr ValueType regionCount() const noexcept {
-		return this->RegionCount;
+		return this->Data.size();
 	}
 
 	/**
@@ -91,11 +88,9 @@ public:
 	 *
 	 * @return The mdspan of the regionfield.
 	 */
-	[[nodiscard]] constexpr MdSpanType mdspan() noexcept {
-		return { this->Data.get(), this->Mapping };
-	}
-	[[nodiscard]] constexpr ConstMdSpanType mdspan() const noexcept {
-		return { this->Data.get(), this->Mapping };
+	template<typename Self>
+	[[nodiscard]] constexpr auto mdspan(this Self& self) noexcept {
+		return std::conditional_t<std::is_const_v<Self>, ConstMdSpanType, MdSpanType> { self.Data.data(), self.Mapping };
 	}
 
 	/**
@@ -103,11 +98,9 @@ public:
 	 *
 	 * @return The span of the regionfield.
 	 */
-	[[nodiscard]] constexpr SpanType span() noexcept {
-		return { this->Data.get(), this->size() };
-	}
-	[[nodiscard]] constexpr ConstSpanType span() const noexcept {
-		return { this->Data.get(), this->size() };
+	template<typename Self>
+	[[nodiscard]] constexpr auto span(this Self& self) noexcept {
+		return std::conditional_t<std::is_const_v<Self>, ConstSpanType, SpanType> { self.Data.data(), self.size() };
 	}
 
 };

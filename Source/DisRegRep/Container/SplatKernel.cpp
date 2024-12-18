@@ -1,4 +1,4 @@
-#include <DisRegRep/Container/CombineKernel.hpp>
+#include <DisRegRep/Container/SplatKernel.hpp>
 #include <DisRegRep/Container/SparseMatrixElement.hpp>
 
 #include <DisRegRep/Type.hpp>
@@ -8,7 +8,7 @@
 
 #include <cassert>
 
-using DisRegRep::Container::CombineKernel::Sparse, DisRegRep::Container::SparseMatrixElement::Importance,
+using DisRegRep::Container::SplatKernel::Sparse, DisRegRep::Container::SparseMatrixElement::Importance,
 	DisRegRep::Type::RegionIdentifier;
 
 using std::for_each, std::execution::unseq;

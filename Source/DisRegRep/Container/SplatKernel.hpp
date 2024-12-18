@@ -21,9 +21,13 @@
 #include <cassert>
 
 /**
- * @brief Stores region importance of the convolution kernel for combining region features.
+ * @brief Stores region importance of the convolution kernel for splatting region features.
+ *
+ * For all kinds of kernels, two fundamental functions are provided: increment and decrement. They work by given region identifier(s)
+ * and the amount of importance to be increased/decreased. To ensure high efficiency, no exception handling is provided for the inputs.
+ * Specifically for decrement, the behaviour is undefined if importance for any region underflows.
  */
-namespace DisRegRep::Container::CombineKernel {
+namespace DisRegRep::Container::SplatKernel {
 
 namespace Internal_ {
 
@@ -76,7 +80,7 @@ private:
 
 	//Modify one region by some amount.
 	template<Internal_::DenseKernelBinaryOperator Op>
-	constexpr void modify(const SizeType region_id, Op&& op, const SizeType amount) noexcept {
+	constexpr void modify(const SizeType region_id, Op&& op, const ValueType amount) noexcept {
 		ValueType& importance = this->Importance[region_id];
 		if constexpr (std::is_same_v<Op, std::minus<>>) {
 			assert(importance >= amount);

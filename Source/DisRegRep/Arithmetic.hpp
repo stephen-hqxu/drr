@@ -115,7 +115,7 @@ template<
 	std::output_iterator<T> O
 >
 requires std::is_convertible_v<std::ranges::range_value_t<R>, T>
-void scaleRange(R&& input, const O output, const T scalar) {
+[[deprecated("Please use Range::Normalise")]] void scaleRange(R&& input, const O output, const T scalar) {
 	using std::transform, std::execution::unseq,
 		std::ranges::cbegin, std::ranges::cend, std::iterator_traits;
 
@@ -136,7 +136,7 @@ void scaleRange(R&& input, const O output, const T scalar) {
  * @return The horizontal product of `v`.
 */
 template<glm::length_t L, typename T, glm::qualifier Q>
-[[nodiscard]] constexpr T horizontalProduct(const glm::vec<L, T, Q>& v) noexcept {
+[[deprecated("No longer needed"), nodiscard]] constexpr T horizontalProduct(const glm::vec<L, T, Q>& v) noexcept {
 	using std::index_sequence, std::make_index_sequence;
 	const auto product = [&v]<std::size_t... I>(index_sequence<I...>) constexpr noexcept -> T {
 		return (T { 1 } * ... * v[I]);

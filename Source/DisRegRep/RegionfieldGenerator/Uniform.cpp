@@ -3,12 +3,12 @@
 #include <DisRegRep/Container/Regionfield.hpp>
 
 #include <algorithm>
+#include <functional>
 
 using DisRegRep::RegionfieldGenerator::Uniform, DisRegRep::Container::Regionfield;
 
-using std::ranges::generate;
+using std::ranges::generate, std::bind_front;
 
 void Uniform::operator()(Regionfield& regionfield) {
-	generate(regionfield.span(),
-		[rng = this->createRandomEngine(), dist = Base::createDistribution(regionfield)]() mutable { return dist(rng); });
+	generate(regionfield.span(), bind_front(Base::createDistribution(regionfield), this->createRandomEngine()));
 }

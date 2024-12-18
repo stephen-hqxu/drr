@@ -124,8 +124,8 @@ inline constexpr auto ToSparse =
 			using std::views::enumerate, std::views::filter, std::views::transform;
 			return std::forward<Dense>(dense)
 				 | enumerate
-				 | filter([ignore_value](const auto& it) constexpr noexcept { return std::get<1U>(it) != ignore_value; })
-				 | transform([](const auto& it) static constexpr noexcept { return make_from_tuple<Basic<Value>>(it); });
+				 | filter([ignore_value](const auto it) constexpr noexcept { return std::get<1U>(it) != ignore_value; })
+				 | transform([](const auto it) static constexpr noexcept { return make_from_tuple<Basic<Value>>(it); });
 		});
 
 }

@@ -1,11 +1,11 @@
 addMainComponent(
 HEADER
 	Combinator
-	CombineKernel
 	Regionfield
 	SparseMatrixElement
+	SplatKernel
 SOURCE
 	Combinator
-	CombineKernel
 	Regionfield
+	SplatKernel
 )

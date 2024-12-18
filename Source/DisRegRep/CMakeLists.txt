@@ -30,6 +30,7 @@ HEADER
 	Exception
 	Range
 	Type
+	UninitialisedAllocator
 SOURCE
 	Exception
 	Main

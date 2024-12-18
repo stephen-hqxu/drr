@@ -4,16 +4,11 @@
 
 #include <glm/vector_relational.hpp>
 
-#include <memory>
-
 using DisRegRep::Container::Regionfield;
 
-using std::make_unique_for_overwrite;
-
-Regionfield::Regionfield(const DimensionType dim, const ValueType region_count) :
-	Mapping(ExtentType(dim.x, dim.y)),
-	Data(make_unique_for_overwrite<ValueType[]>(this->Mapping.required_span_size())),
-	RegionCount(region_count) {
+void Regionfield::resize(const DimensionType dim) {
 	DRR_ASSERT(glm::all(glm::greaterThan(dim, DimensionType(0U))));
-	DRR_ASSERT(region_count > 0U);
+
+	this->Mapping = ExtentType(dim.x, dim.y);
+	this->Data.resize(this->Mapping.required_span_size());
 }
