@@ -4,8 +4,8 @@
 #include <DisRegRep/UninitialisedAllocator.hpp>
 
 #include <glm/vec2.hpp>
-#include <mdspan/mdspan.hpp>
 
+#include <mdspan>
 #include <span>
 #include <vector>
 
@@ -30,10 +30,10 @@ public:
 	using SpanType = std::span<ValueType>;
 	using ConstSpanType = std::span<ConstValue>;
 
-	using ExtentType = Kokkos::dextents<IndexType, 2U>;
-	using LayoutType = Kokkos::layout_left;
-	using MdSpanType = Kokkos::mdspan<ValueType, ExtentType, LayoutType>;
-	using ConstMdSpanType = Kokkos::mdspan<ConstValue, ExtentType, LayoutType>;
+	using ExtentType = std::dextents<IndexType, 2U>;
+	using LayoutType = std::layout_left;
+	using MdSpanType = std::mdspan<ValueType, ExtentType, LayoutType>;
+	using ConstMdSpanType = std::mdspan<ConstValue, ExtentType, LayoutType>;
 	using MappingType = MdSpanType::mapping_type;
 
 private:
@@ -81,6 +81,15 @@ public:
 	 */
 	[[nodiscard]] constexpr IndexType size() const noexcept {
 		return this->Data.size();
+	}
+
+	/**
+	 * @brief Get the index mapping of the regionfield.
+	 * 
+	 * @return Index mapping.
+	 */
+	[[nodiscard]] constexpr const MappingType& mapping() const noexcept {
+		return this->Mapping;
 	}
 
 	/**

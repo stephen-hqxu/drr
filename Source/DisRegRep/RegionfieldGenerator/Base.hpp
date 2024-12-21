@@ -19,7 +19,7 @@ public:
 
 protected:
 
-	using RandomIntType = std::uint16_t;
+	using RandomIntType = std::uint_fast16_t;
 	using RandomEngineType =
 		std::shuffle_order_engine<std::linear_congruential_engine<RandomIntType, 10621U, 210U, (1U << 15U) - 1U>, 16U>;
 	using UniformDistributionType = std::uniform_int_distribution<RandomIntType>;
@@ -38,7 +38,7 @@ protected:
 	 * 
 	 * @return Uniform integer distribution with range [0, region count).
 	 */
-	[[nodiscard]] static UniformDistributionType createDistribution(const Container::Regionfield&) noexcept;
+	[[nodiscard]] static UniformDistributionType createDistribution(const Container::Regionfield&);
 
 public:
 

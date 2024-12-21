@@ -113,24 +113,4 @@ inline constexpr auto ImpureTransform = RangeAdaptorClosure([]<std::ranges::view
 		return std::forward<R>(r) | ranges::views::transform(std::move(f)) | ranges::views::cache1;
 	});
 
-/**
- * @brief Normalise each value in a range.
- *
- * @library STL
- *
- * @tparam R Range type.
- * @tparam V Normalising value type.
- *
- * @param r Input range of values.
- * @param factor Normalising factor. Each value in the range is multiplied by a reciprocal of this.
- *
- * @return Normalised range.
- */
-inline constexpr auto Normalise = RangeAdaptorClosure([]<std::ranges::viewable_range R, std::floating_point V>
-	requires std::ranges::input_range<R> && std::is_convertible_v<std::ranges::range_value_t<R>, V>
-	(R&& r, const V factor) static constexpr noexcept -> auto {
-		using std::views::repeat, std::views::zip_transform, std::multiplies;
-		return zip_transform(multiplies {}, std::forward<R>(r), repeat(V { 1 } / factor));
-	});
-
 }

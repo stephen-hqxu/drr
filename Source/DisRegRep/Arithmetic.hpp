@@ -1,6 +1,7 @@
 #pragma once
 
-#include <DisRegRep/Type.hpp>
+#include "Range.hpp"
+#include "Type.hpp"
 
 #include <glm/fwd.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -8,8 +9,9 @@
 #include <iterator>
 #include <span>
 
-#include <execution>
 #include <algorithm>
+#include <execution>
+#include <functional>
 #include <ranges>
 
 #include <utility>
@@ -25,6 +27,26 @@
 namespace DisRegRep::Arithmetic {
 
 /**
+ * @brief Normalise each value in a range.
+ *
+ * @library STL
+ *
+ * @tparam R Range type.
+ * @tparam V Normalising value type.
+ *
+ * @param r Input range of values.
+ * @param factor Normalising factor. Each value in the range is multiplied by a reciprocal of this.
+ *
+ * @return Normalised range.
+ */
+inline constexpr auto Normalise = Range::RangeAdaptorClosure([]<std::ranges::viewable_range R, std::floating_point V>
+	requires std::ranges::input_range<R> && std::is_convertible_v<std::ranges::range_value_t<R>, V>
+	(R&& r, const V factor) static constexpr noexcept -> auto {
+		using std::views::repeat, std::views::zip_transform, std::multiplies;
+		return zip_transform(multiplies {}, std::forward<R>(r), repeat(V { 1 } / factor));
+	});
+
+/**
  * @brief Convert an integer to signed.
  *
  * @tparam I Integer type.
@@ -33,7 +55,7 @@ namespace DisRegRep::Arithmetic {
  * @return Signed version of `i` if it is unsigned; otherwise unmodified.
  */
 template<std::integral I>
-[[nodiscard]] constexpr auto toSigned(const I i) noexcept {
+[[deprecated, nodiscard]] constexpr auto toSigned(const I i) noexcept {
 	return static_cast<std::make_signed_t<I>>(i);
 }
 
@@ -49,7 +71,8 @@ template<std::integral I>
  * @return Signed version of `v` if it is unsigned; otherwise unmodified.
  */
 template<glm::length_t L, std::integral T, glm::qualifier Q>
-[[nodiscard]] constexpr auto toSigned(const glm::vec<L, T, Q>& v) {
+[[deprecated("Use GLM vector implicit conversion."), nodiscard]]
+constexpr auto toSigned(const glm::vec<L, T, Q>& v) {
 	using glm::value_ptr;
 	using std::span, std::transform, std::execution::unseq;
 
@@ -68,7 +91,7 @@ template<glm::length_t L, std::integral T, glm::qualifier Q>
  * @return Unsigned version of `i` if it is signed; otherwise unmodified.
  */
 template<std::integral I>
-[[nodiscard]] constexpr auto toUnsigned(const I i) noexcept {
+[[deprecated, nodiscard]] constexpr auto toUnsigned(const I i) noexcept {
 	return static_cast<std::make_unsigned_t<I>>(i);
 }
 
@@ -109,7 +132,8 @@ template<
 	std::output_iterator<T> O
 >
 requires std::is_convertible_v<std::ranges::range_value_t<R>, T>
-[[deprecated("Please use Range::Normalise")]] void scaleRange(R&& input, const O output, const T scalar) {
+[[deprecated("Superseded by Arithmetic::Normalise.")]]
+void scaleRange(R&& input, const O output, const T scalar) {
 	using std::transform, std::execution::unseq,
 		std::ranges::cbegin, std::ranges::cend, std::iterator_traits;
 
@@ -130,7 +154,8 @@ requires std::is_convertible_v<std::ranges::range_value_t<R>, T>
  * @return The horizontal product of `v`.
 */
 template<glm::length_t L, typename T, glm::qualifier Q>
-[[deprecated("No longer needed"), nodiscard]] constexpr T horizontalProduct(const glm::vec<L, T, Q>& v) noexcept {
+[[deprecated("Previously used for computing multi-dimensional strides, now superseded by mdspan mapping."), nodiscard]]
+constexpr T horizontalProduct(const glm::vec<L, T, Q>& v) noexcept {
 	using std::index_sequence, std::make_index_sequence;
 	const auto product = [&v]<std::size_t... I>(index_sequence<I...>) constexpr noexcept -> T {
 		return (T { 1 } * ... * v[I]);

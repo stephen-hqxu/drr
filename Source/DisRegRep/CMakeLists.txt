@@ -45,7 +45,6 @@ PRIVATE
 	yaml-cpp::yaml-cpp
 	# Standard Library Extension
 	range-v3::range-v3
-	std::mdspan
 )
 
 set_target_properties(${DRR_MAIN} PROPERTIES

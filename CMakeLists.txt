@@ -30,7 +30,6 @@ endif()
 ##################
 find_package(CLI11 2 CONFIG REQUIRED)
 find_package(glm 1 CONFIG REQUIRED)
-find_package(mdspan 0.6 CONFIG REQUIRED)
 find_package(nanobench CONFIG REQUIRED)
 find_package(range-v3 0.12.0 CONFIG REQUIRED)
 find_package(yaml-cpp 0.8 CONFIG REQUIRED)
