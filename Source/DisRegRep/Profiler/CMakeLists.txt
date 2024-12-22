@@ -1,8 +1,8 @@
 addMainComponent(
 HEADER
-	# ImportanceComputer/
-	ImportanceComputer/Driver
-	ImportanceComputer/Test
+	# Splatting/
+	Splatting/Driver
+	Splatting/Test
 	# System/
 	System/Platform
 	System/ProcessThreadControl
@@ -10,9 +10,9 @@ HEADER
 	ThreadPool
 	Utility
 SOURCE
-	# ImportanceComputer/
-	ImportanceComputer/Driver
-	ImportanceComputer/Test
+	# Splatting/
+	Splatting/Driver
+	Splatting/Test
 	# System/
 	System/ProcessThreadControl
 	# /

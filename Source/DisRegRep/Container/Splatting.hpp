@@ -1,389 +1,432 @@
 #pragma once
 
-#include "ContainerTrait.hpp"
-#include "SparseBin.hpp"
+#include "SparseMatrixElement.hpp"
 
-#include "../Format.hpp"
-#include "../Maths/Arithmetic.hpp"
-#include "../Maths/Indexer.hpp"
+#include <DisRegRep/Type.hpp>
+#include <DisRegRep/UninitialisedAllocator.hpp>
 
-#include <algorithm>
-#include <ranges>
+#include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
+
+#include <mdspan>
 #include <span>
+#include <tuple>
 #include <vector>
 
-#include <concepts>
+#include <algorithm>
+#include <execution>
+#include <iterator>
+#include <ranges>
+
+#include <memory>
 #include <utility>
 
-#include <cstddef>
+#include <type_traits>
+
 #include <cstdint>
 
-namespace DisRegRep {
-
 /**
- * @brief A blend histogram is a matrix of vectors, and each vector stores blending weights for the corresponding region descriptor in
- * each element.
+ * @brief The splatting value matrix (SVM) is a column-major 3D matrix that stores values computed by the convolution used for
+ * splatting of region features. The Y and Z axes are used for locating points in a 2D space, and the X axis is used for locating the
+ * splatting value for the corresponding region.
  */
-namespace BlendHistogram {
+namespace DisRegRep::Container::Splatting {
 
 /**
- * @brief A dense blend histogram uses a 3D matrix.
+ * @brief Common types used by the SVM implementations.
+ */
+namespace Type {
+
+using IndexType = std::uint32_t;
+using LayoutType = std::layout_left;
+
+template<glm::length_t L>
+using DimensionType = glm::vec<L, IndexType>;
+using Dimension2Type = DimensionType<2U>; /**< Point coordinate. */
+using Dimension3Type = DimensionType<3U>; /**< Region index and point coordinate. */
+
+}
+
+/**
+ * @brief A dense SVM is a contiguous 3D matrix of region splatting values.
  *
- * @tparam T The bin type.
-*/
+ * @tparam V Splatting value type.
+ */
 template<typename>
 class BasicDense;
+
+using DenseImportance = BasicDense<DisRegRep::Type::RegionImportance>; /**< Dense region importance. */
+using DenseMask = BasicDense<DisRegRep::Type::RegionMask>; /**< Dense region mask. */
+
 /**
- * @brief A sparse blend histogram is a 2D matrix of arrays with, useful if the bin axis is sparse.
+ * @brief A sparse SVM is a partial sparse matrix that uses compressed sparse row format on the axis that stores region
+ * splatting values (i.e. the X axis), the rest of axes remain dense.
  *
- * @tparam T The bin type.
- * @tparam Sorted Indicates if each histogram is sorted.
-*/
-template<typename, bool>
+ * @tparam V Splatting value type.
+ */
+template<typename>
 class BasicSparse;
 
-template<typename U>
-bool operator==(const BasicDense<U>&, const BasicSparse<U, true>&);
-template<typename U>
-bool operator==(const BasicSparse<U, true>&, const BasicDense<U>&);
+using SparseImportance = BasicSparse<DisRegRep::Type::RegionImportance>; /**< Sparse region importance. */
+using SparseMask = BasicSparse<DisRegRep::Type::RegionMask>; /**< Sparse region mask. */
+
+//Compare if the splatting values are equivalent regardless of storage format.
+//For sparse matrix, values are assumed to be default initialised if it is not present.
+template<typename V>
+[[nodiscard]] bool operator==(const BasicDense<V>&, const BasicSparse<V>&);
+template<typename V>
+[[nodiscard]] bool operator==(const BasicSparse<V>&, const BasicDense<V>&);
 
 #define FRIEND_DENSE_EQ_SPARSE \
-template<typename U> \
-friend bool operator==(const BasicDense<U>&, const BasicSparse<U, true>&); \
-template<typename U> \
-friend bool operator==(const BasicSparse<U, true>&, const BasicDense<U>&)
+	friend bool operator==(const BasicDense<ValueType>&, const BasicSparse<ValueType>&); \
+	friend bool operator==(const BasicSparse<ValueType>&, const BasicDense<ValueType>&)
 
-template<typename T>
+template<typename V>
 class BasicDense {
 public:
 
-	using value_type = T;
+	using ValueType = V;
+	using ConstValue = std::add_const_t<ValueType>;
+	using IndexType = Type::IndexType;
+
+	using Dimension3Type = Type::Dimension3Type;
+
+	using ExtentType = std::dextents<IndexType, 3U>;
+	using LayoutType = Type::LayoutType;
+	using MdSpanType = std::mdspan<ValueType, ExtentType, LayoutType>;
+	using MappingType = typename MdSpanType::mapping_type;
 
 private:
 
-	std::vector<value_type> Histogram;
+	using DataContainerType = std::vector<ValueType, UninitialisedAllocator<ValueType>>;
 
-	using DenseIndexer_t = Indexer<1, 2, 0>;/**< Default indexing order of histogram. */
-	DenseIndexer_t DenseIndexer;
-
-	constexpr DenseIndexer_t::index_type getOffset(const auto x, const auto y) const noexcept {
-		return this->DenseIndexer[x, y, 0];
-	}
-
-	//Get the iterator to the histogram given 2D coordinate.
-	constexpr auto getHistogramIterator(const auto x, const auto y) noexcept {
-		return this->Histogram.begin() + this->getOffset(x, y);
-	}
-	constexpr auto getHistogramIterator(const auto x, const auto y) const noexcept {
-		return this->Histogram.cbegin() + this->getOffset(x, y);
-	}
+	MappingType Mapping;
+	DataContainerType DenseMatrix;
 
 public:
 
-	using BinView = std::span<value_type>;
-	using ConstBinView = std::span<const value_type>;
+	using SizeType = typename DataContainerType::size_type;
 
-	constexpr BasicDense() noexcept = default;
+	/**
+	 * @brief A proxy of a lvalue reference of per-region splatting values at a coordinate.
+	 * 
+	 * @param Const True if the values are constant.
+	 */
+	template<bool Const>
+	class ValueProxy {
+	public:
+
+		static constexpr bool IsConstant = Const;
+
+		using ElementType = std::conditional_t<IsConstant, ConstValue, ValueType>;
+		using ViewType = std::span<ElementType>;
+		using Iterator = typename ViewType::iterator;
+
+	private:
+
+		ViewType Span;
+
+	public:
+
+		/**
+		 * @brief Initialise a value proxy.
+		 * 
+		 * @tparam R Type of region values.
+		 * 
+		 * @param r A range of values for all regions.
+		 */
+		template<std::ranges::contiguous_range R>
+		requires std::ranges::sized_range<R>
+		constexpr ValueProxy(R&& r) noexcept : Span(std::forward<R>(r)) { }
+
+		constexpr ~ValueProxy() = default;
+
+		/**
+		 * @brief Get the view of values.
+		 *
+		 * @return A view of values.
+		 */
+		[[nodiscard]] constexpr ViewType operator*() const noexcept {
+			return this->Span;
+		}
+
+		/**
+		 * @brief Copy a given range of dense matrix to the view in this proxy.
+		 * 
+		 * @tparam Value Type of range to be copied.
+		 * 
+		 * @param value Values to be copied.
+		 * 
+		 * @return Self.
+		 */
+		template<std::ranges::input_range Value>
+		requires std::indirectly_copyable<std::ranges::const_iterator_t<Value>, Iterator>
+		constexpr ValueProxy& operator=(Value&& value)
+		requires(!IsConstant)
+		{
+			using std::ranges::cbegin, std::ranges::cend;
+			std::copy(std::execution::unseq, cbegin(value), cend(value), this->Span.begin());
+			return *this;
+		}
+
+	};
+
+	constexpr BasicDense() = default;
 
 	BasicDense(const BasicDense&) = delete;
 
 	constexpr BasicDense(BasicDense&&) noexcept = default;
 
+	BasicDense& operator=(const BasicDense&) = delete;
+
+	constexpr BasicDense& operator=(BasicDense&&) noexcept = default;
+
 	constexpr ~BasicDense() = default;
 
-	/**
-	 * @brief Compare equality of two dense histograms.
-	 * 
-	 * @param comp The other dense histogram.
-	 * 
-	 * @return True if two histograms are identical.
-	*/
-	bool operator==(const BasicDense&) const;
+	[[nodiscard]] bool operator==(const BasicDense&) const;
 
 	FRIEND_DENSE_EQ_SPARSE;
 
 	/**
-	 * @brief Get the number of byte the dense histogram occupies.
-	 * 
-	 * @return The size in byte.
-	*/
-	size_t sizeByte() const noexcept;
+	 * @brief Get the size of the dense matrix in bytes.
+	 *
+	 * @return Size in bytes.
+	 */
+	[[nodiscard]] SizeType sizeByte() const noexcept;
 
 	/**
-	 * @brief Resize the dimension of histogram.
-	 * If dimension is shrunken, extra data will be trimmed.
-	 * 
-	 * @param dimension The new dimension.
-	 * @param region_count The number of region per histogram.
-	*/
-	void resize(const Format::SizeVec2&, Format::Region_t);
+	 * @brief Resize the current dense matrix with uninitialised data.
+	 *
+	 * @param dim Provide region count, width and height of the dense matrix.
+	 */
+	void resize(Dimension3Type);
 
 	/**
-	 * @brief This function must be called to reset internal state before commencing new computations.
-	 * It's currently a no-op, but I am keeping it for consistency reasons.
-	 * 
-	 * @see BasicSparse::clear()
-	*/
+	 * @brief This function must be called to reset the internal state of the matrix before commencing new computations. For dense
+	 * matrix, it is currently a no-op as there is no internal states involved; keeping it to ensure API consistency with the sparse
+	 * implementation.
+	 */
 	constexpr void clear() const noexcept { }
 
 	/**
-	 * @brief Set bins of a histogram from a range.
+	 * @brief Get a range to the dense matrix.
 	 * 
-	 * @tparam R The range type.
-	 * @tparam Factor The type of factor.
-	 * 
-	 * @param input The input range of bins to be filled into this histogram.
-	 * @param x, y The coordinates into this histogram.
-	 * @param factor Can be specified to scale the range before writing to the histogram.
-	*/
-	template<ContainerTrait::ValueRange<value_type> R>
-	constexpr void operator()(R&& input, const auto x, const auto y) {
-		std::ranges::copy(std::forward<R>(input), this->getHistogramIterator(x, y));
-	}
-	template<std::ranges::input_range R, typename Factor>
-	requires(std::floating_point<value_type>)
-	void operator()(R&& input, const auto x, const auto y, const Factor factor) {
-		Arithmetic::scaleRange(std::forward<R>(input), this->getHistogramIterator(x, y), factor);
-	}
+	 * @return A range to the dense matrix.
+	 */
+	template<typename Self>
+	[[nodiscard]] constexpr auto range(this Self& self) noexcept {
+		using std::views::chunk, std::views::transform;
+		using ProxyType = ValueProxy<std::is_const_v<Self>>;
 
-	/**
-	 * @brief Get the view into a histogram.
-	 * 
-	 * @param x, y The coordinates.
-	 * 
-	 * @return The view of all bins in a histogram.
-	*/
-	constexpr ConstBinView operator[](const auto x, const auto y) const noexcept {
-		return ConstBinView(this->getHistogramIterator(x, y), this->DenseIndexer.extent(2u));
-	}
-
-};
-using Dense = BasicDense<Format::Bin_t>;
-using DenseNorm = BasicDense<Format::NormBin_t>;
-
-#define SCALE_TRANSFORM static_cast<value_type>(value / factor)
-
-/**
- * @brief This class provides storage, and should not be used directly.
- * 
- * @tparam T The bin type.
-*/
-template<typename T>
-class BasicSparseInternalStorage {
-public:
-
-	using value_type = T;
-
-protected:
-
-	using bin_type = SparseBin::BasicSparseBin<value_type>;
-	using offset_type = std::uint32_t;
-
-	std::vector<offset_type> Offset;
-	//List-of-List sparse matrix format, this is better than List-of-Flattened-List
-	//	for allowing constructing the matrix in row-major or column-major order at the same time.
-	std::vector<std::vector<bin_type>> Bin;
-
-	using BinOffsetIndexer_t = Indexer<0, 1>;
-	BinOffsetIndexer_t OffsetIndexer;
-
-	//Without any checking.
-	template<typename R>
-	constexpr void insertBin(R&& input, const auto x, const auto y) {
-		auto& bin_y = this->Bin[y];
-		bin_y.append_range(std::forward<R>(input));
-		this->Offset[this->OffsetIndexer[x + 1, y]] = static_cast<offset_type>(bin_y.size());
-	}
-
-	//Get the index bound of bins for a histogram.
-	constexpr auto getBinBound(const auto x, const auto y) const noexcept {
-		//as offset matrix is row-major linear, we are doing this to avoid recalculating the offset linear index twice
-		const BinOffsetIndexer_t::index_type offset_idx = this->OffsetIndexer[x, y];
-		const offset_type bin_start_idx = this->Offset[offset_idx],
-			//this is equivalent to `this->OffsetIndexer[x + 1, y]`
-			bin_end_idx = this->Offset[offset_idx + 1u];
-		return std::make_pair(bin_start_idx, bin_end_idx);
-	}
-
-public:
-
-	using ConstBinView = std::span<const bin_type>;
-
-	constexpr BasicSparseInternalStorage() noexcept = default;
-
-	BasicSparseInternalStorage(const BasicSparseInternalStorage&) = delete;
-
-	constexpr BasicSparseInternalStorage(BasicSparseInternalStorage&&) noexcept = default;
-
-	constexpr ~BasicSparseInternalStorage() = default;
-
-	/**
-	 * @brief Get the size in byte of this sparse histogram.
-	 * 
-	 * @return The size in byte.
-	*/
-	size_t sizeByte() const noexcept;
-
-	/**
-	 * @brief Resize the histogram.
-	 * All contents in the histogram will be cleared.
-	 *
-	 * @param dimension The new dimension for the histogram.
-	 * @param region_count The number of region per histogram.
-	 * This argument is unused in sparse histogram, keeping this for API consistency.
-	*/
-	void resize(Format::SizeVec2, Format::Region_t);
-
-	/**
-	 * @brief Clear the sparse histogram for new computations.
-	 * This function must be called to reset internal state of the histogram
-	 * and clear old values before commencing any computations.
-	*/
-	void clear();
-
-	/**
-	 * @brief Push some bins from a dense histogram into the current sparse histogram.
-	 * 
-	 * @tparam R The type of input range.
-	 * @tparam Factor The type of factor.
-	 * 
-	 * @param input The input range containing bins to be pushed.
-	 * @param x, y The index to the histogram whose bins are belonging to.
-	 * The behaviour is undefined if bins are not pushed contiguously in x axis.
-	 * @param factor Provide a factor to scale the input before writing to the histogram.
-	*/
-	template<ContainerTrait::ValueRange<value_type> R>
-	requires(!SparseBin::SparseBinRange<R>)
-	constexpr void operator()(R&& input, const auto x, const auto y) {
-		using Range_t = std::ranges::range_value_t<R>;
-		auto input_range = std::forward<R>(input)
-			| std::views::enumerate
-			| std::views::filter([](const auto& bin) constexpr static noexcept {
-				return std::get<1u>(bin) != Range_t { 0 };
-			}) | std::views::transform([](const auto& bin) constexpr static noexcept {
-				const auto [region, value] = bin;
-				return bin_type {
-					.Region = static_cast<Format::Region_t>(region),
-					.Value = value
-				};
-			});
-		this->insertBin(input_range, x, y);
-	}
-	template<std::ranges::input_range R, typename Factor>
-	requires(!SparseBin::SparseBinRange<R> && std::floating_point<value_type>)
-	constexpr void operator()(R&& input, const auto x, const auto y, const Factor factor) {
-		//resolves to the function above ^^^
-		(*this)(std::forward<R>(input) | std::views::transform(
-			[factor](const auto value) constexpr noexcept { return SCALE_TRANSFORM; }), x, y);
-	}
-
-	/**
-	 * @brief Read bins from this sparse histogram given histogram index.
-	 * 
-	 * @param x, y The index to the histogram whose bins are to be read.
-	 * 
-	 * @return The view into the histogram bins for the current coordinate.
-	*/
-	constexpr ConstBinView operator[](const auto x, const auto y) const noexcept {
-		const auto [first, last] = this->getBinBound(x, y);
-		const auto bin_it = this->Bin[y].cbegin();
-		return ConstBinView(bin_it + first, bin_it + last);
+		return typename ProxyType::ViewType(self.DenseMatrix.data(), self.Mapping.required_span_size())
+			 | chunk(self.Mapping.stride(1U))
+			 | transform([](auto region_val) static constexpr noexcept { return ProxyType(std::move(region_val)); });
 	}
 
 };
 
-template<typename T>
-class BasicSparse<T, true> : public BasicSparseInternalStorage<T> {
+template<typename V>
+class BasicSparse {
+public:
+
+	using ValueType = V;
+	using ElementType = SparseMatrixElement::Basic<ValueType>;
+	using ConstElement = std::add_const_t<ElementType>;
+	using OffsetType = std::uint32_t;
+	using ConstOffset = std::add_const_t<OffsetType>;
+	using IndexType = Type::IndexType;
+
+	using Dimension3Type = Type::Dimension3Type;
+
+	using OffsetExtentType = std::dextents<IndexType, 2U>;
+	using OffsetLayoutType = Type::LayoutType;
+	using OffsetMdSpanType = std::mdspan<OffsetType, OffsetExtentType, OffsetLayoutType>;
+	using OffsetMappingType = OffsetMdSpanType::mapping_type;
+
 private:
 
-	//Pretty straight-forward, sort every histogram by region.
-	void sortStorage();
+	using OffsetContainerType = std::vector<OffsetType, UninitialisedAllocator<OffsetType>>;
+	using ElementContainerType = std::vector<ElementType>;
+
+	OffsetMappingType OffsetMapping;
+	OffsetContainerType Offset;
+	ElementContainerType SparseMatrix;
+
+	//Linear size of the dense offset matrix.
+	[[nodiscard]] constexpr IndexType sizeOffset() const noexcept {
+		//The final offset is the total number of elements in the sparse matrix,
+		//	so we can later use pairwise view to compute the span of every element.
+		return this->OffsetMapping.required_span_size() + 1U;
+	}
 
 public:
+
+	using SizeType = std::common_type_t<OffsetContainerType::size_type, typename ElementContainerType::size_type>;
+
+	/**
+	 * @brief A proxy of per-region splatting values at a coordinate.
+	 *
+	 * @tparam Const True if the values are constant.
+	 */
+	template<bool Const>
+	class ValueProxy {
+	public:
+
+		static constexpr bool IsConstant = Const;
+
+		using ElementType = std::conditional_t<IsConstant, ConstElement, ElementType>;
+		using ElementViewType = std::span<ElementType>;
+
+		using ConstElementContainer = std::add_const_t<ElementContainerType>;
+		using ElementContainerType = std::conditional_t<IsConstant, ConstElementContainer, ElementContainerType>;
+		using ElementContainerPointer = std::add_pointer_t<ElementContainerType>;
+		using ElementContainerReference = std::add_lvalue_reference_t<ElementContainerType>;
+
+		using OffsetType = std::conditional_t<IsConstant, ConstOffset, OffsetType>;
+		using OffsetReference = std::add_lvalue_reference_t<OffsetType>;
+		using PairwiseOffsetType = std::tuple<OffsetReference, OffsetReference>;
+
+	private:
+
+		PairwiseOffsetType PairwiseOffset;
+		ElementContainerPointer ElementContainer;
+
+	public:
+
+		/**
+		 * @brief Initialise a value proxy.
+		 *
+		 * @param pairwise_offset The offset of the **next** element in the contiguous memory order.
+		 * @param sparse_matrix The sparse matrix container.
+		 */
+		constexpr ValueProxy(PairwiseOffsetType pairwise_offset, ElementContainerReference sparse_matrix) noexcept :
+			PairwiseOffset(std::move(pairwise_offset)), ElementContainer(std::addressof(sparse_matrix)) { }
+
+		constexpr ~ValueProxy() = default;
+
+		/**
+		 * @brief Get the view of values.
+		 *
+		 * @return View of values.
+		 */
+		[[nodiscard]] constexpr ElementViewType operator*() const noexcept {
+			const auto [prev, next] = this->PairwiseOffset;
+			return { this->ElementContainer->begin() + prev, next - prev };
+		}
+
+		/**
+		 * @brief Append a range of dense matrix to the view in this proxy.
+		 *
+		 * @tparam Value Type of range value.
+		 *
+		 * @param value Values to be appended.
+		 *
+		 * @return Self.
+		 */
+		template<std::ranges::input_range Value>
+		requires std::is_convertible_v<std::ranges::range_value_t<Value>, ValueType>
+		constexpr ValueProxy& operator=(Value&& value)
+		requires(!IsConstant)
+		{
+			*this = std::forward<Value>(value) | SparseMatrixElement::ToSparse;
+			return *this;
+		}
+
+		/**
+		 * @brief Append a range of sparse matrix to the view in this proxy.
+		 *
+		 * @tparam Value Type of range value.
+		 *
+		 * @param value Values to be appended.
+		 *
+		 * @return Self.
+		 */
+		template<std::ranges::input_range Value>
+		requires std::is_same_v<std::ranges::range_value_t<Value>, ElementType>
+		constexpr ValueProxy& operator=(Value&& value)
+		requires(!IsConstant)
+		{
+			auto& [_, next] = this->PairwiseOffset;
+			this->ElementContainer->append_range(std::forward<Value>(value));
+			next = this->ElementContainer->size();
+			return *this;
+		}
+
+	};
 
 	constexpr BasicSparse() noexcept = default;
 
-	//Convert a unsorted sparse histogram to a sorted one.
-	//CONSIDER: Can add other constructors if needed.
-	BasicSparse& operator=(BasicSparse<T, false>&&);
+	BasicSparse(const BasicSparse&) = delete;
+
+	constexpr BasicSparse(BasicSparse&&) noexcept = default;
+
+	BasicSparse& operator=(const BasicSparse&) = delete;
+
+	constexpr BasicSparse& operator=(BasicSparse&&) noexcept = default;
 
 	constexpr ~BasicSparse() = default;
 
-	/**
-	 * @brief Compare equality of two sparse histograms.
-	 *
-	 * @param comp The other sparse histogram.
-	 *
-	 * @return True if two histograms are identical if all offsets and bins are equal.
-	*/
-	bool operator==(const BasicSparse&) const;
+	[[nodiscard]] bool operator==(const BasicSparse&) const;
 
 	FRIEND_DENSE_EQ_SPARSE;
 
-};
-
-template<typename T>
-class BasicSparse<T, false> : public BasicSparseInternalStorage<T> {
-private:
-
-	friend class BasicSparse<T, true>;
-
-	using Base = BasicSparseInternalStorage<T>;
-
-	using typename Base::bin_type,
-		typename Base::value_type;
-
-public:
-
-	using Base::operator();
-
-	constexpr BasicSparse() noexcept = default;
-
-	constexpr ~BasicSparse() = default;
+	/**
+	 * @brief Sort the splatting values of each element in the sparse matrix, in ascending order of region identifier.
+	 *
+	 * @link BasicSparse::isSorted
+	 */
+	void sort();
 
 	/**
-	 * @brief Push some bins from a sparse histogram into the current one.
+	 * @brief Check if the splatting values of each element in the sparse matrix is sorted.
+	 *
+	 * @link BasicSparse::sort
+	 *
+	 * @return True if all sorted.
+	 */
+	[[nodiscard]] bool isSorted() const;
+
+	/**
+	 * @brief Get the size of the sparse matrix in bytes.
+	 *
+	 * @return Size in bytes.
+	 */
+	[[nodiscard]] SizeType sizeByte() const noexcept;
+
+	/**
+	 * @brief Resize the current sparse matrix with uninitialised data.
+	 *
+	 * @param dim Provide width and height of the sparse matrix. The region count is sparsely populated, but should still be provided
+	 * as is similar to that of the dense matrix to keep API consistency.
+	 */
+	void resize(Dimension3Type);
+
+	/**
+	 * @brief This function must be called to reset the internal state of the matrix and clear old values before commencing new
+	 * computations.
+	 */
+	void clear();
+
+	/**
+	 * @brief Get a range to the sparse matrix.
 	 * 
-	 * @tparam R The type of input range.
-	 * @tparam Factor The type of factor.
-	 * 
-	 * @param input The input range containing bins to be pushed.
-	 * @param x,y The index to the histogram.
-	 * @param factor Provide a factor to scale the input before writing to the histogram.
-	*/
-	template<SparseBin::SparseBinRangeValue<value_type> R>
-	constexpr void operator()(R&& input, const auto x, const auto y) {
-		this->insertBin(std::forward<R>(input), x, y);
-	}
-	template<SparseBin::SparseBinRange R, typename Factor>
-	requires(std::floating_point<value_type>)
-	constexpr void operator()(R&& input, const auto x, const auto y, const Factor factor) {
-		//resolves to the function above ^^^
-		(*this)(std::forward<R>(input) | std::views::transform([factor](const auto& bin) constexpr noexcept {
-			const auto [region, value] = bin;
-			return bin_type {
-				.Region = region,
-				.Value = SCALE_TRANSFORM
-			};
-		}), x, y);
+	 * @return A range to the sparse matrix.
+	 */
+	template<typename Self>
+	[[nodiscard]] constexpr auto range(this Self& self) noexcept {
+		using std::views::pairwise, std::views::transform;
+		using ProxyType = ValueProxy<std::is_const_v<Self>>;
+
+		//Not using pairwise_transform since I need to pass the original tuple to the proxy.
+		return self.Offset
+			| pairwise
+			| transform([&elem = self.SparseMatrix](auto pairwise_offset) constexpr noexcept {
+				return ProxyType(std::move(pairwise_offset), elem);
+			});
 	}
 
 };
-template<typename T>
-using BasicSparseSorted = BasicSparse<T, true>;
-template<typename T>
-using BasicSparseUnsorted = BasicSparse<T, false>;
 
-using SparseSorted = BasicSparseSorted<Format::Bin_t>;
-using SparseNormSorted = BasicSparseSorted<Format::NormBin_t>;
-using SparseUnsorted = BasicSparseUnsorted<Format::Bin_t>;
-using SparseNormUnsorted = BasicSparseUnsorted<Format::NormBin_t>;
-
-#undef SCALE_TRANSFORM
-
-#undef DENSE_EQ_SPARSE
 #undef FRIEND_DENSE_EQ_SPARSE
-
-}
 
 }

@@ -21,9 +21,9 @@ endfunction()
 add_executable(${DRR_MAIN})
 
 add_subdirectory(Container)
-add_subdirectory(ImportanceComputer)
 add_subdirectory(Profiler)
 add_subdirectory(RegionfieldGenerator)
+add_subdirectory(Splatting)
 addMainComponent(
 HEADER
 	Arithmetic

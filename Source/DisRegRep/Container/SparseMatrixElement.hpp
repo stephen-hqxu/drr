@@ -78,9 +78,11 @@ inline constexpr auto ToDense = Range::RangeAdaptorClosure(
 		using ranges::views::iota;
 		using std::ranges::cbegin, std::ranges::cend,
 			std::ranges::forward_range,
-			std::ranges::is_sorted, std::ranges::less;
+			std::ranges::is_sorted, std::ranges::less, std::mem_fn;
 		if constexpr (forward_range<Sparse>) {
-			assert(is_sorted(sparse, less {}, &Basic<Value>::Identifier));
+			//Must be sorted by region identifier
+			//	because of how we forge a dense matrix by enumeration in ascending order.
+			assert(is_sorted(sparse, less {}, mem_fn(&Basic<Value>::Identifier)));
 		}
 
 		//We keep the current iterator as an internal state, making this range an input range (O(N)).
