@@ -2,9 +2,9 @@
 
 #include "SparseMatrixElement.hpp"
 
-#include <DisRegRep/Arithmetic.hpp>
 #include <DisRegRep/Type.hpp>
 
+#include <span>
 #include <vector>
 
 #include <algorithm>
@@ -110,7 +110,9 @@ private:
 			using std::ranges::all_of, std::views::zip;
 			assert(all_of(zip(this->Importance_, importance), std::ranges::greater_equal {}));
 		}
-		Arithmetic::addRange(this->Importance_, std::move(op), std::forward<Importance>(importance), this->Importance_.begin());
+		using std::transform, std::execution::unseq, std::ranges::cbegin;
+		transform(unseq, this->Importance_.cbegin(), this->Importance_.cend(), cbegin(std::forward<Importance>(importance)),
+			this->Importance_.end(), std::move(op));
 	}
 
 	//Modify some regions by some amount.
@@ -144,6 +146,15 @@ public:
 	 * @brief Clear all contents in the kernel and reset importance of all regions to zero.
 	 */
 	void clear() noexcept;
+
+	/**
+	 * @brief Get a constant view into the dense kernel.
+	 * 
+	 * @return The dense kernel view.
+	 */
+	[[nodiscard]] constexpr auto span() const noexcept {
+		return std::span(this->Importance_);
+	}
 
 	/**
 	 * @brief Increment the importance of a region by one.
@@ -281,6 +292,15 @@ public:
 	 * @brief Clear all contents in the kernel.
 	 */
 	void clear() noexcept;
+
+	/**
+	 * @brief Get a constant view into the sparse kernel.
+	 * 
+	 * @return The sparse kernel view.
+	 */
+	[[nodiscard]] constexpr auto span() const noexcept {
+		return std::span(this->Importance_);
+	}
 
 	/**
 	 * @brief Increment importance of a region by a given amount specified in a sparse importance matrix element.

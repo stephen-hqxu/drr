@@ -9,14 +9,16 @@
 #include <glm/geometric.hpp>
 #include <glm/vec2.hpp>
 
+#include <range/v3/range/conversion.hpp>
 #include <range/v3/view/generate_n.hpp>
 
 #include <array>
+#include <span>
 #include <vector>
 
 #include <algorithm>
-#include <functional>
 #include <execution>
+#include <functional>
 #include <iterator>
 #include <ranges>
 
@@ -28,19 +30,18 @@ using DisRegRep::RegionfieldGenerator::VoronoiDiagram, DisRegRep::Container::Reg
 
 using glm::u16vec2, glm::f32vec2;
 
-using ranges::views::generate_n;
+using ranges::to, ranges::views::generate_n;
 
-using std::array, std::vector;
+using std::array, std::span, std::vector;
 using std::execution::par_unseq;
 using std::ranges::min_element, std::ranges::distance,
 	std::bind_front, std::apply;
-using std::ranges::to,
-	std::views::iota, std::views::cartesian_product;
+using std::views::iota, std::views::cartesian_product;
 using std::index_sequence;
 
 void VoronoiDiagram::operator()(Regionfield& regionfield) {
 	DRR_ASSERT(this->CentroidCount > 0U);
-	const Regionfield::SpanType rf_span = regionfield.span();
+	const span rf_span = regionfield.span();
 	const Regionfield::ExtentType& rf_extent = regionfield.mapping().extents();
 
 	auto rng = this->createRandomEngine();
@@ -68,13 +69,11 @@ void VoronoiDiagram::operator()(Regionfield& regionfield) {
 	std::transform(par_unseq, idx_rg.cbegin(), idx_rg.cend(), rf_span.begin(),
 		[&region_centroid, &region_assignment](const auto& idx) noexcept {
 			const auto [y, x] = idx;
-
-			const auto centroid_distance = region_centroid
-				| std::views::transform([current_coord = f32vec2(x, y)](const f32vec2 centroid_coord) noexcept {
-					return glm::distance(current_coord, centroid_coord);
-				});
-			const auto argmin = distance(centroid_distance.cbegin(), min_element(centroid_distance));
-
+			const auto argmin = distance(region_centroid.cbegin(),
+				min_element(region_centroid, {},
+					[current_coord = f32vec2(x, y)](const f32vec2 centroid_coord) noexcept {
+						return glm::distance(current_coord, centroid_coord);
+					}));
 			return region_assignment[argmin];
 		});
 }

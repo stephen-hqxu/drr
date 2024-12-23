@@ -9,8 +9,6 @@
 #include <span>
 #include <vector>
 
-#include <type_traits>
-
 #include <cstdint>
 
 namespace DisRegRep::Container {
@@ -27,13 +25,9 @@ public:
 	using IndexType = std::uint32_t;
 	using DimensionType = glm::vec<2U, IndexType>;
 
-	using SpanType = std::span<ValueType>;
-	using ConstSpanType = std::span<ConstValue>;
-
 	using ExtentType = std::dextents<IndexType, 2U>;
 	using LayoutType = std::layout_left;
 	using MdSpanType = std::mdspan<ValueType, ExtentType, LayoutType>;
-	using ConstMdSpanType = std::mdspan<ConstValue, ExtentType, LayoutType>;
 	using MappingType = MdSpanType::mapping_type;
 
 private:
@@ -99,7 +93,7 @@ public:
 	 */
 	template<typename Self>
 	[[nodiscard]] constexpr auto mdspan(this Self& self) noexcept {
-		return std::conditional_t<std::is_const_v<Self>, ConstMdSpanType, MdSpanType> { self.Data.data(), self.Mapping };
+		return std::mdspan(self.Data.data(), self.mapping());
 	}
 
 	/**
@@ -109,7 +103,7 @@ public:
 	 */
 	template<typename Self>
 	[[nodiscard]] constexpr auto span(this Self& self) noexcept {
-		return std::conditional_t<std::is_const_v<Self>, ConstSpanType, SpanType> { self.Data.data(), self.size() };
+		return std::span(self.Data);
 	}
 
 };

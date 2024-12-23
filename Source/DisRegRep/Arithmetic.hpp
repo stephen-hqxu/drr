@@ -103,7 +103,7 @@ template<std::integral I>
  * @param b The second range.
  * @param output The output iterator.
  */
-void addRange(
+[[deprecated("Redundant; just use plain transform.")]] void addRange(
 	std::ranges::forward_range auto&& a,
 	std::move_constructible auto f,
 	std::ranges::forward_range auto&& b,
@@ -171,7 +171,8 @@ constexpr T horizontalProduct(const glm::vec<L, T, Q>& v) noexcept {
  * 
  * @return The kernel area.
 */
-[[nodiscard]] constexpr std::uint32_t kernelArea(const Type::Radius radius) noexcept {
+[[deprecated("Calculation of kernel area is an implementation detail of the splatting convolution; keep it private."), nodiscard]]
+constexpr std::uint32_t kernelArea(const std::uint32_t radius) noexcept {
 	const std::uint32_t diameter = 2U * radius + 1U;
 	return diameter * diameter;
 }

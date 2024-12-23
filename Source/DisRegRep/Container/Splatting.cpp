@@ -24,7 +24,7 @@ using std::equal, std::for_each, std::all_of,
 	std::ranges::fill,
 	std::execution::par_unseq, std::execution::unseq,
 	std::views::zip_transform;
-using std::mem_fn, std::ranges::less, std::identity;
+using std::mem_fn, std::identity;
 
 template<typename V>
 bool Splatting::operator==(const BasicDense<V>& dense, const BasicSparse<V>& sparse) {
@@ -75,7 +75,7 @@ void BasicSparse<V>::sort() {
 	using std::ranges::sort;
 	const auto rg = this->range();
 	for_each(par_unseq, rg.begin(), rg.end(),
-		[](const auto proxy) static constexpr { sort(*proxy, less {}, mem_fn(&ElementType::Identifier)); });
+		[](const auto proxy) static constexpr { sort(*proxy, {}, mem_fn(&ElementType::Identifier)); });
 }
 
 template<typename V>
@@ -83,7 +83,7 @@ bool BasicSparse<V>::isSorted() const {
 	using std::ranges::is_sorted;
 	const auto rg = this->range();
 	return all_of(par_unseq, rg.cbegin(), rg.cend(),
-		[](const auto proxy) static constexpr { return is_sorted(*proxy, less {}, mem_fn(&ElementType::Identifier)); });
+		[](const auto proxy) static constexpr { return is_sorted(*proxy, {}, mem_fn(&ElementType::Identifier)); });
 }
 
 template<typename V>
@@ -99,7 +99,6 @@ void BasicSparse<V>::resize(const Dimension3Type dim) {
 
 	this->OffsetMapping = OffsetExtentType(dim_xy.x, dim_xy.y);
 	this->Offset.resize(this->sizeOffset());
-	this->SparseMatrix.clear();
 }
 
 template<typename V>

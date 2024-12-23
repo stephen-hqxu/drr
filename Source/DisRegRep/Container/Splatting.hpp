@@ -78,8 +78,10 @@ template<typename V>
 [[nodiscard]] bool operator==(const BasicSparse<V>&, const BasicDense<V>&);
 
 #define FRIEND_DENSE_EQ_SPARSE \
-	friend bool operator==(const BasicDense<ValueType>&, const BasicSparse<ValueType>&); \
-	friend bool operator==(const BasicSparse<ValueType>&, const BasicDense<ValueType>&)
+	template<typename W> \
+	friend bool operator==(const BasicDense<W>&, const BasicSparse<W>&); \
+	template<typename W> \
+	friend bool operator==(const BasicSparse<W>&, const BasicDense<W>&)
 
 template<typename V>
 class BasicDense {
@@ -118,26 +120,26 @@ public:
 
 		static constexpr bool IsConstant = Const;
 
-		using ElementType = std::conditional_t<IsConstant, ConstValue, ValueType>;
-		using ViewType = std::span<ElementType>;
-		using Iterator = typename ViewType::iterator;
+		using ProxyElementType = std::conditional_t<IsConstant, ConstValue, ValueType>;
+		using ProxyViewType = std::span<ProxyElementType>;
+		using ProxyIterator = typename ProxyViewType::iterator;
 
 	private:
 
-		ViewType Span;
+		ProxyViewType Span;
 
 	public:
 
 		/**
 		 * @brief Initialise a value proxy.
-		 * 
+		 *
 		 * @tparam R Type of region values.
-		 * 
+		 *
 		 * @param r A range of values for all regions.
 		 */
-		template<std::ranges::contiguous_range R>
-		requires std::ranges::sized_range<R>
-		constexpr ValueProxy(R&& r) noexcept : Span(std::forward<R>(r)) { }
+		template<typename R>
+		requires std::is_constructible_v<ProxyViewType, R>
+		constexpr ValueProxy(R&& r) noexcept(std::is_nothrow_constructible_v<ProxyViewType, R>) : Span(std::forward<R>(r)) { }
 
 		constexpr ~ValueProxy() = default;
 
@@ -146,7 +148,7 @@ public:
 		 *
 		 * @return A view of values.
 		 */
-		[[nodiscard]] constexpr ViewType operator*() const noexcept {
+		[[nodiscard]] constexpr ProxyViewType operator*() const noexcept {
 			return this->Span;
 		}
 
@@ -159,13 +161,14 @@ public:
 		 * 
 		 * @return Self.
 		 */
-		template<std::ranges::input_range Value>
-		requires std::indirectly_copyable<std::ranges::const_iterator_t<Value>, Iterator>
+		template<std::ranges::forward_range Value>
+		requires std::indirectly_copyable<std::ranges::const_iterator_t<Value>, ProxyIterator>
 		constexpr ValueProxy& operator=(Value&& value)
 		requires(!IsConstant)
 		{
-			using std::ranges::cbegin, std::ranges::cend;
-			std::copy(std::execution::unseq, cbegin(value), cend(value), this->Span.begin());
+			using std::copy, std::execution::unseq,
+				std::ranges::cbegin, std::ranges::cend;
+			copy(unseq, cbegin(value), cend(value), this->Span.begin());
 			return *this;
 		}
 
@@ -195,7 +198,7 @@ public:
 	[[nodiscard]] SizeType sizeByte() const noexcept;
 
 	/**
-	 * @brief Resize the current dense matrix with uninitialised data.
+	 * @brief Resize the current dense matrix. All existing contents become undefined.
 	 *
 	 * @param dim Provide region count, width and height of the dense matrix.
 	 */
@@ -218,7 +221,7 @@ public:
 		using std::views::chunk, std::views::transform;
 		using ProxyType = ValueProxy<std::is_const_v<Self>>;
 
-		return typename ProxyType::ViewType(self.DenseMatrix.data(), self.Mapping.required_span_size())
+		return self.DenseMatrix
 			 | chunk(self.Mapping.stride(1U))
 			 | transform([](auto region_val) static constexpr noexcept { return ProxyType(std::move(region_val)); });
 	}
@@ -247,6 +250,7 @@ private:
 
 	using OffsetContainerType = std::vector<OffsetType, UninitialisedAllocator<OffsetType>>;
 	using ElementContainerType = std::vector<ElementType>;
+	using ConstElementContainerType = std::add_const_t<ElementContainerType>;
 
 	OffsetMappingType OffsetMapping;
 	OffsetContainerType Offset;
@@ -274,22 +278,21 @@ public:
 
 		static constexpr bool IsConstant = Const;
 
-		using ElementType = std::conditional_t<IsConstant, ConstElement, ElementType>;
-		using ElementViewType = std::span<ElementType>;
+		using ProxyElementType = std::conditional_t<IsConstant, ConstElement, ElementType>;
+		using ProxyElementViewType = std::span<ProxyElementType>;
 
-		using ConstElementContainer = std::add_const_t<ElementContainerType>;
-		using ElementContainerType = std::conditional_t<IsConstant, ConstElementContainer, ElementContainerType>;
-		using ElementContainerPointer = std::add_pointer_t<ElementContainerType>;
-		using ElementContainerReference = std::add_lvalue_reference_t<ElementContainerType>;
+		using ProxyElementContainerType = std::conditional_t<IsConstant, ConstElementContainerType, ElementContainerType>;
+		using ProxyElementContainerPointer = std::add_pointer_t<ProxyElementContainerType>;
+		using ProxyElementContainerReference = std::add_lvalue_reference_t<ProxyElementContainerType>;
 
-		using OffsetType = std::conditional_t<IsConstant, ConstOffset, OffsetType>;
-		using OffsetReference = std::add_lvalue_reference_t<OffsetType>;
-		using PairwiseOffsetType = std::tuple<OffsetReference, OffsetReference>;
+		using ProxyOffsetType = std::conditional_t<IsConstant, ConstOffset, OffsetType>;
+		using ProxyOffsetReference = std::add_lvalue_reference_t<ProxyOffsetType>;
+		using ProxyPairwiseOffsetType = std::tuple<ProxyOffsetReference, ProxyOffsetReference>;
 
 	private:
 
-		PairwiseOffsetType PairwiseOffset;
-		ElementContainerPointer ElementContainer;
+		ProxyPairwiseOffsetType PairwiseOffset;
+		ProxyElementContainerPointer ElementContainer;
 
 	public:
 
@@ -299,7 +302,7 @@ public:
 		 * @param pairwise_offset The offset of the **next** element in the contiguous memory order.
 		 * @param sparse_matrix The sparse matrix container.
 		 */
-		constexpr ValueProxy(PairwiseOffsetType pairwise_offset, ElementContainerReference sparse_matrix) noexcept :
+		constexpr ValueProxy(ProxyPairwiseOffsetType pairwise_offset, ProxyElementContainerReference sparse_matrix) noexcept :
 			PairwiseOffset(std::move(pairwise_offset)), ElementContainer(std::addressof(sparse_matrix)) { }
 
 		constexpr ~ValueProxy() = default;
@@ -309,7 +312,7 @@ public:
 		 *
 		 * @return View of values.
 		 */
-		[[nodiscard]] constexpr ElementViewType operator*() const noexcept {
+		[[nodiscard]] constexpr ProxyElementViewType operator*() const noexcept {
 			const auto [prev, next] = this->PairwiseOffset;
 			return { this->ElementContainer->begin() + prev, next - prev };
 		}
@@ -394,7 +397,7 @@ public:
 	[[nodiscard]] SizeType sizeByte() const noexcept;
 
 	/**
-	 * @brief Resize the current sparse matrix with uninitialised data.
+	 * @brief Resize the current sparse matrix. All existing contents become undefined.
 	 *
 	 * @param dim Provide width and height of the sparse matrix. The region count is sparsely populated, but should still be provided
 	 * as is similar to that of the dense matrix to keep API consistency.
