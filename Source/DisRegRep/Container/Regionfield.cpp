@@ -1,6 +1,6 @@
 #include <DisRegRep/Container/Regionfield.hpp>
 
-#include <DisRegRep/Exception.hpp>
+#include <DisRegRep/Core/Exception.hpp>
 
 #include <glm/vector_relational.hpp>
 

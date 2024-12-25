@@ -1,7 +1,7 @@
 #pragma once
 
-#include <DisRegRep/Range.hpp>
-#include <DisRegRep/Type.hpp>
+#include <DisRegRep/Core/Range.hpp>
+#include <DisRegRep/Core/Type.hpp>
 
 #include <range/v3/view/iota.hpp>
 

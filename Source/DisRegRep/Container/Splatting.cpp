@@ -1,8 +1,8 @@
 #include <DisRegRep/Container/Splatting.hpp>
 #include <DisRegRep/Container/SparseMatrixElement.hpp>
 
-#include <DisRegRep/Exception.hpp>
-#include <DisRegRep/Type.hpp>
+#include <DisRegRep/Core/Exception.hpp>
+#include <DisRegRep/Core/Type.hpp>
 
 #include <glm/vector_relational.hpp>
 

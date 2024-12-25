@@ -1,4 +1,4 @@
-#include <DisRegRep/Exception.hpp>
+#include <DisRegRep/Core/Exception.hpp>
 
 #include <string_view>
 #include <format>

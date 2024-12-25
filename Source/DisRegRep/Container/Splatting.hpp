@@ -2,8 +2,8 @@
 
 #include "SparseMatrixElement.hpp"
 
-#include <DisRegRep/Type.hpp>
-#include <DisRegRep/UninitialisedAllocator.hpp>
+#include <DisRegRep/Core/Type.hpp>
+#include <DisRegRep/Core/UninitialisedAllocator.hpp>
 
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>

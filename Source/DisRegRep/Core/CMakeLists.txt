@@ -1,0 +1,10 @@
+addMainComponent(
+HEADER
+	Arithmetic
+	Exception
+	Range
+	Type
+	UninitialisedAllocator
+SOURCE
+	Exception
+)

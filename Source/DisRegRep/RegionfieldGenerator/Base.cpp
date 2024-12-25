@@ -2,7 +2,7 @@
 
 #include <DisRegRep/Container/Regionfield.hpp>
 
-#include <DisRegRep/Exception.hpp>
+#include <DisRegRep/Core/Exception.hpp>
 
 using DisRegRep::RegionfieldGenerator::Base, DisRegRep::Container::Regionfield;
 

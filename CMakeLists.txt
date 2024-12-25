@@ -32,11 +32,12 @@ find_package(CLI11 2 CONFIG REQUIRED)
 find_package(glm 1 CONFIG REQUIRED)
 find_package(nanobench CONFIG REQUIRED)
 find_package(range-v3 0.12.0 CONFIG REQUIRED)
+find_package(xxHash 0.8 CONFIG REQUIRED)
 find_package(yaml-cpp 0.8 CONFIG REQUIRED)
+
+add_subdirectory(External)
 
 ###############################################################################
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/Output/bin)
-
-set(DRR_MAIN "Main")
 
 add_subdirectory(Source/${PROJECT_NAME})

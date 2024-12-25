@@ -2,8 +2,8 @@
 
 #include <DisRegRep/Container/Regionfield.hpp>
 
-#include <DisRegRep/Exception.hpp>
-#include <DisRegRep/Type.hpp>
+#include <DisRegRep/Core/Exception.hpp>
+#include <DisRegRep/Core/Type.hpp>
 
 #include <glm/fwd.hpp>
 #include <glm/geometric.hpp>

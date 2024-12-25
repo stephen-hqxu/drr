@@ -1,7 +1,7 @@
 #include <DisRegRep/Container/SplatKernel.hpp>
 #include <DisRegRep/Container/SparseMatrixElement.hpp>
 
-#include <DisRegRep/Type.hpp>
+#include <DisRegRep/Core/Type.hpp>
 
 #include <algorithm>
 #include <execution>

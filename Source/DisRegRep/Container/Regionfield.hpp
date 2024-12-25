@@ -1,7 +1,7 @@
 #pragma once
 
-#include <DisRegRep/Type.hpp>
-#include <DisRegRep/UninitialisedAllocator.hpp>
+#include <DisRegRep/Core/Type.hpp>
+#include <DisRegRep/Core/UninitialisedAllocator.hpp>
 
 #include <glm/vec2.hpp>
 

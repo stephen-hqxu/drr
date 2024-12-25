@@ -6,40 +6,31 @@ function(addMainComponent)
 	list(TRANSFORM COMPONENT_HEADER APPEND .hpp)
 	list(TRANSFORM COMPONENT_SOURCE APPEND .cpp)
 
-	target_sources(${DRR_MAIN} PRIVATE
+	target_sources(Main PRIVATE
 	FILE_SET header
 		TYPE HEADERS
 		BASE_DIRS ${INCLUDE_DIR}
 		FILES ${COMPONENT_HEADER}
 	)
-	target_sources(${DRR_MAIN} PRIVATE ${COMPONENT_SOURCE})
+	target_sources(Main PRIVATE ${COMPONENT_SOURCE})
 endfunction()
 
 #######################
 ### Target Creation ###
 #######################
-add_executable(${DRR_MAIN})
+add_executable(Main Main.cpp)
 
 add_subdirectory(Container)
+add_subdirectory(Core)
 add_subdirectory(Profiler)
 add_subdirectory(RegionfieldGenerator)
 add_subdirectory(Splatting)
-addMainComponent(
-HEADER
-	Arithmetic
-	Exception
-	Range
-	Type
-	UninitialisedAllocator
-SOURCE
-	Exception
-	Main
-)
 
-target_link_libraries(${DRR_MAIN}
+target_link_libraries(Main
 PRIVATE
 	glm::glm
 	nanobench::nanobench
+	xxHash
 	# Command Line API
 	CLI11::CLI11
 	yaml-cpp::yaml-cpp
@@ -47,16 +38,16 @@ PRIVATE
 	range-v3::range-v3
 )
 
-set_target_properties(${DRR_MAIN} PROPERTIES
+set_target_properties(Main PROPERTIES
 	RUNTIME_OUTPUT_NAME drr
-	VS_DEBUGGER_WORKING_DIRECTORY $<TARGET_FILE_DIR:${DRR_MAIN}>
+	VS_DEBUGGER_WORKING_DIRECTORY $<TARGET_FILE_DIR:Main>
 )
 
 ####################
 ### Source Group ###
 ####################
-get_target_property(DRR_SOURCE ${DRR_MAIN} SOURCES)
-get_target_property(DRR_HEADER ${DRR_MAIN} HEADER_SET_header)
+get_target_property(DRR_SOURCE Main SOURCES)
+get_target_property(DRR_HEADER Main HEADER_SET_header)
 
 function(addMainSourceGroup)
 	cmake_parse_arguments(GROUP "" "PREFIX" "FILE" ${ARGV})
