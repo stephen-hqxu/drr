@@ -31,7 +31,7 @@ struct Basic {
 
 	using ValueType = V;
 
-	Type::RegionIdentifier Identifier; /**< Identifier of the region this element is for. */
+	Core::Type::RegionIdentifier Identifier; /**< Identifier of the region this element is for. */
 	ValueType Value; /**< Data stored in this element for this region. */
 
 	[[nodiscard]] constexpr bool operator==(const Basic&) const
@@ -39,8 +39,8 @@ struct Basic {
 
 };
 
-using Importance = Basic<Type::RegionImportance>; /**< Sparse region importance matrix element. */
-using Mask = Basic<Type::RegionMask>; /**< Sparse region mask matrix element. */
+using Importance = Basic<Core::Type::RegionImportance>; /**< Sparse region importance matrix element. */
+using Mask = Basic<Core::Type::RegionMask>; /**< Sparse region mask matrix element. */
 
 /**
  * `T` is a specialisation of basic sparse matrix element.
@@ -70,11 +70,11 @@ concept ImportanceRange = std::is_same_v<std::ranges::range_value_t<R>, Importan
  *
  * @return A range of dense matrix.
  */
-inline constexpr auto ToDense = Range::RangeAdaptorClosure(
+inline constexpr auto ToDense = Core::Range::RangeAdaptorClosure(
 	[]<std::ranges::input_range Sparse, typename Value = typename std::ranges::range_value_t<Sparse>::ValueType>
 	requires Is<std::ranges::range_value_t<Sparse>> && std::is_nothrow_copy_constructible_v<Value>
-	(Sparse&& sparse, const Type::RegionIdentifier region_count, const Value fill_value = {}) static constexpr noexcept -> auto {
-		using Range::ImpureTransform;
+	(Sparse&& sparse, const Core::Type::RegionIdentifier region_count, const Value fill_value = {}) static constexpr noexcept -> auto {
+		using Core::Range::ImpureTransform;
 		using ranges::views::iota;
 		using std::ranges::cbegin, std::ranges::cend,
 			std::ranges::forward_range, std::ranges::is_sorted, std::mem_fn;
@@ -87,7 +87,7 @@ inline constexpr auto ToDense = Range::RangeAdaptorClosure(
 		//We keep the current iterator as an internal state, making this range an input range (O(N)).
 		//A way to maintain the original range category is
 		//	by using binary search to find the element given a dense region ID (O(N log N)).
-		return iota(Type::RegionIdentifier {}, region_count)
+		return iota(Core::Type::RegionIdentifier {}, region_count)
 			 | ImpureTransform(
 				 [fill_value, it = cbegin(sparse), end = cend(sparse)](const auto dense_region_id) mutable constexpr noexcept {
 					 if (it == end) {
@@ -117,7 +117,7 @@ inline constexpr auto ToDense = Range::RangeAdaptorClosure(
  * @return A range of sparse matrix element.
  */
 inline constexpr auto ToSparse =
-	Range::RangeAdaptorClosure([]<std::ranges::viewable_range Dense, typename Value = std::ranges::range_value_t<Dense>>
+	Core::Range::RangeAdaptorClosure([]<std::ranges::viewable_range Dense, typename Value = std::ranges::range_value_t<Dense>>
 		requires std::ranges::input_range<Dense> && std::equality_comparable<Value> && std::is_nothrow_copy_constructible_v<Value>
 		(Dense&& dense, const Value ignore_value = {}) static constexpr noexcept -> auto {
 			using std::make_from_tuple;

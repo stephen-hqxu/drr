@@ -1,4 +1,4 @@
-#include <DisRegRep/Container/Splatting.hpp>
+#include <DisRegRep/Container/SplattingCoefficient.hpp>
 #include <DisRegRep/Container/SparseMatrixElement.hpp>
 
 #include <DisRegRep/Core/Exception.hpp>
@@ -14,9 +14,9 @@
 #include <functional>
 #include <ranges>
 
-namespace Splatting = DisRegRep::Container::Splatting;
-using Splatting::BasicDense, Splatting::BasicSparse;
-using DisRegRep::Type::RegionImportance, DisRegRep::Type::RegionMask;
+namespace SpltCoef = DisRegRep::Container::SplattingCoefficient;
+using SpltCoef::BasicDense, SpltCoef::BasicSparse;
+using DisRegRep::Core::Type::RegionImportance, DisRegRep::Core::Type::RegionMask;
 
 using std::span,
 	std::tie, std::apply;
@@ -27,7 +27,7 @@ using std::equal, std::for_each, std::all_of,
 using std::mem_fn, std::identity;
 
 template<typename V>
-bool Splatting::operator==(const BasicDense<V>& dense, const BasicSparse<V>& sparse) {
+bool SpltCoef::operator==(const BasicDense<V>& dense, const BasicSparse<V>& sparse) {
 	DRR_ASSERT(sparse.isSorted());
 
 	const auto compare_rg = zip_transform(
@@ -39,7 +39,7 @@ bool Splatting::operator==(const BasicDense<V>& dense, const BasicSparse<V>& spa
 }
 
 template<typename V>
-bool Splatting::operator==(const BasicSparse<V>& sparse, const BasicDense<V>& dense) {
+bool SpltCoef::operator==(const BasicSparse<V>& sparse, const BasicDense<V>& dense) {
 	return dense == sparse;
 }
 
@@ -109,16 +109,16 @@ void BasicSparse<V>::clear() {
 	this->SparseMatrix.clear();
 }
 
-#define INSTANTIATE_DENSE(TYPE) template class DisRegRep::Container::Splatting::BasicDense<TYPE>
+#define INSTANTIATE_DENSE(TYPE) template class DisRegRep::Container::SplattingCoefficient::BasicDense<TYPE>
 INSTANTIATE_DENSE(RegionImportance);
 INSTANTIATE_DENSE(RegionMask);
 
-#define INSTANTIATE_SPARSE(TYPE) template class DisRegRep::Container::Splatting::BasicSparse<TYPE>
+#define INSTANTIATE_SPARSE(TYPE) template class DisRegRep::Container::SplattingCoefficient::BasicSparse<TYPE>
 INSTANTIATE_SPARSE(RegionImportance);
 INSTANTIATE_SPARSE(RegionMask);
 
 #define INSTANTIATE_EQ(TYPE) \
-	template bool DisRegRep::Container::Splatting::operator==<TYPE>(const BasicDense<TYPE>&, const BasicSparse<TYPE>&); \
-	template bool DisRegRep::Container::Splatting::operator==<TYPE>(const BasicSparse<TYPE>&, const BasicDense<TYPE>&)
+	template bool DisRegRep::Container::SplattingCoefficient::operator==<TYPE>(const BasicDense<TYPE>&, const BasicSparse<TYPE>&); \
+	template bool DisRegRep::Container::SplattingCoefficient::operator==<TYPE>(const BasicSparse<TYPE>&, const BasicDense<TYPE>&)
 INSTANTIATE_EQ(RegionImportance);
 INSTANTIATE_EQ(RegionMask);

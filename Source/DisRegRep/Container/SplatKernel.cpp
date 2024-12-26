@@ -14,7 +14,7 @@
 
 namespace SplatKernel = DisRegRep::Container::SplatKernel;
 using SplatKernel::Dense, SplatKernel::Sparse, SplatKernel::Internal_::DenseKernelBinaryOperator,
-	DisRegRep::Container::SparseMatrixElement::Importance, DisRegRep::Type::RegionIdentifier;
+	DisRegRep::Container::SparseMatrixElement::Importance, DisRegRep::Core::Type::RegionIdentifier;
 
 using std::for_each, std::execution::unseq,
 	std::ranges::fill;
@@ -33,7 +33,7 @@ namespace {
 }
 
 template<DenseKernelBinaryOperator Op>
-void Dense::modify(const SizeType region_id, Op op, const ValueType amount) noexcept(
+void Dense::modify(const IndexType region_id, Op op, const ValueType amount) noexcept(
 	std::is_nothrow_invocable_v<Op, ValueType, ValueType>) {
 	ValueType& importance = this->Importance_[region_id];
 	if constexpr (is_same_v<Op, minus<>>) {
@@ -48,7 +48,7 @@ void Dense::modify(const Importance& importance, Op op) noexcept(std::is_nothrow
 	this->modify(region_id, std::move(op), value);
 }
 
-void Dense::resize(const SizeType region_count) {
+void Dense::resize(const IndexType region_count) {
 	this->Importance_.resize(region_count);
 }
 
@@ -56,7 +56,7 @@ void Dense::clear() noexcept {
 	fill(this->Importance_, ValueType {});
 }
 
-void Dense::increment(const SizeType region_id) noexcept {
+void Dense::increment(const IndexType region_id) noexcept {
 	this->modify(region_id, plus {}, 1U);
 }
 
@@ -64,7 +64,7 @@ void Dense::increment(const Importance& importance) noexcept {
 	this->modify(importance, plus {});
 }
 
-void Dense::decrement(const SizeType region_id) noexcept {
+void Dense::decrement(const IndexType region_id) noexcept {
 	this->modify(region_id, minus {}, 1U);
 }
 
@@ -72,7 +72,7 @@ void Dense::decrement(const Importance& importance) noexcept {
 	this->modify(importance, minus {});
 }
 
-void Sparse::resize(const SizeType region_count) {
+void Sparse::resize(const IndexType region_count) {
 	this->Offset.resize(region_count, Sparse::NoValueOffset);
 }
 
@@ -92,7 +92,7 @@ void Sparse::increment(const ValueType& importance) {
 	}
 }
 
-void Sparse::increment(const SizeType region_id) {
+void Sparse::increment(const IndexType region_id) {
 	this->increment(makeSingleImportance(region_id));
 }
 
@@ -115,6 +115,6 @@ void Sparse::decrement(const ValueType& importance) {
 	}
 }
 
-void Sparse::decrement(const SizeType region_id) {
+void Sparse::decrement(const IndexType region_id) {
 	this->decrement(makeSingleImportance(region_id));
 }

@@ -26,14 +26,15 @@
 #include <cstdint>
 
 /**
- * @brief The splatting value matrix (SVM) is a column-major 3D matrix that stores values computed by the convolution used for
- * splatting of region features. The Y and Z axes are used for locating points in a 2D space, and the X axis is used for locating the
- * splatting value for the corresponding region.
+ * @brief Splatting coefficients are values computed by the convolution used for splatting of region features. In this project there
+ * are mainly two kinds of splatting coefficients, being region importance and region mask. The splatting coefficients are stored in a
+ * 3D column-major matrix, namely the splatting coefficient matrix (SCM). The Y and Z axes are used for locating points in a 2D space,
+ * and the X axis is used for locating the splatting coefficients for the corresponding region.
  */
-namespace DisRegRep::Container::Splatting {
+namespace DisRegRep::Container::SplattingCoefficient {
 
 /**
- * @brief Common types used by the SVM implementations.
+ * @brief Common types used by the SCM implementations.
  */
 namespace Type {
 
@@ -48,30 +49,29 @@ using Dimension3Type = DimensionType<3U>; /**< Region index and point coordinate
 }
 
 /**
- * @brief A dense SVM is a contiguous 3D matrix of region splatting values.
+ * @brief A dense SCM is a contiguous 3D matrix of region splatting coefficients.
  *
- * @tparam V Splatting value type.
+ * @tparam V Splatting coefficient value type.
  */
 template<typename>
 class BasicDense;
 
-using DenseImportance = BasicDense<DisRegRep::Type::RegionImportance>; /**< Dense region importance. */
-using DenseMask = BasicDense<DisRegRep::Type::RegionMask>; /**< Dense region mask. */
+using DenseImportance = BasicDense<Core::Type::RegionImportance>; /**< Dense region importance. */
+using DenseMask = BasicDense<Core::Type::RegionMask>; /**< Dense region mask. */
 
 /**
- * @brief A sparse SVM is a partial sparse matrix that uses compressed sparse row format on the axis that stores region
- * splatting values (i.e. the X axis), the rest of axes remain dense.
+ * @brief A sparse SCM is a partial sparse matrix that uses compressed sparse row format on the axis that stores region
+ * splatting coefficients (i.e. the X axis), the rest of axes remain dense.
  *
- * @tparam V Splatting value type.
+ * @tparam V Splatting coefficient value type.
  */
 template<typename>
 class BasicSparse;
 
-using SparseImportance = BasicSparse<DisRegRep::Type::RegionImportance>; /**< Sparse region importance. */
-using SparseMask = BasicSparse<DisRegRep::Type::RegionMask>; /**< Sparse region mask. */
+using SparseImportance = BasicSparse<Core::Type::RegionImportance>; /**< Sparse region importance. */
+using SparseMask = BasicSparse<Core::Type::RegionMask>; /**< Sparse region mask. */
 
-//Compare if the splatting values are equivalent regardless of storage format.
-//For sparse matrix, values are assumed to be default initialised if it is not present.
+//Compare if the splatting coefficient are equivalent in value regardless of storage format.
 template<typename V>
 [[nodiscard]] bool operator==(const BasicDense<V>&, const BasicSparse<V>&);
 template<typename V>
@@ -100,7 +100,7 @@ public:
 
 private:
 
-	using DataContainerType = std::vector<ValueType, UninitialisedAllocator<ValueType>>;
+	using DataContainerType = std::vector<ValueType, Core::UninitialisedAllocator<ValueType>>;
 
 	MappingType Mapping;
 	DataContainerType DenseMatrix;
@@ -110,8 +110,9 @@ public:
 	using SizeType = typename DataContainerType::size_type;
 
 	/**
-	 * @brief A proxy of a lvalue reference of per-region splatting values at a coordinate.
-	 * 
+	 * @brief A proxy that acts like a lvalue reference to values along the X-axis (i.e. the per-region splatting coefficient at fixed
+	 * coordinate) of the dense matrix.
+	 *
 	 * @param Const True if the values are constant.
 	 */
 	template<bool Const>
@@ -133,9 +134,9 @@ public:
 		/**
 		 * @brief Initialise a value proxy.
 		 *
-		 * @tparam R Type of region values.
+		 * @tparam R Type of range of values.
 		 *
-		 * @param r A range of values for all regions.
+		 * @param r A range of values.
 		 */
 		template<typename R>
 		requires std::is_constructible_v<ProxyViewType, R>
@@ -248,7 +249,7 @@ public:
 
 private:
 
-	using OffsetContainerType = std::vector<OffsetType, UninitialisedAllocator<OffsetType>>;
+	using OffsetContainerType = std::vector<OffsetType, Core::UninitialisedAllocator<OffsetType>>;
 	using ElementContainerType = std::vector<ElementType>;
 	using ConstElementContainerType = std::add_const_t<ElementContainerType>;
 
@@ -268,7 +269,7 @@ public:
 	using SizeType = std::common_type_t<OffsetContainerType::size_type, typename ElementContainerType::size_type>;
 
 	/**
-	 * @brief A proxy of per-region splatting values at a coordinate.
+	 * @brief A proxy of values along the X-axis (i.e. the per-region splatting coefficient at fixed coordinate) of the sparse matrix.
 	 *
 	 * @tparam Const True if the values are constant.
 	 */
@@ -374,14 +375,14 @@ public:
 	FRIEND_DENSE_EQ_SPARSE;
 
 	/**
-	 * @brief Sort the splatting values of each element in the sparse matrix, in ascending order of region identifier.
+	 * @brief Sort the values of each element in the sparse matrix, in ascending order of region identifier.
 	 *
 	 * @link BasicSparse::isSorted
 	 */
 	void sort();
 
 	/**
-	 * @brief Check if the splatting values of each element in the sparse matrix is sorted.
+	 * @brief Check if the values of each element in the sparse matrix is sorted.
 	 *
 	 * @link BasicSparse::sort
 	 *

@@ -10,7 +10,7 @@
 /**
  * @brief Standard types defined to be used in the discrete region representation project.
  */
-namespace DisRegRep::Type {
+namespace DisRegRep::Core::Type {
 
 using RegionIdentifier = std::uint8_t; /**< An integer to uniquely identify a region. */
 using RegionImportance = std::uint32_t; /**< Region importance is defined as the frequency of occurence of a region. */

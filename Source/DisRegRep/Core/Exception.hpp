@@ -10,10 +10,10 @@
 //Make an assertion on a boolean expression.
 #define DRR_ASSERT(EXPRESSION) \
 	if (!(EXPRESSION)) [[unlikely]] { \
-		throw DisRegRep::Exception(std::format("Assertion Failure on expression:\n\t{}", #EXPRESSION)); \
+		throw DisRegRep::Core::Exception(std::format("Assertion Failure on expression:\n\t{}", #EXPRESSION)); \
 	}
 
-namespace DisRegRep {
+namespace DisRegRep::Core {
 
 /**
  * @brief Base of all exceptions.

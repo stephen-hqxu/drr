@@ -3,9 +3,9 @@ HEADER
 	Regionfield
 	SparseMatrixElement
 	SplatKernel
-	Splatting
+	SplattingCoefficient
 SOURCE
 	Regionfield
 	SplatKernel
-	Splatting
+	SplattingCoefficient
 )

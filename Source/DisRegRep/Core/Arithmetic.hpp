@@ -24,7 +24,7 @@
 /**
  * @brief Standard algebraic operations.
  */
-namespace DisRegRep::Arithmetic {
+namespace DisRegRep::Core::Arithmetic {
 
 /**
  * @brief Normalise each value in a range.

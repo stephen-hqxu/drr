@@ -56,7 +56,7 @@ void VoronoiDiagram::operator()(Regionfield& regionfield) {
 		| to<vector>();
 	const auto region_assignment =
 		generate_n(bind_front(Base::createDistribution(regionfield), rng), this->CentroidCount)
-		| to<vector<Type::RegionIdentifier>>();
+		| to<vector<Core::Type::RegionIdentifier>>();
 
 	/*
 	 * Find the nearest centroid for every point in the regionfield.

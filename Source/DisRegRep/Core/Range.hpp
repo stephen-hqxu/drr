@@ -15,7 +15,7 @@
 /**
  * @brief Additional range views and adaptors.
  */
-namespace DisRegRep::Range {
+namespace DisRegRep::Core::Range {
 
 /**
  * `F` can be used as a range function.

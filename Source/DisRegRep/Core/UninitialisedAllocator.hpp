@@ -3,7 +3,7 @@
 #include <memory>
 #include <type_traits>
 
-namespace DisRegRep {
+namespace DisRegRep::Core {
 
 /**
  * @brief An allocator adaptor that does not perform construction nor destruction on a compatible type. This allows the type to be

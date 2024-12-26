@@ -33,7 +33,7 @@ namespace DisRegRep::Container::SplatKernel {
  * `Importance` is a range of importance.
  */
 template<typename Importance>
-concept DenseImportanceRange = Type::RegionImportanceRange<Importance> && std::ranges::forward_range<Importance>;
+concept DenseImportanceRange = Core::Type::RegionImportanceRange<Importance> && std::ranges::forward_range<Importance>;
 
 /**
  * `Importance` is a range of sparse importance matrix element.
@@ -43,7 +43,7 @@ concept SparseImportanceRange = SparseMatrixElement::ImportanceRange<Importance>
 
 namespace Internal_ {
 
-using DenseValueType = Type::RegionImportance; /**< Value type of kernel using dense matrix. */
+using DenseValueType = Core::Type::RegionImportance; /**< Value type of kernel using dense matrix. */
 
 /**
  * `Op` is a binary operator on dense kernel values.
@@ -87,7 +87,7 @@ class Dense {
 public:
 
 	using ValueType = Internal_::DenseValueType;
-	using SizeType = Type::RegionIdentifier;
+	using IndexType = Core::Type::RegionIdentifier;
 
 private:
 
@@ -97,7 +97,7 @@ private:
 
 	//Modify one region by some amount.
 	template<Internal_::DenseKernelBinaryOperator Op>
-	void modify(SizeType, Op, ValueType) noexcept(std::is_nothrow_invocable_v<Op, ValueType, ValueType>);
+	void modify(IndexType, Op, ValueType) noexcept(std::is_nothrow_invocable_v<Op, ValueType, ValueType>);
 
 	//Modify one region by a given sparse importance matrix element.
 	template<Internal_::DenseKernelBinaryOperator Op>
@@ -140,7 +140,7 @@ public:
 	 *
 	 * @param region_count The maximum number of region identifiers to be held by this kernel.
 	 */
-	void resize(SizeType);
+	void resize(IndexType);
 
 	/**
 	 * @brief Clear all contents in the kernel and reset importance of all regions to zero.
@@ -161,7 +161,7 @@ public:
 	 *
 	 * @param region_id Identifier of region whose importance is to be incremented.
 	 */
-	void increment(SizeType) noexcept;
+	void increment(IndexType) noexcept;
 
 	/**
 	 * @brief Increment the importance of a region by some amount.
@@ -200,7 +200,7 @@ public:
 	 *
 	 * @param region_id Identifier of region whose importance is to be decremented.
 	 */
-	void decrement(SizeType) noexcept;
+	void decrement(IndexType) noexcept;
 
 	/**
 	 * @brief Decrement the importance of a region by some amount.
@@ -244,8 +244,8 @@ class Sparse {
 public:
 
 	using ValueType = SparseMatrixElement::Importance;
-	using OffsetType = Dense::SizeType;
-	using SizeType = OffsetType;
+	using OffsetType = Dense::IndexType;
+	using IndexType = OffsetType;
 
 private:
 
@@ -286,7 +286,7 @@ public:
 	 *
 	 * @param region_count The maximum number of region identifiers to be held by this kernel.
 	 */
-	void resize(SizeType);
+	void resize(IndexType);
 
 	/**
 	 * @brief Clear all contents in the kernel.
@@ -314,7 +314,7 @@ public:
 	 *
 	 * @param region_id Identifier of region whose importance is to be incremented.
 	 */
-	void increment(SizeType);
+	void increment(IndexType);
 
 	/**
 	 * @brief Increment importance of some regions by some amount.
@@ -340,7 +340,7 @@ public:
 	 *
 	 * @param region_id Identifier of region whose importance is to be decremented.
 	 */
-	void decrement(SizeType);
+	void decrement(IndexType);
 
 	/**
 	 * @brief Decrement importance of some regions by some amount.

@@ -5,6 +5,8 @@ HEADER
 	Range
 	Type
 	UninitialisedAllocator
+	XXHash
 SOURCE
 	Exception
+	XXHash
 )

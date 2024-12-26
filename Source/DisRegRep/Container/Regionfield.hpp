@@ -20,7 +20,7 @@ namespace DisRegRep::Container {
 class Regionfield {
 public:
 
-	using ValueType = Type::RegionIdentifier;
+	using ValueType = Core::Type::RegionIdentifier;
 	using ConstValue = std::add_const_t<ValueType>;
 	using IndexType = std::uint32_t;
 	using DimensionType = glm::vec<2U, IndexType>;
@@ -33,7 +33,7 @@ public:
 private:
 
 	MappingType Mapping;
-	std::vector<ValueType, UninitialisedAllocator<ValueType>> Data;
+	std::vector<ValueType, Core::UninitialisedAllocator<ValueType>> Data;
 
 public:
 
