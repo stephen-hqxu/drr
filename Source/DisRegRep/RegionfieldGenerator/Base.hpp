@@ -1,6 +1,7 @@
 #pragma once
 
 #include <DisRegRep/Container/Regionfield.hpp>
+#include <DisRegRep/Core/XXHash.hpp>
 
 #include <random>
 #include <string_view>
@@ -15,21 +16,19 @@ namespace DisRegRep::RegionfieldGenerator {
 class Base {
 public:
 
-	using SeedType = std::uint32_t;
+	using SeedType = std::uint_fast32_t;
 
 protected:
 
 	using RandomIntType = std::uint_fast16_t;
-	using RandomEngineType =
-		std::shuffle_order_engine<std::linear_congruential_engine<RandomIntType, 10621U, 210U, (1U << 15U) - 1U>, 16U>;
 	using UniformDistributionType = std::uniform_int_distribution<RandomIntType>;
 
 	/**
-	 * @brief Create a new random engine using the currently set seed.
+	 * @brief Generate a secret sequence using the currently set seed.
 	 *
-	 * @return Random engine with current seed.
+	 * @return Secret sequence with current seed.
 	 */
-	[[nodiscard]] RandomEngineType createRandomEngine() const noexcept;
+	[[nodiscard]] Core::XXHash::Secret generateSecret() const;
 
 	/**
 	 * @brief Create a new distribution based on the region count specified in a regionfield.

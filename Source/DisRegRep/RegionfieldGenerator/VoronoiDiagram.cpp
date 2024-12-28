@@ -4,6 +4,7 @@
 
 #include <DisRegRep/Core/Exception.hpp>
 #include <DisRegRep/Core/Type.hpp>
+#include <DisRegRep/Core/XXHash.hpp>
 
 #include <glm/fwd.hpp>
 #include <glm/geometric.hpp>
@@ -35,7 +36,7 @@ using ranges::to, ranges::views::generate_n;
 using std::array, std::span, std::vector;
 using std::execution::par_unseq;
 using std::ranges::min_element, std::ranges::distance,
-	std::bind_front, std::apply;
+	std::apply;
 using std::views::iota, std::views::cartesian_product;
 using std::index_sequence;
 
@@ -44,7 +45,7 @@ void VoronoiDiagram::operator()(Regionfield& regionfield) {
 	const span rf_span = regionfield.span();
 	const Regionfield::ExtentType& rf_extent = regionfield.mapping().extents();
 
-	auto rng = this->createRandomEngine();
+	auto rng = Core::XXHash::RandomEngine(this->generateSecret());
 	array<UniformDistributionType, 2U> dist;
 	std::ranges::transform(iota(0U, dist.size()), dist.begin(),
 		[&rf_extent](const auto ext) { return UniformDistributionType(0U, rf_extent.extent(ext) - 1U); });
@@ -55,7 +56,7 @@ void VoronoiDiagram::operator()(Regionfield& regionfield) {
 		}, this->CentroidCount)
 		| to<vector>();
 	const auto region_assignment =
-		generate_n(bind_front(Base::createDistribution(regionfield), rng), this->CentroidCount)
+		generate_n([dist = Base::createDistribution(regionfield), &rng]() mutable { return dist(rng); }, this->CentroidCount)
 		| to<vector<Core::Type::RegionIdentifier>>();
 
 	/*
