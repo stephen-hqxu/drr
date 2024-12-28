@@ -28,7 +28,7 @@ XXHash::Secret XXHash::generateSecret(const ApplicationSecretView app_secret, co
 	using GeneratedType = std::uint64_t;
 	static_assert(ApplicationSecretSize % sizeof(GeneratedType) == 0U);
 	static_assert(TotalSecretSize % sizeof(GeneratedType) == 0U);
-	static constexpr std::uint8_t TypedTotalSecretSize = TotalSecretSize / sizeof(GeneratedType);
+	static constexpr std::uint_fast8_t TypedTotalSecretSize = TotalSecretSize / sizeof(GeneratedType);
 
 	//Only Mersenne-Twister engine guarantees that output range covers the whole bit range without giving bias.
 	Secret secret;

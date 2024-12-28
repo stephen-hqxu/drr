@@ -38,7 +38,7 @@ namespace DisRegRep::Container::SplattingCoefficient {
  */
 namespace Type {
 
-using IndexType = std::uint32_t;
+using IndexType = std::uint_fast32_t;
 using LayoutType = std::layout_left;
 
 template<glm::length_t L>
@@ -236,7 +236,7 @@ public:
 	using ValueType = V;
 	using ElementType = SparseMatrixElement::Basic<ValueType>;
 	using ConstElement = std::add_const_t<ElementType>;
-	using OffsetType = std::uint32_t;
+	using OffsetType = std::uint_least32_t;
 	using ConstOffset = std::add_const_t<OffsetType>;
 	using IndexType = Type::IndexType;
 

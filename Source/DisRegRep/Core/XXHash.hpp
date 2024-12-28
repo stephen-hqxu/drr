@@ -34,7 +34,7 @@ namespace ApplicationSecretStringConversionError {
 
 }
 
-inline constexpr std::uint8_t ApplicationSecretSize = 80U, /**< Size in byte of the secret specified by the end application. */
+inline constexpr std::uint_fast8_t ApplicationSecretSize = 80U, /**< Size in byte of the secret specified by the end application. */
 	TotalSecretSize = ApplicationSecretSize * 2U; /**< Size in byte of the total secret sequence. */
 
 using SeedType = std::uint_fast64_t;
@@ -66,7 +66,7 @@ using Input = std::span<const std::byte>;
 
 	ApplicationSecret secret {};
 	transform(str | split(' '), secret.begin(), [](const auto token) static consteval noexcept {
-		std::underlying_type_t<ApplicationSecret::value_type> byte {};
+		std::uint8_t byte {};
 		const auto first = data(token);
 		if (from_chars(first, first + size(token), byte, 16).ec != errc {}) [[unlikely]] {
 			ApplicationSecretStringConversionError::HasInvalidToken();

@@ -22,7 +22,7 @@ public:
 
 	using ValueType = Core::Type::RegionIdentifier;
 	using ConstValue = std::add_const_t<ValueType>;
-	using IndexType = std::uint32_t;
+	using IndexType = std::uint_fast32_t;
 	using DimensionType = glm::vec<2U, IndexType>;
 
 	using ExtentType = std::dextents<IndexType, 2U>;
