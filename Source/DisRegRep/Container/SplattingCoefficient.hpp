@@ -2,6 +2,7 @@
 
 #include "SparseMatrixElement.hpp"
 
+#include <DisRegRep/Core/Arithmetic.hpp>
 #include <DisRegRep/Core/Type.hpp>
 #include <DisRegRep/Core/UninitialisedAllocator.hpp>
 
@@ -155,20 +156,20 @@ public:
 
 		/**
 		 * @brief Copy a given range of dense matrix to the view in this proxy.
-		 * 
+		 *
 		 * @tparam Value Type of range to be copied.
-		 * 
+		 *
 		 * @param value Values to be copied.
-		 * 
+		 *
 		 * @return Self.
 		 */
 		template<std::ranges::forward_range Value>
-		requires std::indirectly_copyable<std::ranges::const_iterator_t<Value>, ProxyIterator>
-		constexpr ValueProxy& operator=(Value&& value)
-		requires(!IsConstant)
+		requires std::ranges::common_range<Value>
+			  && std::indirectly_copyable<std::ranges::const_iterator_t<Value>, ProxyIterator>
+				 constexpr const ValueProxy& operator=(Value&& value) const
+				 requires(!IsConstant)
 		{
-			using std::copy, std::execution::unseq,
-				std::ranges::cbegin, std::ranges::cend;
+			using std::copy, std::execution::unseq, std::ranges::cbegin, std::ranges::cend;
 			copy(unseq, cbegin(value), cend(value), this->Span.begin());
 			return *this;
 		}
@@ -199,18 +200,12 @@ public:
 	[[nodiscard]] SizeType sizeByte() const noexcept;
 
 	/**
-	 * @brief Resize the current dense matrix. All existing contents become undefined.
+	 * @brief Resize the current dense matrix. All existing contents become undefined and the internal state of the matrix is reset,
+	 * thus suitable for commencing new computations.
 	 *
 	 * @param dim Provide region count, width and height of the dense matrix.
 	 */
 	void resize(Dimension3Type);
-
-	/**
-	 * @brief This function must be called to reset the internal state of the matrix before commencing new computations. For dense
-	 * matrix, it is currently a no-op as there is no internal states involved; keeping it to ensure API consistency with the sparse
-	 * implementation.
-	 */
-	constexpr void clear() const noexcept { }
 
 	/**
 	 * @brief Get a range to the dense matrix.
@@ -218,13 +213,22 @@ public:
 	 * @return A range to the dense matrix.
 	 */
 	template<typename Self>
-	[[nodiscard]] constexpr auto range(this Self& self) noexcept {
-		using std::views::chunk, std::views::transform;
+	[[nodiscard]] constexpr std::ranges::view auto range(this Self& self) noexcept {
+		using std::views::transform;
 		using ProxyType = ValueProxy<std::is_const_v<Self>>;
 
 		return self.DenseMatrix
-			 | chunk(self.Mapping.stride(1U))
+			 | Core::Arithmetic::View2d(self.Mapping.stride(1U))
 			 | transform([](auto region_val) static constexpr noexcept { return ProxyType(std::move(region_val)); });
+	}
+
+	/**
+	 * @brief Get a transposed 2D range to the dense matrix.
+	 *
+	 * @return A transposed 2D range to the dense matrix.
+	 */
+	[[nodiscard]] constexpr std::ranges::view auto rangeTransposed2d() const noexcept {
+		return this->range() | Core::Arithmetic::ViewTransposed2d(this->Mapping.extents().extent(2U));
 	}
 
 };
@@ -249,7 +253,7 @@ public:
 
 private:
 
-	using OffsetContainerType = std::vector<OffsetType, Core::UninitialisedAllocator<OffsetType>>;
+	using OffsetContainerType = std::vector<OffsetType>;
 	using ElementContainerType = std::vector<ElementType>;
 	using ConstElementContainerType = std::add_const_t<ElementContainerType>;
 
@@ -329,7 +333,7 @@ public:
 		 */
 		template<std::ranges::input_range Value>
 		requires std::is_convertible_v<std::ranges::range_value_t<Value>, ValueType>
-		constexpr ValueProxy& operator=(Value&& value)
+		constexpr const ValueProxy& operator=(Value&& value) const
 		requires(!IsConstant)
 		{
 			*this = std::forward<Value>(value) | SparseMatrixElement::ToSparse;
@@ -347,7 +351,7 @@ public:
 		 */
 		template<std::ranges::input_range Value>
 		requires std::is_same_v<std::ranges::range_value_t<Value>, ElementType>
-		constexpr ValueProxy& operator=(Value&& value)
+		constexpr const ValueProxy& operator=(Value&& value) const
 		requires(!IsConstant)
 		{
 			auto& [_, next] = this->PairwiseOffset;
@@ -398,7 +402,8 @@ public:
 	[[nodiscard]] SizeType sizeByte() const noexcept;
 
 	/**
-	 * @brief Resize the current sparse matrix. All existing contents become undefined.
+	 * @brief Resize the current sparse matrix. All existing contents become undefined and the internal state of the matrix is reset,
+	 * thus suitable for commencing new computations.
 	 *
 	 * @param dim Provide width and height of the sparse matrix. The region count is sparsely populated, but should still be provided
 	 * as is similar to that of the dense matrix to keep API consistency.
@@ -406,18 +411,12 @@ public:
 	void resize(Dimension3Type);
 
 	/**
-	 * @brief This function must be called to reset the internal state of the matrix and clear old values before commencing new
-	 * computations.
-	 */
-	void clear();
-
-	/**
 	 * @brief Get a range to the sparse matrix.
 	 * 
 	 * @return A range to the sparse matrix.
 	 */
 	template<typename Self>
-	[[nodiscard]] constexpr auto range(this Self& self) noexcept {
+	[[nodiscard]] constexpr std::ranges::view auto range(this Self& self) noexcept {
 		using std::views::pairwise, std::views::transform;
 		using ProxyType = ValueProxy<std::is_const_v<Self>>;
 
@@ -427,6 +426,15 @@ public:
 			| transform([&elem = self.SparseMatrix](auto pairwise_offset) constexpr noexcept {
 				return ProxyType(std::move(pairwise_offset), elem);
 			});
+	}
+
+	/**
+	 * @brief Get a transposed 2D range to the sparse matrix.
+	 *
+	 * @return A transposed 2D range to the sparse matrix.
+	 */
+	[[nodiscard]] constexpr std::ranges::view auto rangeTransposed2d() const noexcept {
+		return this->range() | Core::Arithmetic::ViewTransposed2d(this->OffsetMapping.stride(1U));
 	}
 
 };

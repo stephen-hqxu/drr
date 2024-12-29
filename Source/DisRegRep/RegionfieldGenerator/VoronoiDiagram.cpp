@@ -27,7 +27,7 @@
 
 #include <cstddef>
 
-using DisRegRep::RegionfieldGenerator::VoronoiDiagram, DisRegRep::Container::Regionfield;
+using DisRegRep::RegionfieldGenerator::VoronoiDiagram;
 
 using glm::u16vec2, glm::f32vec2;
 
@@ -40,10 +40,10 @@ using std::ranges::min_element, std::ranges::distance,
 using std::views::iota, std::views::cartesian_product;
 using std::index_sequence;
 
-void VoronoiDiagram::operator()(Regionfield& regionfield) {
+void VoronoiDiagram::operator()(Container::Regionfield& regionfield) {
 	DRR_ASSERT(this->CentroidCount > 0U);
 	const span rf_span = regionfield.span();
-	const Regionfield::ExtentType& rf_extent = regionfield.mapping().extents();
+	const Container::Regionfield::ExtentType& rf_extent = regionfield.mapping().extents();
 
 	auto rng = Core::XXHash::RandomEngine(this->generateSecret());
 	array<UniformDistributionType, 2U> dist;

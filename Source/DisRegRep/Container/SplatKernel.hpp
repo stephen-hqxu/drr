@@ -39,7 +39,8 @@ concept DenseImportanceRange = Core::Type::RegionImportanceRange<Importance> && 
  * `Importance` is a range of sparse importance matrix element.
  */
 template<typename Importance>
-concept SparseImportanceRange = SparseMatrixElement::ImportanceRange<Importance> && std::ranges::forward_range<Importance>;
+concept SparseImportanceRange = SparseMatrixElement::ImportanceRange<Importance> && std::ranges::forward_range<Importance>
+							 && std::ranges::common_range<Importance>;
 
 namespace Internal_ {
 
@@ -107,8 +108,9 @@ private:
 	template<Internal_::DenseKernelBinaryOperator Op, DenseImportanceRange Importance>
 	void modify(Op op, Importance&& importance) {
 		if constexpr (std::is_same_v<Op, std::minus<>>) {
-			using std::ranges::all_of, std::views::zip;
-			assert(all_of(zip(this->Importance_, importance), std::ranges::greater_equal {}));
+			using std::ranges::all_of, std::views::zip_transform,
+				std::ranges::greater_equal, std::identity;
+			assert(all_of(zip_transform(greater_equal {}, this->Importance_, importance), identity {}));
 		}
 		using std::transform, std::execution::unseq, std::ranges::cbegin;
 		transform(unseq, this->Importance_.cbegin(), this->Importance_.cend(), cbegin(std::forward<Importance>(importance)),
@@ -355,5 +357,27 @@ public:
 	}
 
 };
+
+/**
+ * `Kn` is one of the valid splat kernel.
+ */
+template<typename Kn>
+concept Is = std::disjunction_v<std::is_same<Kn, Dense>, std::is_same<Kn, Sparse>>;
+
+/**
+ * @brief Convert a splat kernel of region importance to mask by normalisation.
+ *
+ * @tparam Kn Splat kernel type.
+ *
+ * @param kernel Splat kernel to be normalised.
+ * @param norm_factor Normalisation factor.
+ *
+ * @return A splat kernel of region mask.
+ */
+template<Is Kn>
+[[nodiscard]] constexpr std::ranges::common_range auto toMask(const Kn& kernel, const Core::Type::RegionMask norm_factor) noexcept {
+	using std::views::common;
+	return kernel.span() | SparseMatrixElement::Normalise(norm_factor) | common;
+}
 
 }

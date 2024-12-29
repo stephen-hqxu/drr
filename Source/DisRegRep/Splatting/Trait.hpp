@@ -1,63 +1,72 @@
 #pragma once
 
-#include "RegionMapFilter.hpp"
-#include "../Format.hpp"
+#include <DisRegRep/Container/SplatKernel.hpp>
+#include <DisRegRep/Container/SplattingCoefficient.hpp>
 
-#include <any>
-#include <concepts>
-#include <memory>
+#include <type_traits>
 
-//No trailing semicolon is allowed
-#define DEFINE_ALL_REGION_MAP_FILTER_ALLOC_FUNC(FILTER, SHORT_PREFIX) \
-REGION_MAP_FILTER_ALLOC_FUNC_DCDH_DEF(FILTER) { DisRegRep::FilterTrait::makeAllocation<SHORT_PREFIX##dcdh>(desc, output); } \
-REGION_MAP_FILTER_ALLOC_FUNC_DCSH_DEF(FILTER) { DisRegRep::FilterTrait::makeAllocation<SHORT_PREFIX##dcsh>(desc, output); } \
-REGION_MAP_FILTER_ALLOC_FUNC_SCSH_DEF(FILTER) { DisRegRep::FilterTrait::makeAllocation<SHORT_PREFIX##scsh>(desc, output); }
-#define DEFINE_ALL_REGION_MAP_FILTER_FILTER_FUNC_DEF(FILTER, SHORT_PREFIX) \
-REGION_MAP_FILTER_FILTER_FUNC_DCDH_DEF(FILTER) { return ::runFilter<SHORT_PREFIX##dcdh>(desc, output); } \
-REGION_MAP_FILTER_FILTER_FUNC_DCSH_DEF(FILTER) { return ::runFilter<SHORT_PREFIX##dcsh>(desc, output); } \
-REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(FILTER) { return ::runFilter<SHORT_PREFIX##scsh>(desc, output); }
+#include <cstdint>
 
-namespace DisRegRep {
+//Get a fully qualified splatting container trait.
+#define DRR_SPLATTING_TRAIT_CONTAINER(KERNEL, OUTPUT) \
+	DisRegRep::Splatting::Trait::Container< \
+		DisRegRep::Splatting::Trait::ContainerImplementation::KERNEL, \
+		DisRegRep::Splatting::Trait::ContainerImplementation::OUTPUT \
+	>
 
 /**
- * @brief Common traits for internal filter implementation.
-*/
-namespace FilterTrait {
+ * @brief Common traits of region feature splatting.
+ */
+namespace DisRegRep::Splatting::Trait {
 
 /**
- * @brief Each filter implementation should have its internal data structure that satisfies this trait.
-*/
-template<typename T>
-concept InternalFilterDataStructure = requires(T t, Format::SizeVec2 extent,
-	Format::Region_t region_count, Format::Radius_t radius) {
-	t.resize(extent, region_count, radius);
-	t.clear();
+ * @brief Identification for the data structure used to implement the container.
+ */
+enum class ContainerImplementation : std::uint8_t {
+	Dense = 0x00U, /**< Use dense matrix to implement the container. */
+	Sparse = 0xFFU /**< Use sparse matrix to implement the container. */
 };
 
 /**
- * @brief Attempt to make an allocation to the output histogram.
- * This allocation function makes allocation on demand, and only allocate memory if necessary.
- * 
- * @tparam T The type of internal data structure.
- * 
- * @param desc The launch description.
- * @param output The memory of allocated histogram.
-*/
-template<InternalFilterDataStructure T>
-void makeAllocation(const RegionMapFilter::LaunchDescription& desc, std::any& output) {
-	using T_sp = std::shared_ptr<T>;
+ * @brief Type traits of containers used during the computation of splatting coefficients.
+ *
+ * @tparam Kernel Container implementation of the splatting kernel.
+ * @tparam Output Container implementation of the computed coefficients.
+ */
+template<ContainerImplementation Kernel, ContainerImplementation Output>
+struct Container {
+private:
 
-	T* allocation;
-	//compatibility check
-	if (const auto* const filter_memory = std::any_cast<T_sp>(&output);
-		filter_memory) {
-		allocation = &**filter_memory;
-	} else {
-		allocation = &*output.emplace<T_sp>(std::make_shared_for_overwrite<T>());
-	}
-	allocation->resize(desc.Extent, desc.Map->RegionCount, desc.Radius);
-}
+	template<ContainerImplementation Impl, typename Dense, typename Sparse>
+	using SwitchContainer = std::conditional_t<Impl == ContainerImplementation::Dense, Dense, Sparse>;
 
-}
+public:
+
+	static constexpr ContainerImplementation KernelContainerImplementation = Kernel,
+		OutputContainerImplementation = Output;
+
+	using KernelType = SwitchContainer<
+		KernelContainerImplementation,
+		DisRegRep::Container::SplatKernel::Dense,
+		DisRegRep::Container::SplatKernel::Sparse
+	>; /**< Container type of the splatting kernel. */
+	using ImportanceOutputType = SwitchContainer<
+		OutputContainerImplementation,
+		DisRegRep::Container::SplattingCoefficient::DenseImportance,
+		DisRegRep::Container::SplattingCoefficient::SparseImportance
+	>; /**< Container type of the output that stores region importance. */
+	using MaskOutputType = SwitchContainer<
+		OutputContainerImplementation,
+		DisRegRep::Container::SplattingCoefficient::DenseMask,
+		DisRegRep::Container::SplattingCoefficient::SparseMask
+	>; /**< Container type of the output that stores region mask. */
+
+};
+
+/**
+ * `Tr` is a container trait.
+ */
+template<typename Tr>
+concept IsContainer = std::is_same_v<Tr, Container<Tr::KernelContainerImplementation, Tr::OutputContainerImplementation>>;
 
 }

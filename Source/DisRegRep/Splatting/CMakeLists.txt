@@ -1,10 +1,13 @@
 addMainComponent(
 HEADER
 	Base
+	BaseFullConvolution
 	FastFullOccupancy
+	ImplementationHelper
 	Trait
 	VanillaFullOccupancy
 SOURCE
+	BaseFullConvolution
 	FastFullOccupancy
 	VanillaFullOccupancy
 )

@@ -1,161 +1,145 @@
-#include <DisRegRep/Filter/FastRegionAreaFilter.hpp>
-#include <DisRegRep/Filter/FilterTrait.hpp>
+#include <DisRegRep/Splatting/FastFullOccupancy.hpp>
+#include <DisRegRep/Splatting/ImplementationHelper.hpp>
 
-#include <DisRegRep/Container/BlendHistogram.hpp>
-#include <DisRegRep/Container/HistogramCache.hpp>
-#include <DisRegRep/Maths/Arithmetic.hpp>
+#include <DisRegRep/Container/SplatKernel.hpp>
+#include <DisRegRep/Container/SplattingCoefficient.hpp>
 
-#include <ranges>
+#include <DisRegRep/Core/Arithmetic.hpp>
+
+#include <tuple>
+
+#include <algorithm>
 #include <functional>
+#include <iterator>
+#include <ranges>
 
 #include <utility>
+
+#include <concepts>
 #include <type_traits>
 
-using std::any, std::any_cast;
-using std::shared_ptr;
-using std::views::iota;
+#include <cassert>
 
-using namespace DisRegRep;
-namespace BH = BlendHistogram;
-namespace HC = HistogramCache;
-using Format::SSize_t, Format::SizeVec2, Format::Region_t, Format::Radius_t;
+namespace SpltKn = DisRegRep::Container::SplatKernel;
+using DisRegRep::Splatting::FastFullOccupancy;
+
+using std::tuple, std::make_tuple;
+using std::ranges::for_each,
+	std::views::take, std::views::drop, std::views::zip;
+using std::invoke, std::identity;
+
+using std::output_iterator;
+using std::ranges::forward_range,
+	std::ranges::range_difference_t, std::ranges::range_value_t, std::ranges::range_rvalue_reference_t;
+using std::invocable, std::invoke_result_t;
 
 namespace {
 
-//Calculate dimension for horizontal pass histogram.
-constexpr SizeVec2 calcHorizontalHistogramDimension(SizeVec2 histogram_size, const Radius_t radius) noexcept {
-	//Remember we have transposed x,y axes during filtering to improve cache locality.
-	//It does improve performance by around 10%, which is pretty decent :)
-	//Therefore the horizontal pass requires padding above and below.
-	histogram_size[0] += 2u * radius;
-	return histogram_size;
-}
+DRR_SPLATTING_DEFINE_SCRATCH_MEMORY {
+public:
 
-template<typename THist, typename TNormHist, typename TCache>
-struct ReABSAHistogram {
+	DRR_SPLATTING_SCRATCH_MEMORY_CONTAINER_TRAIT;
 
-	struct {
+	using ExtentType = DisRegRep::Container::SplattingCoefficient::Type::Dimension3Type;
 
-		THist Horizontal;
-		TNormHist Final;
+	typename ContainerTrait::KernelType Kernel;
+	typename ContainerTrait::ImportanceOutputType Horizontal;
+	typename ContainerTrait::MaskOutputType Vertical;
 
-	} Histogram;
-	TCache Cache;
-
-	void resize(const SizeVec2& histogram_size, const Region_t rc, const Radius_t radius) {
-		auto& [hori, final] = this->Histogram;
-		hori.resize(::calcHorizontalHistogramDimension(histogram_size, radius), rc);
-		final.resize(histogram_size, rc);
-		this->Cache.resize(rc);
-	}
-
-	void clear() {
-		auto& [hori, final] = this->Histogram;
-		hori.clear();
-		final.clear();
-		this->Cache.clear();
+	//(region count, width, height)
+	void resize(const tuple<ExtentType, FastFullOccupancy::SizeType> arg) {
+		auto [extent, padding] = arg;
+		this->Kernel.resize(extent.x);
+		this->Vertical.resize(extent);
+		extent.z += padding;
+		this->Horizontal.resize(extent);
 	}
 
 };
-using ReABSAdcdh = ReABSAHistogram<BH::Dense, BH::DenseNorm, HC::Dense>;
-using ReABSAdcsh = ReABSAHistogram<BH::SparseSorted, BH::SparseNormSorted, HC::Dense>;
-using ReABSAscsh = ReABSAHistogram<BH::SparseUnsorted, BH::SparseNormUnsorted, HC::Sparse>;
 
-template<typename THist>
-inline const auto& runFilter(const auto& desc, any& memory) {
-	const auto& [map_ptr, offset, extent, radius] = desc;
-	const RegionMap& map = *map_ptr;
+template<
+	forward_range ScanlineRange,
+	SpltKn::Is KernelMemory,
+	typename KernelMemoryProj,
+	forward_range Scanline = range_value_t<ScanlineRange>
+>
+void conv1d(
+	const ScanlineRange scanline_rg,
+	KernelMemory& kernel_memory,
+	output_iterator<invoke_result_t<KernelMemoryProj, const KernelMemory&>> auto out,
+	const range_difference_t<Scanline> d,
+	KernelMemoryProj kernel_memory_proj,
+	invocable<range_rvalue_reference_t<Scanline>> auto scanline_element_proj
+) {
+	for (const Scanline scanline : scanline_rg) [[likely]] {
+		kernel_memory.clear();
 
-	using std::as_const, Arithmetic::toSigned;
-	const auto [off_x, off_y] = toSigned(offset);
-	const auto [ext_x, ext_y] = toSigned(extent);
-	const auto sradius = toSigned(radius);
-	const auto sradius_2 = 2 * sradius;
+		//Compute the initial kernel in this scanline.
+		for_each(scanline | take(d), [&kernel_memory, &proj = scanline_element_proj](
+										 auto element) noexcept { kernel_memory.increment(invoke(proj, std::move(element))); });
+		*out++ = invoke(kernel_memory_proj, std::as_const(kernel_memory));
 
-	THist& fast_histogram = *any_cast<shared_ptr<THist>&>(memory);
-	fast_histogram.clear();
-
-	auto& [histogram, cache] = fast_histogram;
-	auto& [histogram_h, histogram_full] = histogram;
-
-	const auto copy_to_histogram_h = [&cache = as_const(cache), &histogram_h](const auto x, const auto y) -> void {
-		//remember axes are swapped
-		histogram_h(cache, y, x);
-	};
-	/********************
-	 * Horizontal pass
-	 *******************/
-	for (const auto y : iota(SSize_t { 0 }, ext_y + sradius_2)) {
-		//region map y value
-		const auto rg_y = off_y + y - sradius;
-		
-		cache.clear();
-		//compute initialise bin for the current row
-		for (const auto rx : iota(off_x - sradius, off_x + sradius + 1)) {
-			const Region_t region = map[rx, rg_y];
-			cache.increment(region);
-		}
-		copy_to_histogram_h(0, y);
-
-		//sliding kernel
-		for (const auto x : iota(SSize_t { 1 }, ext_x)) {
-			const auto rg_x = off_x + x;
-
-			const Region_t removing_region = map[rg_x - sradius - 1, rg_y],
-				adding_region = map[rg_x + sradius, rg_y];
-			cache.decrement(removing_region);
-			cache.increment(adding_region);
-
-			copy_to_histogram_h(x, y);
-		}
+		//Kernel sliding.
+		using std::ranges::transform;
+		//First element from the current kernel.
+		//The good thing is we don't need to calculate the size of decrement range and simply rely on zip view,
+		//	and we can avoid getting the size of the scanline and do annoying maths.
+		const auto decrement_rg = scanline;
+		//Last element from the next kernel.
+		const auto increment_rg = scanline | drop(d);
+		out = transform(zip(decrement_rg, increment_rg), out,
+			[&kernel_memory, &se_proj = scanline_element_proj, &km_proj = kernel_memory_proj](auto it) noexcept {
+				auto [dec_element, inc_element] = std::move(it);
+				//Decrement first is slightly more efficient,
+				//	in case of sparse kernel, it will need to remove empty elements and shift following elements ahead.
+				//Increment inserts at the back.
+				kernel_memory.decrement(invoke(se_proj, std::move(dec_element)));
+				kernel_memory.increment(invoke(se_proj, std::move(inc_element)));
+				return invoke(km_proj, std::as_const(kernel_memory));
+			}).out;
 	}
-
-	using std::plus, std::minus, std::is_same_v;
-	//For some reason the `as_const` here on horizontal histogram is very important,
-	//	benchmark shows up-to 16% of improvement in timing for using const v.s. non-const version.
-	const auto cache_op_histogram_h = [&cache, &histogram_h = as_const(histogram_h)]
-		<typename Op>(const auto x, const auto y, Op) -> void {
-		//basically add everything from existing histogram into the cache
-		//also remember that axes are swapped
-		const auto bin_view = histogram_h[y, x];
-		if constexpr (is_same_v<Op, plus<void>>) {
-			cache.increment(bin_view);
-		} else {
-			cache.decrement(bin_view);
-		}
-	};
-	const auto copy_to_output = [&cache = as_const(cache), &histogram_full,
-		kernel_area = 1.0 * Arithmetic::kernelArea(radius)](const auto x, const auto y) -> void {
-		histogram_full(cache, x, y, kernel_area);
-	};
-	const auto op_plus = plus { };
-	const auto op_minus = minus { };
-	/********************
-	 * Vertical pass
-	 ******************/
-	for (const auto x : iota(SSize_t { 0 }, ext_x)) {
-		//build initial accumulator
-		cache.clear();
-		for (const auto ry : iota(SSize_t { 0 }, sradius_2 + 1)) {
-			//this operator will first convert uint16_t to int, and compiler gives a warning
-			//this is fine, because int is representable
-			cache_op_histogram_h(x, ry, op_plus);
-		}
-		copy_to_output(x, 0);
-
-		//sliding kernel
-		for (const auto y : iota(SSize_t { 1 }, ext_y)) {
-			cache_op_histogram_h(x, y - 1, op_minus);
-			cache_op_histogram_h(x, y + sradius_2, op_plus);
-
-			copy_to_output(x, y);
-		}
-	}
-	
-	return histogram_full;
 }
 
 }
 
-DEFINE_ALL_REGION_MAP_FILTER_ALLOC_FUNC(FastRegionAreaFilter, ::ReABSA)
-DEFINE_ALL_REGION_MAP_FILTER_FILTER_FUNC_DEF(FastRegionAreaFilter, ::ReABSA)
+DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(FastFullOccupancy) {
+	this->validate(info);
+
+	using ScratchMemoryType = ScratchMemory<ContainerTrait>;
+	const auto [regionfield, offset, extent] = info;
+
+	const SizeType d = this->diametre(),
+		//Padding does not include the centre element (only the halo), so minus one from the diametre.
+		d_halo = d - 1U;
+
+	//Horizontal pass requires padding above and below the matrix.
+	auto& [kernel_memory, horizontal_memory, vertical_memory] = ImplementationHelper::allocate<ScratchMemoryType>(
+		memory, make_tuple(typename ScratchMemoryType::ExtentType(regionfield->RegionCount, extent), d_halo));
+
+	//Need to read the whole halo from regionfield.
+	//In horizontal scanline, this overlaps with the 1D kernel.
+	//In vertical scanline, this includes the padding.
+	conv1d(
+		regionfield->range2d() | Core::Arithmetic::SubRange2d(offset - this->Radius, extent + d_halo),
+		kernel_memory,
+		horizontal_memory.range().begin(),
+		d,
+		[](const auto& km) static constexpr noexcept { return km.span(); },
+		identity {}
+	);
+
+	//Repeat the same process in the vertical pass.
+	conv1d(
+		horizontal_memory.rangeTransposed2d(),
+		kernel_memory,
+		vertical_memory.range().begin(),
+		d,
+		[norm_factor = BaseFullConvolution::kernelNormalisationFactor(d)](
+			const auto& km) constexpr noexcept { return SpltKn::toMask(km, norm_factor); },
+		[](const auto proxy) static constexpr noexcept { return *proxy; }
+	);
+
+	return vertical_memory;
+}
+
+DRR_SPLATTING_DEFINE_FUNCTOR_ALL(FastFullOccupancy)

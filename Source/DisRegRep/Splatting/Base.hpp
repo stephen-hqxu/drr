@@ -1,139 +1,99 @@
 #pragma once
 
-#include "../Format.hpp"
-#include "../Container/RegionMap.hpp"
-#include "../Container/BlendHistogram.hpp"
+#include "Trait.hpp"
+
+#include <DisRegRep/Container/Regionfield.hpp>
+#include <DisRegRep/Container/SplattingCoefficient.hpp>
 
 #include <any>
 #include <string_view>
 
-#define DEFINE_TAG(NAME, HIST_TYPE) struct NAME { \
-	using HistogramType = BlendHistogram::HIST_TYPE; \
-	constexpr static std::string_view TagName = #NAME; \
-}
+#include <type_traits>
 
-//declare `tryAllocateHistogram`
-#define REGION_MAP_FILTER_ALLOC_FUNC(TAG) void tryAllocateHistogram(LaunchTag::TAG, \
-const LaunchDescription&, std::any&) const
-#define REGION_MAP_FILTER_ALLOC_FUNC_DCDH REGION_MAP_FILTER_ALLOC_FUNC(DCDH)
-#define REGION_MAP_FILTER_ALLOC_FUNC_DCSH REGION_MAP_FILTER_ALLOC_FUNC(DCSH)
-#define REGION_MAP_FILTER_ALLOC_FUNC_SCSH REGION_MAP_FILTER_ALLOC_FUNC(SCSH)
-#define REGION_MAP_FILTER_ALLOC_FUNC_ALL \
-REGION_MAP_FILTER_ALLOC_FUNC_DCDH override; \
-REGION_MAP_FILTER_ALLOC_FUNC_DCSH override; \
-REGION_MAP_FILTER_ALLOC_FUNC_SCSH override
+//Declare `DisRegRep::Splatting::Base::operator()`.
+#define DRR_SPLATTING_DECLARE_FUNCTOR(QUAL, KERNEL, OUTPUT) \
+	DRR_SPLATTING_TRAIT_CONTAINER(KERNEL, OUTPUT)::MaskOutputType& QUAL operator()( \
+		const DRR_SPLATTING_TRAIT_CONTAINER(KERNEL, OUTPUT) container_trait, \
+		const DisRegRep::Splatting::Base::InvokeInfo& info, \
+		std::any& memory \
+	) const
+//Do `DRR_SPLATTING_DECLARE_FUNCTOR` for every valid combination of container implementations.
+#define DRR_SPLATTING_DECLARE_FUNCTOR_ALL(PREFIX, SUFFIX) \
+	PREFIX DRR_SPLATTING_DECLARE_FUNCTOR(, Dense, Dense) SUFFIX; \
+	PREFIX DRR_SPLATTING_DECLARE_FUNCTOR(, Dense, Sparse) SUFFIX; \
+	PREFIX DRR_SPLATTING_DECLARE_FUNCTOR(, Sparse, Sparse) SUFFIX
+//Do `DRR_SPLATTING_DECLARE_FUNCTOR_ALL` with the correct fixes for splatting implementations.
+#define DRR_SPLATTING_DECLARE_FUNCTOR_ALL_IMPL DRR_SPLATTING_DECLARE_FUNCTOR_ALL(, override)
 
-//declare `operator()`
-#define REGION_MAP_FILTER_FILTER_FUNC(TAG) \
-const DisRegRep::RegionMapFilter::LaunchTag::TAG::HistogramType& operator()(LaunchTag::TAG, \
-const LaunchDescription&, std::any&) const
-#define REGION_MAP_FILTER_FILTER_FUNC_DCDH REGION_MAP_FILTER_FILTER_FUNC(DCDH)
-#define REGION_MAP_FILTER_FILTER_FUNC_DCSH REGION_MAP_FILTER_FILTER_FUNC(DCSH)
-#define REGION_MAP_FILTER_FILTER_FUNC_SCSH REGION_MAP_FILTER_FILTER_FUNC(SCSH)
-#define REGION_MAP_FILTER_FILTER_FUNC_ALL \
-REGION_MAP_FILTER_FILTER_FUNC_DCDH override; \
-REGION_MAP_FILTER_FILTER_FUNC_DCSH override; \
-REGION_MAP_FILTER_FILTER_FUNC_SCSH override
+//Declare a template function that delegates the call of splatting functor to here.
+//This declaration should only be made private in the derived class.
+#define DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR(FUNC_QUAL, QUAL) \
+	template<DisRegRep::Splatting::Trait::IsContainer ContainerTrait> \
+	FUNC_QUAL ContainerTrait::MaskOutputType& QUAL invokeImpl( \
+		const DisRegRep::Splatting::Base::InvokeInfo& info, \
+		std::any& memory \
+	) const
+//Do `DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR` with the correct qualifier for splatting implementations.
+#define DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR_IMPL DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR(,)
 
-//define `tryAllocateHistogram`
-#define REGION_MAP_FILTER_ALLOC_FUNC_DEF(CLASS, TAG) void CLASS::tryAllocateHistogram(LaunchTag::TAG, \
-const LaunchDescription& desc, any& output) const
-#define REGION_MAP_FILTER_ALLOC_FUNC_DCDH_DEF(CLASS) REGION_MAP_FILTER_ALLOC_FUNC_DEF(CLASS, DCDH)
-#define REGION_MAP_FILTER_ALLOC_FUNC_DCSH_DEF(CLASS) REGION_MAP_FILTER_ALLOC_FUNC_DEF(CLASS, DCSH)
-#define REGION_MAP_FILTER_ALLOC_FUNC_SCSH_DEF(CLASS) REGION_MAP_FILTER_ALLOC_FUNC_DEF(CLASS, SCSH)
-
-//define `operator()`
-#define REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, TAG) \
-const DisRegRep::RegionMapFilter::LaunchTag::TAG::HistogramType& CLASS::operator()(LaunchTag::TAG, \
-const LaunchDescription& desc, any& output) const
-#define REGION_MAP_FILTER_FILTER_FUNC_DCDH_DEF(CLASS) REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, DCDH)
-#define REGION_MAP_FILTER_FILTER_FUNC_DCSH_DEF(CLASS) REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, DCSH)
-#define REGION_MAP_FILTER_FILTER_FUNC_SCSH_DEF(CLASS) REGION_MAP_FILTER_FILTER_FUNC_DEF(CLASS, SCSH)
-
-namespace DisRegRep {
+namespace DisRegRep::Splatting {
 
 /**
- * @brief A fundamental class for different implementation of region map filters.
-*/
-class RegionMapFilter {
+ * @brief Provide a unified API for implementations of different approaches that compute the coefficient for region feature splatting,
+ * given a regionfield as input.
+ */
+class Base {
 public:
 
-	/**
-	 * @brief Tag to specify filter type.
-	*/
-	struct LaunchTag {
+	//The reason why we take the common of these two types is because we will be using this as 2D index to access these containers.
+	using DimensionType = std::common_type_t<
+		Container::Regionfield::DimensionType,
+		Container::SplattingCoefficient::Type::Dimension2Type
+	>;
 
-		DEFINE_TAG(DCDH, DenseNorm);/**< Dense cache dense histogram */
-		DEFINE_TAG(DCSH, SparseNormSorted);/**< Dense cache sparse histogram */
-		DEFINE_TAG(SCSH, SparseNormUnsorted);/**< Sparse cache sparse histogram */
+	struct InvokeInfo {
 
-	};
-
-	/**
-	 * @brief The configuration for filter launch.
-	*/
-	struct LaunchDescription {
-
-		const RegionMap* Map;/**< The region map. */
-		Format::SizeVec2 Offset,/**< Start offset. */
-			Extent;/**< The extent of covered area to be filtered. */
-		Format::Radius_t Radius;/**< Radius of filter. */
+		const Container::Regionfield* Regionfield;
+		DimensionType Offset, /**< Coordinate of the first point on `Regionfield` included for splatting. */
+			Extent; /**< Extent covering the area on `Regionfield` to be splatted. */
 
 	};
 
-	constexpr RegionMapFilter() noexcept = default;
+	constexpr Base() noexcept = default;
 
-	RegionMapFilter(const RegionMapFilter&) = delete;
+	Base(const Base&) = delete;
 
-	RegionMapFilter(RegionMapFilter&&) = delete;
+	Base(Base&&) = delete;
 
-	constexpr virtual ~RegionMapFilter() = default;
+	Base& operator=(const Base&) = delete;
 
-	/**
-	 * @brief Get a descriptive name of the filter implementation.
-	 * 
-	 * @return The filter name.
-	*/
-	constexpr virtual std::string_view name() const noexcept = 0;
+	Base& operator=(Base&&) = delete;
+
+	virtual constexpr ~Base() = default;
 
 	/**
-	 * @brief Try to allocate histogram memory for launch.
-	 * This function first detects if the given `output` is sufficient to hold result for filtering using `desc`.
-	 * If so, this function is a no-op; otherwise, memory will be allocated and placed to `output`.
-	 * This can help minimising the number of reallocation.
-	 * 
-	 * @param tag_dense Specify to allocate dense histogram.
-	 * @param tag_sparse Specify to allocate sparse histogram.
-	 * @param desc The filter launch description.
-	 * @param output The allocated memory.
-	*/
-	virtual REGION_MAP_FILTER_ALLOC_FUNC_DCDH = 0;
-	virtual REGION_MAP_FILTER_ALLOC_FUNC_DCSH = 0;
-	virtual REGION_MAP_FILTER_ALLOC_FUNC_SCSH = 0;
+	 * @brief Get a descriptive name of the splatting method.
+	 *
+	 * @return The splatting method name.
+	 */
+	[[nodiscard]] virtual constexpr std::string_view name() const noexcept = 0;
 
 	/**
-	 * @brief Perform filter on region map.
-	 * This filter does no boundary checking, application should adjust offset to handle padding.
-	 * 
-	 * @param tag_dense Specify to compute dense histogram.
-	 * @param tag_sparse Specify to compute sparse histogram.
-	 * @param desc The filter launch description.
-	 * @param memory The memory allocated for this launch.
-	 * The behaviour is undefined if this memory is not allocated with compatible launch description.
-	 * The compatibility depends on implementation of derived class.
-	 * 
-	 * @return The generated normalised blend histogram for this region map.
-	 * The memory is held by the `memory` input.
-	 * It's safe to cast away constness if the application wishes to.
-	 * However it is not recommended to destroys this memory
-	 *	if application needs to reuse this histogram for further filter tasks.
-	*/
-	virtual REGION_MAP_FILTER_FILTER_FUNC_DCDH = 0;
-	virtual REGION_MAP_FILTER_FILTER_FUNC_DCSH = 0;
-	virtual REGION_MAP_FILTER_FILTER_FUNC_SCSH = 0;
+	 * @brief Invoke to compute region feature splatting coefficients on a given regionfield. The splatting does not need to
+	 * perform boundary checking, and the application should adjust offset to handle potential out-of-bound access.
+	 *
+	 * @param container_trait Specify the container trait.
+	 * @param info The invoke info.
+	 * @param memory The scratch memory to be used in this invocation. The type is erased to allow implementation-defined behaviours.
+	 * It is recommended to use the same memory instance across different invocation with the same `container_trait` to enable memory
+	 * reuse. Otherwise, existing contents captured in `memory` will be destroyed if it does not contain a valid type used by the
+	 * specific implementation.
+	 *
+	 * @return The generated region mask for this regionfield whose memory is sourced from `memory`. It is safe to modify its contents
+	 * should the application wish to.
+	 */
+	DRR_SPLATTING_DECLARE_FUNCTOR_ALL(virtual, = 0);
 
 };
 
 }
-
-#undef DEFINE_TAG

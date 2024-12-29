@@ -94,17 +94,12 @@ typename BasicSparse<V>::SizeType BasicSparse<V>::sizeByte() const noexcept {
 template<typename V>
 void BasicSparse<V>::resize(const Dimension3Type dim) {
 	//Region count is unused in sparse matrix.
-	const auto dim_xy = Type::Dimension2Type(dim.y, dim.z);
-	DRR_ASSERT(glm::all(glm::greaterThan(dim_xy, Type::Dimension2Type(0U))));
+	const auto dim_wh = Type::Dimension2Type(dim.y, dim.z);
+	DRR_ASSERT(glm::all(glm::greaterThan(dim_wh, Type::Dimension2Type(0U))));
 
-	this->OffsetMapping = OffsetExtentType(dim_xy.x, dim_xy.y);
-	this->Offset.resize(this->sizeOffset());
-}
-
-template<typename V>
-void BasicSparse<V>::clear() {
+	this->OffsetMapping = OffsetExtentType(dim_wh.x, dim_wh.y);
 	//Initialise starting offset for each element in the new sparse matrix.
-	fill(this->Offset, OffsetType {});
+	this->Offset.resize(this->sizeOffset());
 	//We will be pushing new elements into the matrix, so need to clear the old ones.
 	this->SparseMatrix.clear();
 }

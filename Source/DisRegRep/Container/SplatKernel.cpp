@@ -12,8 +12,8 @@
 
 #include <cassert>
 
-namespace SplatKernel = DisRegRep::Container::SplatKernel;
-using SplatKernel::Dense, SplatKernel::Sparse, SplatKernel::Internal_::DenseKernelBinaryOperator,
+namespace SpltKn = DisRegRep::Container::SplatKernel;
+using SpltKn::Dense, SpltKn::Sparse, SpltKn::Internal_::DenseKernelBinaryOperator,
 	DisRegRep::Container::SparseMatrixElement::Importance, DisRegRep::Core::Type::RegionIdentifier;
 
 using std::for_each, std::execution::unseq,

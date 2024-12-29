@@ -6,8 +6,7 @@
 #include <DisRegRep/Core/XXHash.hpp>
 
 namespace XXHash = DisRegRep::Core::XXHash;
-using DisRegRep::RegionfieldGenerator::Base,
-	DisRegRep::Container::Regionfield;
+using DisRegRep::RegionfieldGenerator::Base;
 
 namespace {
 
@@ -19,8 +18,8 @@ XXHash::Secret Base::generateSecret() const {
 	return XXHash::generateSecret(DefaultSecret, this->Seed);
 }
 
-Base::UniformDistributionType Base::createDistribution(const Regionfield& regionfield) {
-	const Regionfield::ValueType region_count = regionfield.RegionCount;
+Base::UniformDistributionType Base::createDistribution(const Container::Regionfield& regionfield) {
+	const Container::Regionfield::ValueType region_count = regionfield.RegionCount;
 	DRR_ASSERT(region_count > 0U);
 
 	return UniformDistributionType(0U, region_count - 1U);

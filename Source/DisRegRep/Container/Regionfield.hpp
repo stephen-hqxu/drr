@@ -1,5 +1,6 @@
 #pragma once
 
+#include <DisRegRep/Core/Arithmetic.hpp>
 #include <DisRegRep/Core/Type.hpp>
 #include <DisRegRep/Core/UninitialisedAllocator.hpp>
 
@@ -8,6 +9,8 @@
 #include <mdspan>
 #include <span>
 #include <vector>
+
+#include <ranges>
 
 #include <cstdint>
 
@@ -104,6 +107,16 @@ public:
 	template<typename Self>
 	[[nodiscard]] constexpr auto span(this Self& self) noexcept {
 		return std::span(self.Data);
+	}
+
+	/**
+	 * @brief Form a 2D view on the regionfield matrix.
+	 * 
+	 * @return The 2D range of the regionfield.
+	 */
+	template<typename Self>
+	[[nodiscard]] constexpr std::ranges::view auto range2d(this Self& self) noexcept {
+		return self.Data | Core::Arithmetic::View2d(self.mapping().stride(1U));
 	}
 
 };

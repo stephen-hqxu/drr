@@ -1,5 +1,6 @@
 #pragma once
 
+#include <DisRegRep/Core/Arithmetic.hpp>
 #include <DisRegRep/Core/Range.hpp>
 #include <DisRegRep/Core/Type.hpp>
 
@@ -11,6 +12,7 @@
 #include <functional>
 #include <ranges>
 
+#include <concepts>
 #include <type_traits>
 #include <utility>
 
@@ -73,7 +75,8 @@ concept ImportanceRange = std::is_same_v<std::ranges::range_value_t<R>, Importan
 inline constexpr auto ToDense = Core::Range::RangeAdaptorClosure(
 	[]<std::ranges::input_range Sparse, typename Value = typename std::ranges::range_value_t<Sparse>::ValueType>
 	requires Is<std::ranges::range_value_t<Sparse>> && std::is_nothrow_copy_constructible_v<Value>
-	(Sparse&& sparse, const Core::Type::RegionIdentifier region_count, const Value fill_value = {}) static constexpr noexcept -> auto {
+	(Sparse&& sparse, const Core::Type::RegionIdentifier region_count, const Value fill_value = {}) static constexpr noexcept(
+		std::is_nothrow_move_constructible_v<std::ranges::const_iterator_t<Sparse>>) -> auto {
 		using Core::Range::ImpureTransform;
 		using ranges::views::iota;
 		using std::ranges::cbegin, std::ranges::cend,
@@ -119,7 +122,8 @@ inline constexpr auto ToDense = Core::Range::RangeAdaptorClosure(
 inline constexpr auto ToSparse =
 	Core::Range::RangeAdaptorClosure([]<std::ranges::viewable_range Dense, typename Value = std::ranges::range_value_t<Dense>>
 		requires std::ranges::input_range<Dense> && std::equality_comparable<Value> && std::is_nothrow_copy_constructible_v<Value>
-		(Dense&& dense, const Value ignore_value = {}) static constexpr noexcept -> auto {
+		(Dense&& dense, const Value ignore_value = {}) static constexpr noexcept(
+			std::is_nothrow_constructible_v<std::decay_t<Dense>, Dense>) -> auto {
 			using std::make_from_tuple;
 			using std::views::enumerate, std::views::filter, std::views::transform;
 			return std::forward<Dense>(dense)
@@ -127,5 +131,32 @@ inline constexpr auto ToSparse =
 				 | filter([ignore_value](const auto it) constexpr noexcept { return std::get<1U>(it) != ignore_value; })
 				 | transform([](const auto it) static constexpr noexcept { return make_from_tuple<Basic<Value>>(it); });
 		});
+
+/**
+ * @brief Normalise values in a range of dense or sparse matrix.
+ *
+ * @link Core::Arithmetic::Normalise
+ *
+ * @tparam Element Type of range of matrix element.
+ * @tparam Factor Type of normalising value.
+ *
+ * @param element Input range of matrix elements.
+ * @param factor Normalising factor.
+ *
+ * @return Normalised range.
+ */
+inline constexpr auto Normalise = Core::Range::RangeAdaptorClosure(
+	[]<std::ranges::viewable_range Element, std::floating_point Factor, typename Value = std::ranges::range_value_t<Element>>
+	requires(std::ranges::input_range<Element>
+				&& ((Is<Value> && std::is_convertible_v<typename Value::ValueType, Factor>) || std::is_convertible_v<Value, Factor>))
+	(Element&& element, const Factor factor) static constexpr noexcept(
+		std::is_nothrow_constructible_v<std::decay_t<Element>, Element>) -> auto {
+		using Core::Arithmetic::Normalise, std::views::transform, std::mem_fn;
+		if constexpr (Is<Value>) {
+			return std::forward<Element>(element) | transform(mem_fn(&Value::Value)) | Normalise(factor);
+		} else {
+			return Normalise(std::forward<Element>(element), factor);
+		}
+	});
 
 }

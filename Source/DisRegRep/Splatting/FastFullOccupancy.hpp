@@ -1,25 +1,34 @@
 #pragma once
 
-#include "RegionMapFilter.hpp"
+#include "BaseFullConvolution.hpp"
 
-namespace DisRegRep {
+#include <string_view>
+
+namespace DisRegRep::Splatting {
 
 /**
- * @brief Our proposed method for blazing-fast filtering the region map.
-*/
-class FastRegionAreaFilter final : public RegionMapFilter {
+ * @brief An improved version of the vanilla convolution-based splatting coefficient computer by region occupancy, with two commonly
+ * used convolution optimisations integrated, being separation and accumulation. Due to the use of separation and linear construction
+ * of the splatting coefficient matrix, the output is transposed.
+ *
+ * @link VanillaFullOccupancy
+ */
+class FastFullOccupancy final : public BaseFullConvolution {
+private:
+
+	DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR_IMPL;
+
 public:
 
-	constexpr FastRegionAreaFilter() noexcept = default;
+	constexpr FastFullOccupancy() noexcept = default;
 
-	constexpr ~FastRegionAreaFilter() override = default;
+	constexpr ~FastFullOccupancy() override = default;
 
-	constexpr std::string_view name() const noexcept override {
-		return "ReAB+SA";
+	[[nodiscard]] constexpr std::string_view name() const noexcept override {
+		return "F+";
 	}
 
-	REGION_MAP_FILTER_ALLOC_FUNC_ALL;
-	REGION_MAP_FILTER_FILTER_FUNC_ALL;
+	DRR_SPLATTING_DECLARE_FUNCTOR_ALL_IMPL;
 
 };
 

@@ -1,83 +1,74 @@
-#include <DisRegRep/Filter/OriginalRegionAreaFilter.hpp>
-#include <DisRegRep/Filter/FilterTrait.hpp>
+#include <DisRegRep/Splatting/VanillaFullOccupancy.hpp>
+#include <DisRegRep/Splatting/ImplementationHelper.hpp>
 
-#include <DisRegRep/Container/BlendHistogram.hpp>
-#include <DisRegRep/Container/HistogramCache.hpp>
-#include <DisRegRep/Maths/Arithmetic.hpp>
+#include <DisRegRep/Container/SplatKernel.hpp>
 
+#include <DisRegRep/Core/Arithmetic.hpp>
+
+#include <algorithm>
 #include <ranges>
 #include <utility>
 
-using std::any, std::any_cast;
-using std::shared_ptr;
-using std::views::iota;
+#include <cstddef>
 
-using namespace DisRegRep;
-namespace BH = BlendHistogram;
-namespace HC = HistogramCache;
-using Format::SSize_t, Format::SizeVec2, Format::Region_t, Format::Radius_t;
+using DisRegRep::Splatting::VanillaFullOccupancy;
+
+using std::views::cartesian_product, std::views::iota, std::views::transform,
+	std::views::take, std::views::join;
+using std::index_sequence;
 
 namespace {
 
-template<typename TNormHist, typename TCache>
-struct ReABHistogram {
+DRR_SPLATTING_DEFINE_SCRATCH_MEMORY {
+public:
 
-	TNormHist Histogram;
-	TCache Cache;
+	DRR_SPLATTING_SCRATCH_MEMORY_CONTAINER_TRAIT;
 
-	void resize(const SizeVec2& histogram_size, const Region_t rc, Radius_t) {
-		this->Histogram.resize(histogram_size, rc);
-		this->Cache.resize(rc);
-	}
+	using ExtentType = typename ContainerTrait::MaskOutputType::Dimension3Type;
 
-	void clear() {
-		this->Histogram.clear();
-		this->Cache.clear();
+	typename ContainerTrait::KernelType Kernel;
+	typename ContainerTrait::MaskOutputType Output;
+
+	//(region count, width, height)
+	void resize(const ExtentType extent) {
+		this->Kernel.resize(extent.x);
+		this->Output.resize(extent);
 	}
 
 };
-using ReABdcdh = ReABHistogram<BH::DenseNorm, HC::Dense>;
-using ReABdcsh = ReABHistogram<BH::SparseNormSorted, HC::Dense>;
-using ReABscsh = ReABHistogram<BH::SparseNormUnsorted, HC::Sparse>;
-
-template<typename THist>
-inline const auto& runFilter(const auto& desc, any& memory) {
-	const auto& [map_ptr, offset, extent, radius] = desc;
-	const RegionMap& map = *map_ptr;
-
-	using Arithmetic::toSigned;
-	const auto [off_x, off_y] = toSigned(offset);
-	const auto [ext_x, ext_y] = toSigned(extent);
-	const auto sradius = toSigned(radius);
-
-	THist& original_histogram = *any_cast<shared_ptr<THist>&>(memory);
-	original_histogram.clear();
-
-	auto& [histogram, cache] = original_histogram;
-
-	const auto copy_cache_to_histogram = [&histogram, &cache = std::as_const(cache),
-		kernel_area = 1.0 * Arithmetic::kernelArea(radius)](const auto x, const auto y) -> void {
-		histogram(cache, x, y, kernel_area);
-	};
-	for (const auto y : iota(SSize_t { 0 }, ext_y)) {
-		for (const auto x : iota(SSize_t { 0 }, ext_x)) {
-			cache.clear();
-
-			for (const auto ry : iota(off_y - sradius, off_y + sradius + 1)) {
-				for (const auto rx : iota(off_x - sradius, off_x + sradius + 1)) {
-					const Region_t region = map[x + rx, y + ry];
-					cache.increment(region);
-				}
-			}
-
-			//normalise bin and copy to output
-			copy_cache_to_histogram(x, y);
-		}
-	}
-	return histogram;
-}
 
 }
 
-DEFINE_ALL_REGION_MAP_FILTER_ALLOC_FUNC(OriginalRegionAreaFilter, ::ReAB)
-DEFINE_ALL_REGION_MAP_FILTER_FILTER_FUNC_DEF(OriginalRegionAreaFilter, ::ReAB)
+DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(VanillaFullOccupancy) {
+	this->validate(info);
+
+	using ScratchMemoryType = ScratchMemory<ContainerTrait>;
+	const auto [regionfield, offset, extent] = info;
+	auto& [kernel_memory, output_memory] = ImplementationHelper::allocate<ScratchMemoryType>(
+		memory, typename ScratchMemoryType::ExtentType(regionfield->RegionCount, extent));
+
+	const SizeType d = this->diametre();
+
+	const auto element_rg = [r = this->Radius, &offset, &extent]<std::size_t... I>(index_sequence<I...>) constexpr noexcept {
+		return cartesian_product(iota(offset[I] - r) | take(extent[I])...);
+	}(index_sequence<1U, 0U> {});
+	const auto kernel_rg = element_rg
+		| transform([d, rf_2d = regionfield->range2d()](const auto idx) constexpr noexcept {
+			const auto [y, x] = idx;
+			return rf_2d
+				| Core::Arithmetic::SubRange2d(DimensionType(x, y), DimensionType(d))
+				| join;
+		  });
+
+	using std::ranges::transform, std::ranges::for_each;
+	transform(kernel_rg, output_memory.range().begin(),
+		[&kernel_memory, norm_factor = BaseFullConvolution::kernelNormalisationFactor(d)](auto kernel) noexcept {
+			kernel_memory.clear();
+			for_each(std::move(kernel), [&kernel_memory](const auto region_id) noexcept { kernel_memory.increment(region_id); });
+			return Container::SplatKernel::toMask(kernel_memory, norm_factor);
+		});
+
+	return output_memory;
+}
+
+DRR_SPLATTING_DEFINE_FUNCTOR_ALL(VanillaFullOccupancy)

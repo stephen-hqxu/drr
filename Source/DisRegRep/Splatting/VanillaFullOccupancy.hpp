@@ -1,26 +1,30 @@
 #pragma once
 
-#include "RegionMapFilter.hpp"
+#include "BaseFullConvolution.hpp"
 
-namespace DisRegRep {
+#include <string_view>
+
+namespace DisRegRep::Splatting {
 
 /**
- * @brief A unoptimised implementation to filter the region map and generate a region descriptor blend histogram, which is
- * expected to be very slow.
+ * @brief A vanilla (a.k.a. naive or brute-force) convolution-based splatting coefficient computer by the occupancy of each region.
  */
-class OriginalRegionAreaFilter final : public RegionMapFilter {
+class VanillaFullOccupancy final : public BaseFullConvolution {
+private:
+
+	DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR_IMPL;
+
 public:
 
-	constexpr OriginalRegionAreaFilter() noexcept = default;
+	constexpr VanillaFullOccupancy() noexcept = default;
 
-	constexpr ~OriginalRegionAreaFilter() override = default;
+	constexpr ~VanillaFullOccupancy() override = default;
 
-	constexpr std::string_view name() const noexcept override {
-		return "ReAB";
+	[[nodiscard]] constexpr std::string_view name() const noexcept override {
+		return "F-";
 	}
 
-	REGION_MAP_FILTER_ALLOC_FUNC_ALL;
-	REGION_MAP_FILTER_FILTER_FUNC_ALL;
+	DRR_SPLATTING_DECLARE_FUNCTOR_ALL_IMPL;
 
 };
 
