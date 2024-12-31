@@ -37,7 +37,70 @@ find_package(yaml-cpp 0.8 CONFIG REQUIRED)
 
 add_subdirectory(External)
 
-###############################################################################
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/Output/bin)
+####################
+### Target Setup ###
+####################
+#[[
+Add source to target `DRR_CURRENT_TARGET`. Include directory of the source are set to `DRR_CURRENT_INCLUDE_DIR`.
 
-add_subdirectory(Source/${PROJECT_NAME})
+@param [HEADER <header>...] Target headers.
+@param [SOURCE <source>...] Target sources.
+]]
+function(drrTargetSource)
+	cmake_parse_arguments(TARGET "" "" "HEADER;SOURCE" ${ARGV})
+
+	list(TRANSFORM TARGET_HEADER APPEND .hpp)
+	list(TRANSFORM TARGET_SOURCE APPEND .cpp)
+
+	target_sources(${DRR_CURRENT_TARGET} PRIVATE
+	FILE_SET header
+		TYPE HEADERS
+		BASE_DIRS ${DRR_CURRENT_INCLUDE_DIR}
+		FILES ${TARGET_HEADER}
+	)
+	target_sources(${DRR_CURRENT_TARGET} PRIVATE ${TARGET_SOURCE})
+endfunction()
+
+#[[
+Setup source group for target `DRR_CURRENT_TARGET`.
+]]
+function(drrSourceGroup)
+	get_target_property(Source ${DRR_CURRENT_TARGET} SOURCES)
+	get_target_property(Header ${DRR_CURRENT_TARGET} HEADER_SET_header)
+
+	foreach(Category IN ITEMS Source Header)
+		source_group(
+			TREE ${CMAKE_CURRENT_SOURCE_DIR}
+			PREFIX ${Category}
+			FILES ${${Category}}
+		)
+	endforeach()
+endfunction()
+
+#[[
+Add a subdirectory and set required environments.
+
+@param <SourceDir> Directory of source to be added.
+@param [INCLUDE_NAMESPACE] Specify if the include directory should be scoped under project namespace.
+]]
+function(drrAddSubdirectory SourceDir)
+	cmake_parse_arguments(SUBDIR "INCLUDE_NAMESPACE" "" "" ${ARGN})
+
+	set(DRR_CURRENT_TARGET ${SourceDir})
+	cmake_path(APPEND CMAKE_CURRENT_SOURCE_DIR ${SourceDir} OUTPUT_VARIABLE DRR_CURRENT_INCLUDE_DIR)
+
+	if(SUBDIR_INCLUDE_NAMESPACE)
+		add_subdirectory(${SourceDir}/${PROJECT_NAME})
+	else()
+		add_subdirectory(${SourceDir})
+	endif()
+endfunction()
+
+###############################################################################
+set(DRR_OUTPUT_ROOT ${PROJECT_BINARY_DIR}/Output)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${DRR_OUTPUT_ROOT}/bin)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${DRR_OUTPUT_ROOT}/lib)
+
+set(CMAKE_STATIC_LIBRARY_PREFIX ${PROJECT_NAME}-)
+
+drrAddSubdirectory(Library INCLUDE_NAMESPACE)

@@ -2,6 +2,7 @@
 ### xxHash ###
 ##############
 add_library(xxHash INTERFACE)
+add_library(${PROJECT_NAME}::xxHash ALIAS xxHash)
 target_link_libraries(xxHash INTERFACE xxHash::xxhash)
 target_compile_definitions(xxHash INTERFACE
 	XXH_NO_STREAM

@@ -1,4 +1,4 @@
-addMainComponent(
+drrTargetSource(
 HEADER
 	Regionfield
 	SparseMatrixElement
