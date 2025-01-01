@@ -1,5 +1,6 @@
 drrTargetSource(
 HEADER
+	System/Error
 	System/Platform
 	System/ProcessThreadControl
 

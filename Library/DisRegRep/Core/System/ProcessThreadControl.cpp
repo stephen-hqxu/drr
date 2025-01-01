@@ -1,112 +1,128 @@
-#include <DisRegRep/Launch/System/ProcessThreadControl.hpp>
-#include <DisRegRep/Launch/System/Platform.hpp>
+#include <DisRegRep/Core/System/ProcessThreadControl.hpp>
+#include <DisRegRep/Core/System/Error.hpp>
+#include <DisRegRep/Core/System/Platform.hpp>
 
-#if DRR_PLATFORM_OS & (DRR_PLATFORM_OS_WIN32 | DRR_PLATFORM_OS_WIN64)
-#define USE_WINDOWS_PROCESS_THREAD
-#elif DRR_PLATFORM_OS & (DRR_PLATFORM_OS_CYGWIN | DRR_PLATFORM_OS_POSIX)
-#define USE_POSIX_PROCESS_THREAD
-#else
-#error Cannot control process and thread because the code is being compiled on a unsupported platform.
-#endif
+#include <DisRegRep/Core/Exception.hpp>
 
-#ifdef USE_WINDOWS_PROCESS_THREAD
-#define NOMINMAX
-#define WIN32_LEAN_AND_MEAN
+#include <range/v3/view/linear_distribute.hpp>
+
+//NOLINTBEGIN(misc-include-cleaner, misc-unused-using-decls)
+/**********
+ * OS API *
+ **********/
+#ifdef DRR_CORE_SYSTEM_PLATFORM_OS_WINDOWS
 #include <Windows.h>
+#include <WinBase.h>
 #include <processthreadsapi.h>
-#elifdef USE_POSIX_PROCESS_THREAD
+#elifdef DRR_CORE_SYSTEM_PLATFORM_OS_POSIX
+#define _GNU_SOURCE
 #include <pthread.h>
 #include <sched.h>
 #endif
+/*****************************************************************************/
+
+#include <array>
 
 #include <algorithm>
+#include <execution>
+#include <functional>
+#include <iterator>
+#include <ranges>
 
-#include <format>
-#include <source_location>
-#include <stdexcept>
-
-#include <limits>
-#include <type_traits>
-#include <utility>
+#include <thread>
 
 #include <cmath>
-#include <cerrno>
 
-using std::numeric_limits, std::to_underlying, std::underlying_type_t;
-using std::runtime_error, std::format, std::source_location;
+namespace ProcThrCtrl = DisRegRep::Core::System::ProcessThreadControl;
+using ProcThrCtrl::Priority, ProcThrCtrl::AffinityMask;
 
-using namespace DisRegRep;
-using ProcessThreadControl::Priority;
+using ranges::views::linear_distribute;
+
+using std::array;
+using std::for_each, std::execution::unseq,
+	std::ranges::find_if,
+	std::ranges::less_equal, std::bind_front,
+	std::ranges::distance;
+using std::views::iota, std::views::filter;
+using std::jthread;
+//NOLINTEND(misc-include-cleaner, misc-unused-using-decls)
 
 namespace {
 
-#ifdef USE_WINDOWS_PROCESS_THREAD
-HANDLE getNativeThread() noexcept {
+using HandleType = jthread::native_handle_type;
+
+#ifdef DRR_CORE_SYSTEM_PLATFORM_OS_WINDOWS
+[[nodiscard]] HandleType getCurrentThread() noexcept {
 	return GetCurrentThread();
 }
 
-void setNativeThreadPriority(HANDLE thread_handle, const Priority priority) {
-	constexpr static auto translate_priority = [](const Priority priority) constexpr static noexcept -> int {
-		using enum Priority;
-		switch (priority) {
-		case Min: return THREAD_PRIORITY_IDLE;
-		case Low: return THREAD_PRIORITY_LOWEST;
-		case Medium: return THREAD_PRIORITY_NORMAL;
-		case High: return THREAD_PRIORITY_HIGHEST;
-		//CONSIDER: Maybe to change the process class to real-time? But that requires root privilege.
-		case Max: return THREAD_PRIORITY_TIME_CRITICAL;
-		default: std::unreachable();
-		}
+void setNativeThreadPriority(const HandleType thread, const Priority priority) {
+	static constexpr array SystemPriorityProgression = {
+		THREAD_PRIORITY_IDLE,
+		THREAD_PRIORITY_LOWEST,
+		THREAD_PRIORITY_BELOW_NORMAL,
+		THREAD_PRIORITY_NORMAL,
+		THREAD_PRIORITY_ABOVE_NORMAL,
+		THREAD_PRIORITY_HIGHEST
 	};
-	if (!SetThreadPriority(thread_handle, translate_priority(priority))) {
-		throw runtime_error(format("Failed to set thread priority on Windows, given error code: {}.", GetLastError()));
-	}
-}
-//^^^ Windows ^^^ // vvv POSIX vvv
-#elifdef USE_POSIX_PROCESS_THREAD
-//REMINDER: The implementation for setting pthread priority is experimental.
-//I am not familiar with pthread and I don't have a working compiler on POSIX system to compile this codebase, so everything here
-//	untested; it may not even compile!
-void checkPthread(const int ret, const source_location src = source_location::current()) {
-	if (ret) {
-		throw runtime_error(
-			format("Error from pthread at line {} from function {}, given error code: {}.", src.line(), src.function_name(), ret));
-	}
+	static constexpr auto PriorityValueProgression =
+		linear_distribute(ProcThrCtrl::MinPriority, Priority { ProcThrCtrl::MaxPriority - 1 }, SystemPriorityProgression.size());
+
+	const auto priority_band_it = find_if(PriorityValueProgression, bind_front(less_equal {}, priority));
+	const int system_priority = priority_band_it == PriorityValueProgression.end()
+								  ? THREAD_PRIORITY_TIME_CRITICAL
+								  : SystemPriorityProgression[distance(PriorityValueProgression.begin(), priority_band_it)];
+	DRR_ASSERT_SYSTEM_ERROR_WINDOWS(SetThreadPriority(thread, system_priority));
 }
 
-pthread_t getNativeThread() noexcept {
+void setNativeThreadAffinityMask(const HandleType thread, const AffinityMask affinity_mask) {
+	DRR_ASSERT_SYSTEM_ERROR_WINDOWS(SetThreadAffinityMask(thread, affinity_mask.to_ullong()));
+}
+#elifdef DRR_CORE_SYSTEM_PLATFORM_OS_POSIX
+//^^^ Windows ^^^ // vvv POSIX vvv
+[[nodiscard]] HandleType getCurrentThread() noexcept {
 	return pthread_self();
 }
 
-void setNativeThreadPriority(const pthread_t pt, const Priority priority) {
-	constexpr static auto translate_priority = [](const Priority priority, const int min,
-												   const int max) static noexcept -> int {
-		const float ratio = 1.0F * to_underlying(priority) / numeric_limits<underlying_type_t<Priority>>::max(),
-			distance = max - min,
-			rescaled = ratio * distance;
-		return std::clamp(static_cast<int>(std::round(min + rescaled)), min, max);
-	};
-	//CONSIDER: Instead of overwriting the policy, get the current policy of the given thread.
-	constexpr static int policy = SCHED_OTHER;
+void setNativeThreadPriority(const HandleType thread, const Priority priority) {
+	int policy;
+	sched_param param;
+	DRR_ASSERT_SYSTEM_ERROR_POSIX(pthread_getschedparam(thread, &policy, &param));
+	(void)param;
 
-	const int prio_min = sched_get_priority_min(policy), prio_max = sched_get_priority_max(policy);
-	if (prio_min < 0 || prio_max < 0) {
-		checkPthread(errno);
-	}
+	const int priority_min = sched_get_priority_min(policy),
+		priority_max = sched_get_priority_max(policy);
+	DRR_ASSERT_SYSTEM_ERROR_POSIX_ERRNO(priority_min);
+	DRR_ASSERT_SYSTEM_ERROR_POSIX_ERRNO(priority_max);
 
-	const sched_param param {
-		.sched_priority = translate_priority(priority, prio_min, prio_max)
-	};
-	checkPthread(pthread_setschedparam(pt, policy, &param));
+	const float norm_priority = (1.0F * priority - ProcThrCtrl::MinPriority) / (ProcThrCtrl::MaxPriority - ProcThrCtrl::MinPriority);
+	DRR_ASSERT_SYSTEM_ERROR_POSIX(pthread_setschedprio(thread, std::lerp(priority_min, priority_max, norm_priority)));
+}
+
+void setNativeThreadAffinityMask(const HandleType thread, const AffinityMask affinity_mask) {
+	cpu_set_t set;
+	CPU_ZERO(&set);
+
+	auto set_mask =
+		iota(0UZ, affinity_mask.size()) | filter([affinity_mask](const auto i) constexpr noexcept { return affinity_mask.test(i); });
+	for_each(unseq, set_mask.cbegin(), set_mask.cend(), [&set](const auto i) noexcept { CPU_SET(i, &set); });
+
+	DRR_ASSERT_SYSTEM_ERROR_POSIX(pthread_setaffinity_np(thread, sizeof(set), &set));
 }
 #endif
+//^^^ POSIX ^^^ // vvv Platform Independent vvv
+[[nodiscard]] HandleType getNativeHandle(jthread* const thread) noexcept {
+	return thread ? thread->native_handle() : getCurrentThread();
+}
 
 }
 
-void ProcessThreadControl::setPriority(std::jthread& thread, const Priority priority) {
-	setNativeThreadPriority(thread.native_handle(), priority);
+void ProcThrCtrl::setPriority(const Priority priority, jthread* const thread) {
+	DRR_ASSERT(priority >= ProcThrCtrl::MinPriority && priority <= ProcThrCtrl::MaxPriority);
+	setNativeThreadPriority(getNativeHandle(thread), priority);
 }
 
-void ProcessThreadControl::setPriority(const Priority priority) {
-	setNativeThreadPriority(getNativeThread(), priority);
+void ProcThrCtrl::setAffinityMask(const AffinityMask affinity_mask, jthread* const thread) {
+	DRR_ASSERT(jthread::hardware_concurrency() <= affinity_mask.size());
+	setNativeThreadAffinityMask(getNativeHandle(thread), affinity_mask);
 }
