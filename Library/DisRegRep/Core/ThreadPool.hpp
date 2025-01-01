@@ -2,146 +2,193 @@
 
 #include "System/ProcessThreadControl.hpp"
 
+#include <queue>
+#include <vector>
+
 #include <functional>
 #include <memory>
-#include <queue>
 
 #include <condition_variable>
 #include <future>
 #include <mutex>
 #include <thread>
 
-#include <concepts>
-#include <exception>
-#include <type_traits>
 #include <utility>
 
-#include <cstddef>
+#include <concepts>
+#include <type_traits>
 
-namespace DisRegRep {
+#include <exception>
+
+#include <cstdint>
+
+namespace DisRegRep::Core {
 
 /**
  * @brief A pool of reusable threads.
-*/
+ */
 class ThreadPool {
 public:
 
+	using SizeType = std::uint_fast8_t;
+
 	/**
-	 * @brief Additional information regarding the thread used to execute the job.
-	*/
+	 * @brief Additional information regarding the thread assigned for executing the task.
+	 */
 	struct ThreadInfo {
 
-		size_t ThreadIndex;/**< Index of the thread within the thread pool. */
+		SizeType Index; /**< Index of the thread within the living thread pool. */
 
 	};
+
+	//Type of `ThreadInfo` when passed through the task.
+	using ThreadInfoArgumentType = std::add_lvalue_reference_t<std::add_const_t<ThreadInfo>>;
 
 private:
 
 	/**
-	 * @brief A type-erased job submitted by the application.
+	 * @brief A type-erased task submitted by the application.
 	 */
-	class JobEntry {
+	class AnyTask {
 	public:
 
-		constexpr JobEntry() noexcept = default;
+		constexpr AnyTask() noexcept = default;
 
-		constexpr virtual ~JobEntry() = default;
+		AnyTask(const AnyTask&) = delete;
+
+		AnyTask(AnyTask&&) = delete;
+
+		AnyTask& operator=(const AnyTask&) = delete;
+
+		AnyTask& operator=(AnyTask&&) = delete;
+
+		virtual constexpr ~AnyTask() = default;
 
 		/**
-		 * @brief Execute the job.
+		 * @brief Execute the task.
 		 *
 		 * @param thread_info The information regarding the executing thread.
 		 */
-		virtual void execute(const ThreadInfo&) = 0;
+		virtual void operator()(ThreadInfoArgumentType) = 0;
 
 	};
 
 	/**
-	 * @brief The job entry submitted by the user.
+	 * @brief A task submitted by the application.
 	 *
-	 * @tparam Func The function to be executed.
+	 * @tparam F Type of function represents the task.
 	 */
-	template<typename Func>
-	class UserJobEntry final : public JobEntry {
+	template<std::invocable<ThreadInfoArgumentType> F>
+	class ApplicationTask final : public AnyTask {
 	public:
 
-		using return_type = std::invoke_result_t<Func, ThreadInfo>;
+		using TaskType = F;
+		using ReturnType = std::invoke_result_t<TaskType, ThreadInfoArgumentType>;
 
-		std::promise<return_type> Promise;
-		Func Function;
+		TaskType Task;
+		std::promise<ReturnType> Promise;
 
 		/**
-		 * @brief Initialise a user job entry.
+		 * @brief Create an application task.
 		 *
-		 * @tparam T The type of the wrapped function.
-		 * @param func The wrapped function that takes a thread info as the first argument.
+		 * @param task The wrapped function that takes a thread info as the first argument.
 		 */
-		template<std::same_as<Func> T>
-		UserJobEntry(T&& func) noexcept(std::is_nothrow_move_constructible_v<Func>) : Function(std::forward<T>(func)) { }
+		explicit ApplicationTask(TaskType&& task) : Task(std::move(task)) { }
 
-		~UserJobEntry() override = default;
+		~ApplicationTask() override = default;
 
-		void execute(const ThreadInfo& thread_info) override {
-			using std::invoke;
+		void operator()(ThreadInfoArgumentType thread_info) override {
+			using std::invoke, std::is_same_v, std::current_exception;
 			try {
-				if constexpr (std::is_same_v<return_type, void>) {
-					invoke(this->Function, thread_info);
+				if constexpr (is_same_v<ReturnType, void>) {
+					invoke(this->Task, thread_info);
 					this->Promise.set_value();
 				} else {
-					this->Promise.set_value(invoke(this->Function, thread_info));
+					this->Promise.set_value(invoke(this->Task, thread_info));
 				}
 			} catch (...) {
-				this->Promise.set_exception(std::current_exception());
+				this->Promise.set_exception(current_exception());
 			}
 		}
 
 	};
 
-	std::queue<std::unique_ptr<JobEntry>> Job;
+	std::queue<std::unique_ptr<AnyTask>> TaskQueue;
 
 	std::mutex Mutex;
 	std::condition_variable Signal;
 
-	std::unique_ptr<std::jthread[]> Worker;
-	size_t WorkerCount;
+	std::vector<std::jthread> Thread;
 
 public:
 
 	/**
 	 * @brief Create a thread pool.
-	 * 
-	 * @param thread_count The number of thread to hold.
-	*/
-	explicit ThreadPool(size_t);
+	 *
+	 * @param size Number of thread to be allocated to the pool.
+	 */
+	ThreadPool(SizeType);
+
+	ThreadPool(const ThreadPool&) = delete;
 
 	ThreadPool(ThreadPool&&) = delete;
+
+	ThreadPool& operator=(const ThreadPool&) = delete;
 
 	ThreadPool& operator=(ThreadPool&&) = delete;
 
 	~ThreadPool();
 
 	/**
-	 * @brief Set the priority for all threads in the thread pool.
+	 * @brief Get thread pool size.
 	 *
-	 * @param priority The priority value for all threads.
+	 * @return Number of thread in the pool.
 	 */
-	void setPriority(ProcessThreadControl::Priority) const;
+	[[nodiscard]] constexpr SizeType size() const noexcept {
+		return this->Thread.size();
+	}
 
-	//Enqueue a function for thread pool execution.
-	//The first argument in the function receives a thread info structure.
-	template<typename Func, typename... Arg, typename Ret = std::invoke_result_t<Func, ThreadInfo, Arg...>>
-	[[nodiscard]] std::future<Ret> enqueue(Func&& func, Arg&&... arg) {
-		using namespace std::placeholders;
+	/**
+	 * @brief Set priority of all threads in the pool.
+	 *
+	 * @param priority Priority value set to.
+	 */
+	void setPriority(System::ProcessThreadControl::Priority);
 
-		std::future<Ret> future;
+	/**
+	 * @brief Set affinity mask of all threads in the pool.
+	 *
+	 * @param affinity_mask Affinity mask set to.
+	 */
+	void setAffinityMask(System::ProcessThreadControl::AffinityMask);
+
+	/**
+	 * @brief Enqueue an executable task to the thread pool.
+	 *
+	 * @tparam Arg Argument type of the task function.
+	 * @tparam F Task function type.
+	 *
+	 * @param f Function that represents the task. The first argument receives info of the executing thread.
+	 * @param arg Remaining arguments used for calling the function.
+	 *
+	 * @return Future.
+	 */
+	template<
+		typename... Arg,
+		std::invocable<ThreadInfoArgumentType, Arg...> F,
+		typename ReturnType = std::invoke_result_t<F, ThreadInfoArgumentType, Arg...>
+	>
+	requires std::is_move_constructible_v<F>
+	[[nodiscard]] std::future<ReturnType> enqueue(F&& f, Arg&&... arg) {
+		using std::make_unique, std::bind_back;
+		using std::unique_lock;
+
+		auto bound = bind_back(std::forward<F>(f), std::forward<Arg>(arg)...);
+		auto task = make_unique<ApplicationTask<decltype(bound)>>(std::move(bound));
+		auto future = task->Promise.get_future();
 		{
-			const auto lock = std::unique_lock(this->Mutex);
-
-			auto user_job = std::make_unique<
-				UserJobEntry<decltype(std::bind(std::forward<Func>(func), _1, std::forward<Arg>(arg)...))>
-			>(std::bind(std::forward<Func>(func), _1, std::forward<Arg>(arg)...));
-			future = user_job->Promise.get_future();
-			this->Job.emplace(std::move(user_job));
+			const auto lock = unique_lock(this->Mutex);
+			this->TaskQueue.push(std::move(task));
 		}
 		this->Signal.notify_one();
 		return future;

@@ -3,6 +3,8 @@ HEADER
 	System/Error
 	System/Platform
 	System/ProcessThreadControl
+	System/ProcessThreadControlPosix
+	System/ProcessThreadControlWindows
 
 	Arithmetic
 	Exception
