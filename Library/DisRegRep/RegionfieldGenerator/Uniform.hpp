@@ -22,7 +22,7 @@ public:
 		return "Uniform";
 	}
 
-	void operator()(Container::Regionfield&) override;
+	void operator()(Container::Regionfield&) const override;
 
 };
 

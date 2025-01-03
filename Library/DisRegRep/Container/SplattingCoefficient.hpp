@@ -72,18 +72,6 @@ class BasicSparse;
 using SparseImportance = BasicSparse<Core::Type::RegionImportance>; /**< Sparse region importance. */
 using SparseMask = BasicSparse<Core::Type::RegionMask>; /**< Sparse region mask. */
 
-//Compare if the splatting coefficient are equivalent in value regardless of storage format.
-template<typename V>
-[[nodiscard]] bool operator==(const BasicDense<V>&, const BasicSparse<V>&);
-template<typename V>
-[[nodiscard]] bool operator==(const BasicSparse<V>&, const BasicDense<V>&);
-
-#define FRIEND_DENSE_EQ_SPARSE \
-	template<typename W> \
-	friend bool operator==(const BasicDense<W>&, const BasicSparse<W>&); \
-	template<typename W> \
-	friend bool operator==(const BasicSparse<W>&, const BasicDense<W>&)
-
 template<typename V>
 class BasicDense {
 public:
@@ -187,10 +175,6 @@ public:
 	constexpr BasicDense& operator=(BasicDense&&) noexcept = default;
 
 	constexpr ~BasicDense() = default;
-
-	[[nodiscard]] bool operator==(const BasicDense&) const;
-
-	FRIEND_DENSE_EQ_SPARSE;
 
 	/**
 	 * @brief Get the size of the dense matrix in bytes.
@@ -374,10 +358,6 @@ public:
 
 	constexpr ~BasicSparse() = default;
 
-	[[nodiscard]] bool operator==(const BasicSparse&) const;
-
-	FRIEND_DENSE_EQ_SPARSE;
-
 	/**
 	 * @brief Sort the values of each element in the sparse matrix, in ascending order of region identifier.
 	 *
@@ -438,7 +418,5 @@ public:
 	}
 
 };
-
-#undef FRIEND_DENSE_EQ_SPARSE
 
 }

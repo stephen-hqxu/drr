@@ -1,5 +1,4 @@
 #include <DisRegRep/Container/SplattingCoefficient.hpp>
-#include <DisRegRep/Container/SparseMatrixElement.hpp>
 
 #include <DisRegRep/Core/Exception.hpp>
 #include <DisRegRep/Core/Type.hpp>
@@ -7,46 +6,19 @@
 #include <glm/vector_relational.hpp>
 
 #include <span>
-#include <tuple>
 
 #include <algorithm>
 #include <execution>
 #include <functional>
-#include <ranges>
 
 namespace SpltCoef = DisRegRep::Container::SplattingCoefficient;
 using SpltCoef::BasicDense, SpltCoef::BasicSparse;
 using DisRegRep::Core::Type::RegionImportance, DisRegRep::Core::Type::RegionMask;
 
-using std::span,
-	std::tie, std::apply;
-using std::equal, std::for_each, std::all_of,
-	std::ranges::fill,
-	std::execution::par_unseq, std::execution::unseq,
-	std::views::zip_transform;
-using std::mem_fn, std::identity;
-
-template<typename V>
-bool SpltCoef::operator==(const BasicDense<V>& dense, const BasicSparse<V>& sparse) {
-	DRR_ASSERT(sparse.isSorted());
-
-	const auto compare_rg = zip_transform(
-		[](const auto dense_proxy, const auto sparse_proxy) static constexpr {
-			return std::ranges::equal(*dense_proxy | SparseMatrixElement::ToSparse, *sparse_proxy);
-		},
-		dense.range(), sparse.range());
-	return all_of(par_unseq, compare_rg.cbegin(), compare_rg.cend(), identity {});
-}
-
-template<typename V>
-bool SpltCoef::operator==(const BasicSparse<V>& sparse, const BasicDense<V>& dense) {
-	return dense == sparse;
-}
-
-template<typename V>
-bool BasicDense<V>::operator==(const BasicDense& dense) const {
-	return equal(unseq, this->DenseMatrix.cbegin(), this->DenseMatrix.cend(), dense.DenseMatrix.cbegin(), dense.DenseMatrix.cend());
-}
+using std::span;
+using std::for_each, std::all_of,
+	std::execution::par_unseq;
+using std::mem_fn;
 
 template<typename V>
 typename BasicDense<V>::SizeType BasicDense<V>::sizeByte() const noexcept {
@@ -59,15 +31,6 @@ void BasicDense<V>::resize(const Dimension3Type dim) {
 
 	this->Mapping = ExtentType(dim.x, dim.y, dim.z);
 	this->DenseMatrix.resize(this->Mapping.required_span_size());
-}
-
-template<typename V>
-bool BasicSparse<V>::operator==(const BasicSparse& sparse) const {
-	DRR_ASSERT(apply([](const auto&... matrix) static { return (matrix.isSorted() && ...); }, tie(*this, sparse)));
-
-	return equal(unseq, this->Offset.cbegin(), this->Offset.cend(), sparse.Offset.cbegin(), sparse.Offset.cend())
-		&& equal(
-			unseq, this->SparseMatrix.cbegin(), this->SparseMatrix.cend(), sparse.SparseMatrix.cbegin(), sparse.SparseMatrix.cend());
 }
 
 template<typename V>
@@ -111,9 +74,3 @@ INSTANTIATE_DENSE(RegionMask);
 #define INSTANTIATE_SPARSE(TYPE) template class DisRegRep::Container::SplattingCoefficient::BasicSparse<TYPE>
 INSTANTIATE_SPARSE(RegionImportance);
 INSTANTIATE_SPARSE(RegionMask);
-
-#define INSTANTIATE_EQ(TYPE) \
-	template bool DisRegRep::Container::SplattingCoefficient::operator==<TYPE>(const BasicDense<TYPE>&, const BasicSparse<TYPE>&); \
-	template bool DisRegRep::Container::SplattingCoefficient::operator==<TYPE>(const BasicSparse<TYPE>&, const BasicDense<TYPE>&)
-INSTANTIATE_EQ(RegionImportance);
-INSTANTIATE_EQ(RegionMask);

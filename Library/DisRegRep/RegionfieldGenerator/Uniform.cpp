@@ -15,7 +15,7 @@ using std::transform, std::execution::par_unseq,
 	std::views::iota, std::views::common;
 using std::as_const;
 
-void Uniform::operator()(Container::Regionfield& regionfield) {
+void Uniform::operator()(Container::Regionfield& regionfield) const {
 	const auto span = regionfield.span();
 	const auto idx_rg = iota(Container::Regionfield::IndexType {}, span.size()) | common;
 	transform(par_unseq, idx_rg.begin(), idx_rg.end(), span.begin(),

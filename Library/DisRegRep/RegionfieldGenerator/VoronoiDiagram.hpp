@@ -26,7 +26,7 @@ public:
 		return "Voronoi";
 	}
 
-	void operator()(Container::Regionfield&) override;
+	void operator()(Container::Regionfield&) const override;
 
 };
 

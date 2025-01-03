@@ -62,6 +62,11 @@ public:
 	constexpr ~Regionfield() = default;
 
 	/**
+	 * @brief Transpose regionfield matrix.
+	 */
+	void transpose();
+
+	/**
 	 * @brief Resize the regionfield matrix. After this call returns, all existing contents become undefined regardless of whether
 	 * reallocation took place. This function provides a performance benefits of reusing existing memory whenever possible.
 	 *

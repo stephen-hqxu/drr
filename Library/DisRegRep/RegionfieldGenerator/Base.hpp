@@ -67,7 +67,7 @@ public:
 	 *
 	 * @param[Out] regionfield A regionfield matrix where generated contents are stored.
 	 */
-	virtual void operator()(Container::Regionfield&) = 0;
+	virtual void operator()(Container::Regionfield&) const = 0;
 
 };
 

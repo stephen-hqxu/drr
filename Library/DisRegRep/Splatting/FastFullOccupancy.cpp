@@ -30,7 +30,7 @@ using std::invoke, std::identity;
 
 using std::output_iterator;
 using std::ranges::forward_range,
-	std::ranges::range_difference_t, std::ranges::range_value_t, std::ranges::range_rvalue_reference_t;
+	std::ranges::range_difference_t, std::ranges::range_value_t, std::ranges::range_const_reference_t;
 using std::invocable, std::invoke_result_t;
 
 namespace {
@@ -69,14 +69,14 @@ void conv1d(
 	output_iterator<invoke_result_t<KernelMemoryProj, const KernelMemory&>> auto out,
 	const range_difference_t<Scanline> d,
 	KernelMemoryProj kernel_memory_proj,
-	invocable<range_rvalue_reference_t<Scanline>> auto scanline_element_proj
+	invocable<range_const_reference_t<Scanline>> auto scanline_element_proj
 ) {
 	for (const Scanline scanline : scanline_rg) [[likely]] {
 		kernel_memory.clear();
 
 		//Compute the initial kernel in this scanline.
 		for_each(scanline | take(d), [&kernel_memory, &proj = scanline_element_proj](
-										 auto element) noexcept { kernel_memory.increment(invoke(proj, std::move(element))); });
+										 const auto element) noexcept { kernel_memory.increment(invoke(proj, element)); });
 		*out++ = invoke(kernel_memory_proj, std::as_const(kernel_memory));
 
 		//Kernel sliding.
@@ -88,13 +88,13 @@ void conv1d(
 		//Last element from the next kernel.
 		const auto increment_rg = scanline | drop(d);
 		out = transform(zip(decrement_rg, increment_rg), out,
-			[&kernel_memory, &se_proj = scanline_element_proj, &km_proj = kernel_memory_proj](auto it) noexcept {
-				auto [dec_element, inc_element] = std::move(it);
+			[&kernel_memory, &se_proj = scanline_element_proj, &km_proj = kernel_memory_proj](const auto it) noexcept {
+				const auto& [dec_element, inc_element] = it;
 				//Decrement first is slightly more efficient,
 				//	in case of sparse kernel, it will need to remove empty elements and shift following elements ahead.
 				//Increment inserts at the back.
-				kernel_memory.decrement(invoke(se_proj, std::move(dec_element)));
-				kernel_memory.increment(invoke(se_proj, std::move(inc_element)));
+				kernel_memory.decrement(invoke(se_proj, dec_element));
+				kernel_memory.increment(invoke(se_proj, inc_element));
 				return invoke(km_proj, std::as_const(kernel_memory));
 			}).out;
 	}
@@ -136,7 +136,7 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(FastFullOccupancy) {
 		d,
 		[norm_factor = BaseFullConvolution::kernelNormalisationFactor(d)](
 			const auto& km) constexpr noexcept { return SpltKn::toMask(km, norm_factor); },
-		[](const auto proxy) static constexpr noexcept { return *proxy; }
+		[](const auto& proxy) static constexpr noexcept { return *proxy; }
 	);
 
 	return vertical_memory;

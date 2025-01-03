@@ -17,9 +17,10 @@
 #include <span>
 #include <vector>
 
+#include <tuple>
+
 #include <algorithm>
 #include <execution>
-#include <functional>
 #include <iterator>
 #include <ranges>
 
@@ -34,13 +35,13 @@ using glm::u16vec2, glm::f32vec2;
 using ranges::to, ranges::views::generate_n;
 
 using std::array, std::span, std::vector;
-using std::execution::par_unseq;
+using std::apply;
 using std::ranges::min_element, std::ranges::distance,
-	std::apply;
-using std::views::iota, std::views::cartesian_product;
+	std::execution::par_unseq,
+	std::views::iota, std::views::cartesian_product;
 using std::index_sequence;
 
-void VoronoiDiagram::operator()(Container::Regionfield& regionfield) {
+void VoronoiDiagram::operator()(Container::Regionfield& regionfield) const {
 	DRR_ASSERT(this->CentroidCount > 0U);
 	const span rf_span = regionfield.span();
 	const Container::Regionfield::ExtentType& rf_extent = regionfield.mapping().extents();
