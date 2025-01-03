@@ -12,11 +12,10 @@ target_compile_definitions(xxHash INTERFACE
 # Export macro should only be defined during compilation and is not needed by the application.
 # Need to manually replace export with import macro to sure correct symbol visibility.
 get_target_property(xxHashDef xxHash::xxhash INTERFACE_COMPILE_DEFINITIONS)
-list(FIND xxHashDef XXH_EXPORT xxHashExportIndex)
-if(NOT ${xxHashExportIndex} EQUAL -1)
-	# It's a shared library build.
-	list(REMOVE_AT xxHashDef ${xxHashExportIndex})
-	list(APPEND xxHashDef XXH_IMPORT)
-
-	set_target_properties(xxHash::xxhash PROPERTIES INTERFACE_COMPILE_DEFINITIONS ${xxHashDef})
-endif()
+list(TRANSFORM xxHashDef
+	REPLACE EXPORT IMPORT
+	REGEX XXH_EXPORT
+)
+set_target_properties(xxHash::xxhash PROPERTIES
+	INTERFACE_COMPILE_DEFINITIONS "${xxHashDef}"
+)

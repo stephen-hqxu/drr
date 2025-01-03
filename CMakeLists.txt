@@ -6,6 +6,11 @@ project(DisRegRep
 	HOMEPAGE_URL https://github.com/stephen-hqxu/drr
 )
 
+##############
+### Option ###
+##############
+option(DRR_ENABLE_TEST "Build test target" OFF)
+
 ################
 ### Language ###
 ################
@@ -21,19 +26,13 @@ if(MSVC)
 else()
 	add_compile_options(-Wall -mavx2 -mfma)
 endif()
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-	add_compile_options(-Wno-missing-field-initializers)
-endif()
 
 ##################
 ### Dependency ###
 ##################
-find_package(CLI11 2 CONFIG REQUIRED)
 find_package(glm 1 CONFIG REQUIRED)
-find_package(nanobench CONFIG REQUIRED)
 find_package(range-v3 0.12.0 CONFIG REQUIRED)
 find_package(xxHash 0.8 CONFIG REQUIRED)
-find_package(yaml-cpp 0.8 CONFIG REQUIRED)
 
 add_subdirectory(External)
 
@@ -43,7 +42,7 @@ add_subdirectory(External)
 #[[
 Add source to target `DRR_CURRENT_TARGET`. Include directory of the source are set to `DRR_CURRENT_INCLUDE_DIR`.
 
-@param [HEADER <header>...] Target headers.
+@param [HEADER <header>...] Target headers. All headers are assumed to be public.
 @param [SOURCE <source>...] Target sources.
 ]]
 function(drrTargetSource)
@@ -52,13 +51,20 @@ function(drrTargetSource)
 	list(TRANSFORM TARGET_HEADER APPEND .hpp)
 	list(TRANSFORM TARGET_SOURCE APPEND .cpp)
 
-	target_sources(${DRR_CURRENT_TARGET} PRIVATE
-	FILE_SET header
-		TYPE HEADERS
-		BASE_DIRS ${DRR_CURRENT_INCLUDE_DIR}
-		FILES ${TARGET_HEADER}
+	if(DRR_CURRENT_TARGET_REDISTRIBUTABLE)
+		set(RedistributableVisibility PUBLIC)
+	else()
+		set(RedistributableVisibility PRIVATE)
+	endif()
+
+	target_sources(${DRR_CURRENT_TARGET}
+	PRIVATE
+		${TARGET_SOURCE}
+	${RedistributableVisibility}
+		FILE_SET HEADERS
+			BASE_DIRS ${DRR_CURRENT_INCLUDE_DIR}
+			FILES ${TARGET_HEADER}
 	)
-	target_sources(${DRR_CURRENT_TARGET} PRIVATE ${TARGET_SOURCE})
 endfunction()
 
 #[[
@@ -66,7 +72,7 @@ Setup source group for target `DRR_CURRENT_TARGET`.
 ]]
 function(drrSourceGroup)
 	get_target_property(Source ${DRR_CURRENT_TARGET} SOURCES)
-	get_target_property(Header ${DRR_CURRENT_TARGET} HEADER_SET_header)
+	get_target_property(Header ${DRR_CURRENT_TARGET} HEADER_SET_HEADERS)
 
 	foreach(Category IN ITEMS Source Header)
 		source_group(
@@ -81,18 +87,33 @@ endfunction()
 Add a subdirectory and set required environments.
 
 @param <SourceDir> Directory of source to be added.
-@param [INCLUDE_NAMESPACE] Specify if the include directory should be scoped under project namespace.
+@param [REDISTRIBUTABLE] Set if the directory contains a target that shall be redistributed, i.e. will be linked by other targets, such as a library.
 ]]
 function(drrAddSubdirectory SourceDir)
-	cmake_parse_arguments(SUBDIR "INCLUDE_NAMESPACE" "" "" ${ARGN})
+	cmake_parse_arguments(SUBDIR "REDISTRIBUTABLE" "" "" ${ARGN})
 
 	set(DRR_CURRENT_TARGET ${SourceDir})
+	set(DRR_CURRENT_TARGET_REDISTRIBUTABLE ${SUBDIR_REDISTRIBUTABLE})
 	cmake_path(APPEND CMAKE_CURRENT_SOURCE_DIR ${SourceDir} OUTPUT_VARIABLE DRR_CURRENT_INCLUDE_DIR)
 
-	if(SUBDIR_INCLUDE_NAMESPACE)
-		add_subdirectory(${SourceDir}/${PROJECT_NAME})
+	set(Namespace ${PROJECT_NAME})
+	if(NOT DRR_CURRENT_TARGET_REDISTRIBUTABLE)
+		# Normally we do not need to worry about include directory for targets that will not be consumed by other targets.
+		# Since CMake always adds target sources base directory to its include directory,
+		#	we still need to setup a proper directory namespace.
+		# For convenience, instead of having `<project name>/<target>/`,
+		#	we use `<project name>-<target>/` to disambiguate from redistributable targets.
+		string(APPEND Namespace -${DRR_CURRENT_TARGET})
+	endif()
+	add_subdirectory(${DRR_CURRENT_TARGET}/${Namespace})
+
+	if(DRR_CURRENT_TARGET_REDISTRIBUTABLE)
+		add_library(${PROJECT_NAME}::${DRR_CURRENT_TARGET} ALIAS ${DRR_CURRENT_TARGET})
 	else()
-		add_subdirectory(${SourceDir})
+		# Assume non-redistributable targets are executable.
+		set_target_properties(${DRR_CURRENT_TARGET} PROPERTIES
+			VS_DEBUGGER_WORKING_DIRECTORY $<TARGET_FILE_DIR:${DRR_CURRENT_TARGET}>
+		)
 	endif()
 endfunction()
 
@@ -103,4 +124,8 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${DRR_OUTPUT_ROOT}/lib)
 
 set(CMAKE_STATIC_LIBRARY_PREFIX ${PROJECT_NAME}-)
 
-drrAddSubdirectory(Library INCLUDE_NAMESPACE)
+drrAddSubdirectory(Library REDISTRIBUTABLE)
+if(DRR_ENABLE_TEST)
+	enable_testing()
+	drrAddSubdirectory(Test)
+endif()
