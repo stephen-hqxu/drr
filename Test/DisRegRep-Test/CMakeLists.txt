@@ -2,6 +2,7 @@ find_package(Catch2 3 CONFIG REQUIRED)
 include(Catch)
 
 add_executable(${DRR_CURRENT_TARGET})
+add_subdirectory(Core)
 add_subdirectory(Splatting)
 
 target_link_libraries(${DRR_CURRENT_TARGET} PRIVATE
