@@ -61,10 +61,14 @@ public:
 
 	constexpr ~Regionfield() = default;
 
+	[[nodiscard]] constexpr bool operator==(const Regionfield&) const = default;
+
 	/**
 	 * @brief Transpose regionfield matrix.
+	 *
+	 * @return A transpose of the current regionfield matrix.
 	 */
-	void transpose();
+	[[nodiscard]] Regionfield transpose() const;
 
 	/**
 	 * @brief Resize the regionfield matrix. After this call returns, all existing contents become undefined regardless of whether
@@ -83,6 +87,15 @@ public:
 	 */
 	[[nodiscard]] constexpr IndexType size() const noexcept {
 		return this->Data.size();
+	}
+
+	/**
+	 * @brief Check if the regionfield matrix is empty.
+	 * 
+	 * @return True if empty.
+	 */
+	[[nodiscard]] constexpr bool empty() const noexcept {
+		return this->Data.empty();
 	}
 
 	/**

@@ -22,7 +22,7 @@ namespace DisRegRep::Splatting::Trait {
 /**
  * @brief Identification for the data structure used to implement the container.
  */
-enum class ContainerImplementation : std::uint8_t {
+enum class ContainerImplementation : std::uint_fast8_t {
 	Dense = 0x00U, /**< Use dense matrix to implement the container. */
 	Sparse = 0xFFU /**< Use sparse matrix to implement the container. */
 };

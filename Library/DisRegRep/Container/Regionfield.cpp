@@ -5,47 +5,47 @@
 
 #include <glm/vector_relational.hpp>
 
-#include <tuple>
-
 #include <algorithm>
 #include <execution>
-#include <functional>
 #include <ranges>
 
-#include <cassert>
+#include <utility>
+
+#include <cstddef>
 
 using DisRegRep::Container::Regionfield;
 
-using std::apply, std::make_tuple;
-using std::for_each, std::ranges::swap_ranges,
+using std::for_each, std::ranges::copy,
 	std::execution::par_unseq,
-	std::bind_front,
-	std::views::zip, std::views::enumerate, std::views::transform, std::views::drop, std::views::take,
-	std::ranges::range_const_reference_t;
+	std::views::zip;
+using std::index_sequence;
 
-void Regionfield::transpose() {
-	const IndexType stride = this->mapping().stride(1U);
-	const auto original = this->span() | Core::Arithmetic::View2d(stride);
-	const auto transposed = this->span() | Core::Arithmetic::ViewTransposed2d(stride);
-	const IndexType original_size = original.size();
-	assert(original_size == transposed.size());
+Regionfield Regionfield::transpose() const {
+	//Make a fresh copy instead of just changing the stride (as a transposed view).
+	//Although transpose is now much more expensive,
+	//	it gives better cache locality when iterating through the matrix in other places.
+	//It is possible to do an in-place transposition (by swapping upper and lower diagonal), but only with a square matrix.
+	//It is also possible to use an in-place permute algorithm,
+	//	but performance is generally poor on large matrix (even though it saves us memory) as not being parallelisable.
+	Regionfield transposed;
+	transposed.RegionCount = this->RegionCount;
+	const auto transposed_dim = [&ext = this->mapping().extents()]<std::size_t... I>(index_sequence<I...>) constexpr noexcept {
+		return DimensionType(ext.extent(I)...);
+	}(index_sequence<1U, 0U> {});
+	transposed.resize(transposed_dim);
 
-	//A simple, efficient, parallelisable, in-place matrix transpose method.
-	const auto rg = zip(original, transposed)
-		| enumerate
-		| transform([](const auto it) static constexpr noexcept {
-			const auto& [diag_idx, zip_tuple] = it;
-			return apply([diag_idx](const auto&... row_column) constexpr noexcept {
-				//Drop to ensure it does not overlap with elements before, otherwise it will cause data to race.
-				//Exclude diagonal elements because it is stationary.
-				return make_tuple(row_column | drop(diag_idx + 1)...);
-			}, zip_tuple);
-		})
-		//A tiny optimisation to exclude the last range,
-		//	which is essentially an empty range because it only contains a single diagonal element.
-		| take(original_size - 1U);
-	for_each(par_unseq, rg.cbegin(), rg.cend(),
-		bind_front(apply<decltype((swap_ranges)), range_const_reference_t<decltype(rg)>>, swap_ranges));
+	//Cannot use join on parallel algorithm because it is not a forward range.
+	//Mainly because of the xvalue return on the 2D range adaptor, such that inner range is not a reference type.
+	const auto zip_data = zip(
+		this->Data | Core::Arithmetic::View2d(this->mapping().stride(1U)),
+		transposed.Data | Core::Arithmetic::ViewTransposed2d(transposed.mapping().stride(1U))
+	);
+	for_each(par_unseq, zip_data.cbegin(), zip_data.cend(), [](const auto it) static constexpr noexcept {
+		const auto& [input, output] = it;
+		copy(input, output.begin());
+	});
+
+	return transposed;
 }
 
 void Regionfield::resize(const DimensionType dim) {

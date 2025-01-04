@@ -1,5 +1,7 @@
 #include <DisRegRep/Core/Arithmetic.hpp>
 
+#include <DisRegRep-Test/StringMaker.hpp>
+
 #include <catch2/generators/catch_generators_adapters.hpp>
 #include <catch2/generators/catch_generators_random.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -60,17 +62,16 @@ enum class View2dCategory : std::uint_fast8_t {
 SCENARIO("Normalise: Divide a range of numeric values by a factor", "[Core][Arithmetic]") {
 
 	GIVEN("A range of values") {
-		const auto size = GENERATE(take(3U, random(5U, 20U)));
-		const auto number = GENERATE_COPY(take(1U, chunk(size, random(-100, 100))));
+		const auto size = GENERATE(take(3U, random<std::uint_fast8_t>(5U, 20U)));
+		const auto number = GENERATE_COPY(take(1U, chunk(size, random<std::int_least8_t>(-100, 100))));
 
 		WHEN("Values are normalised by their sum") {
-			const auto sum = 1.0F * fold_left_first(number, plus {}).value_or(1);
+			const auto sum = 1.0F * *fold_left_first(number, plus {});
 			const auto normalised_number = number | Arithmetic::Normalise(sum);
 
 			THEN("Sum of normalised values equals one") {
-				const auto normalised_sum = fold_left_first(normalised_number, plus {});
-				REQUIRE(normalised_sum);
-				CHECK_THAT(*normalised_sum, WithinAbs(1.0F, 1e-4F));
+				const auto normalised_sum = *fold_left_first(normalised_number, plus {});
+				CHECK_THAT(normalised_sum, WithinAbs(1.0F, 1e-4F));
 			}
 
 		}

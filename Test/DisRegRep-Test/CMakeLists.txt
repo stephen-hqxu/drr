@@ -2,12 +2,20 @@ find_package(Catch2 3 CONFIG REQUIRED)
 include(Catch)
 
 add_executable(${DRR_CURRENT_TARGET})
+add_subdirectory(Container)
 add_subdirectory(Core)
 add_subdirectory(Splatting)
 
+drrTargetSource(${DRR_CURRENT_TARGET}
+HEADER
+	StringMaker
+)
+
 target_link_libraries(${DRR_CURRENT_TARGET} PRIVATE
 	${PROJECT_NAME}::Library
+
 	Catch2::Catch2WithMain
+	glm::glm
 )
 
 string(TOLOWER ${DRR_CURRENT_TARGET} OutputName)
