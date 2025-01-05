@@ -26,6 +26,9 @@ if(MSVC)
 else()
 	add_compile_options(-Wall -mavx2 -mfma)
 endif()
+if(CMAKE_CXX_COMPILER_ID STREQUAL Clang)
+	add_compile_options(-Wno-missing-field-initializers)
+endif()
 
 ##################
 ### Dependency ###

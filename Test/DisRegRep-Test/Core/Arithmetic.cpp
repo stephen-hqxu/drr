@@ -85,7 +85,7 @@ TEMPLATE_TEST_CASE_SIG("View2d/ViewTransposed2d/SubRange2d: View a linear range 
 	using enum View2dCategory;
 
 	GIVEN("A flattened 2D matrix whose elements are their corresponding coordinates") {
-		static constexpr auto ViewText = [] {
+		static constexpr auto ViewText = [] static consteval noexcept {
 			using namespace std::string_view_literals;
 			switch (Cat) {
 			case Normal: return "2D"sv;

@@ -10,6 +10,7 @@
 #include <catch2/matchers/catch_matchers_range_equals.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
+#include <catch2/catch_get_random_seed.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
@@ -56,9 +57,8 @@ SCENARIO("Regionfield is a matrix of region identifiers", "[Container][Regionfie
 			}
 
 			THEN("Linear size of regionfield container is the product of each extent component") {
-				const auto rf_span = rf.span();
-				REQUIRE_THAT(rf_span, SizeIs(*fold_left_first(dim, multiplies {})));
-				REQUIRE_THAT(rf_span, !IsEmpty());
+				REQUIRE_THAT(rf, SizeIs(*fold_left_first(dim, multiplies {})));
+				REQUIRE_THAT(rf, !IsEmpty());
 			}
 
 			THEN("Dimension of regionfield matrix equals extent") {
@@ -70,19 +70,24 @@ SCENARIO("Regionfield is a matrix of region identifiers", "[Container][Regionfie
 		}
 
 		AND_GIVEN("A regionfield generator") {
-			static constexpr Uniform Generator;
+			Uniform generator;
+			generator.Seed = Catch::getSeed();
 
 			THEN("Regionfield can be filled with region identifiers") {
 				const auto dim = GENERATE(take(2U, chunk(2U, random<std::uint_least8_t>(5U, 20U))));
 				rf.resize(Regionfield::DimensionType(dim[0], dim[1]));
 				rf.RegionCount = GENERATE(take(2U, random<Regionfield::ValueType>(1U, 10U)));
-				Generator(rf);
+				generator(rf);
 
 				WHEN("Matrix is transposed") {
 					const auto rf_t = rf.transpose();
 
 					THEN("Informative fields are unchanged") {
 						CHECK(rf_t.RegionCount == rf.RegionCount);
+					}
+
+					THEN("Total size remains the same") {
+						CHECK_THAT(rf_t, SizeIs(rf.size()));
 					}
 
 					THEN("Its extent gets swapped") {

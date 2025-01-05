@@ -1,4 +1,5 @@
 drrTargetSource(
 SOURCE
 	Regionfield
+	SparseMatrixElement
 )
