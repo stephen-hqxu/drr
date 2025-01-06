@@ -15,7 +15,6 @@
 #include <limits>
 #include <utility>
 
-#include <concepts>
 #include <type_traits>
 
 #include <cassert>
@@ -114,7 +113,7 @@ private:
 		}
 		using std::transform, std::execution::unseq, std::ranges::cbegin;
 		transform(unseq, this->Importance_.cbegin(), this->Importance_.cend(), cbegin(std::forward<Importance>(importance)),
-			this->Importance_.end(), std::move(op));
+			this->Importance_.begin(), std::move(op));
 	}
 
 	//Modify some regions by some amount.
@@ -138,6 +137,24 @@ public:
 	constexpr ~Dense() = default;
 
 	/**
+	 * @brief Get size of the dense kernel.
+	 *
+	 * @return Dense kernel size.
+	 */
+	[[nodiscard]] constexpr IndexType size() const noexcept {
+		return this->Importance_.size();
+	}
+
+	/**
+	 * @brief Check if the dense kernel is empty.
+	 *
+	 * @return True if empty.
+	 */
+	[[nodiscard]] constexpr bool empty() const noexcept {
+		return this->Importance_.empty();
+	}
+
+	/**
 	 * @brief Resize dense kernel.
 	 *
 	 * @param region_count The maximum number of region identifiers to be held by this kernel.
@@ -145,7 +162,7 @@ public:
 	void resize(IndexType);
 
 	/**
-	 * @brief Clear all contents in the kernel and reset importance of all regions to zero.
+	 * @brief Clear all contents in the kernel and reset importance of all regions to zero. Array size is unaffected.
 	 */
 	void clear() noexcept;
 
@@ -284,6 +301,27 @@ public:
 	constexpr ~Sparse() = default;
 
 	/**
+	 * @brief Get size of the sparse kernel.
+	 *
+	 * @note This only checks the size of the importance array. Offset array is hidden from the application as we consider this as an
+	 * implementation detail.
+	 *
+	 * @return Sparse kernel size.
+	 */
+	[[nodiscard]] constexpr IndexType size() const noexcept {
+		return this->Importance_.size();
+	}
+
+	/**
+	 * @brief Check if sparse kernel is empty.
+	 *
+	 * @return True if empty.
+	 */
+	[[nodiscard]] constexpr bool empty() const noexcept {
+		return this->Importance_.empty();
+	}
+
+	/**
 	 * @brief Resize sparse kernel.
 	 *
 	 * @param region_count The maximum number of region identifiers to be held by this kernel.
@@ -291,7 +329,7 @@ public:
 	void resize(IndexType);
 
 	/**
-	 * @brief Clear all contents in the kernel.
+	 * @brief Clear all contents in the kernel. Array size becomes zero afterwards.
 	 */
 	void clear() noexcept;
 

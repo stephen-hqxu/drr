@@ -69,8 +69,9 @@ TEMPLATE_LIST_TEST_CASE("ToDense: Convert from a range of sparse matrix elements
 
 	GIVEN("A range of sparse matrix elements") {
 		static constexpr Type::RegionIdentifier RegionIdentifierStride = 4U;
+		static constexpr std::uint_fast8_t MaxSize = 10U;
 
-		const auto size = GENERATE(take(3U, random<std::uint_fast8_t>(1U, 10U)));
+		const auto size = GENERATE(take(3U, random<std::uint_fast8_t>(1U, MaxSize)));
 		auto sparse = GENERATE_COPY(
 			take(1U, chunk(size, map([](const auto value) static constexpr noexcept { return SparseType { .Value = value }; },
 									 makeRandomGenerator<ValueType>()))));
@@ -83,7 +84,9 @@ TEMPLATE_LIST_TEST_CASE("ToDense: Convert from a range of sparse matrix elements
 			using ranges::to;
 			//Use an arbitrary fill value that does not present in the sparse value.
 			static constexpr ValueType FillValue = 87U;
-			static constexpr std::uint_fast8_t DenseSize = 25U;
+			static constexpr std::uint_fast8_t DenseSize = 45U;
+			static_assert(DenseSize >= RegionIdentifierStride * MaxSize,
+				"If dense range is too small, sparse range will be truncated, and we don't want that to happen.");
 
 			//Make it into a persistent storage since it is only an input range.
 			const auto dense_view = sparse | const_ | SpMatElem::ToDense(DenseSize, FillValue) | to<vector>;
