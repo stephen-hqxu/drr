@@ -16,6 +16,7 @@ target_link_libraries(${DRR_CURRENT_TARGET} PRIVATE
 
 	Catch2::Catch2WithMain
 	glm::glm
+	range-v3::range-v3
 )
 
 string(TOLOWER ${DRR_CURRENT_TARGET} OutputName)
