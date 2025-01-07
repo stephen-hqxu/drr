@@ -88,7 +88,7 @@ void Sparse::increment(const ValueType& importance) {
 		offset = this->Importance_.size();
 		this->Importance_.push_back(importance);
 	} else [[likely]] {
-		this->Importance_[region_id].Value += value;
+		this->Importance_[offset].Value += value;
 	}
 }
 
