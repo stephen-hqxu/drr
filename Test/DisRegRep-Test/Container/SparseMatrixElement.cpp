@@ -48,7 +48,7 @@ using std::is_arithmetic_v, std::is_floating_point_v;
 
 namespace {
 
-using SparseTypeList = std::tuple<SpMatElem::Importance, SpMatElem::Mask>;
+using ElementTypeList = std::tuple<SpMatElem::Importance, SpMatElem::Mask>;
 
 template<typename ValueType>
 requires is_arithmetic_v<ValueType>
@@ -63,9 +63,10 @@ requires is_arithmetic_v<ValueType>
 
 }
 
-TEMPLATE_LIST_TEST_CASE("ToDense: Convert from a range of sparse matrix elements to dense values where each element corresponds to its region identifier", "[Container][SparseMatrixElement]", SparseTypeList) {
-	using SparseType = TestType;
-	using ValueType = typename SparseType::ValueType;
+TEMPLATE_LIST_TEST_CASE("ToDense: Convert from a range of sparse matrix elements to dense values where each element corresponds to its region identifier",
+	"[Container][SparseMatrixElement]", ElementTypeList) {
+	using ElementType = TestType;
+	using ValueType = typename ElementType::ValueType;
 
 	GIVEN("A range of sparse matrix elements") {
 		static constexpr Type::RegionIdentifier RegionIdentifierStride = 4U;
@@ -73,11 +74,11 @@ TEMPLATE_LIST_TEST_CASE("ToDense: Convert from a range of sparse matrix elements
 
 		const auto size = GENERATE(take(3U, random<std::uint_fast8_t>(1U, MaxSize)));
 		auto sparse = GENERATE_COPY(
-			take(1U, chunk(size, map([](const auto value) static constexpr noexcept { return SparseType { .Value = value }; },
+			take(1U, chunk(size, map([](const auto value) static constexpr noexcept { return ElementType { .Value = value }; },
 									 makeRandomGenerator<ValueType>()))));
 
 		using std::views::take;
-		const auto sparse_region_id = sparse | transform(mem_fn(&SparseType::Identifier));
+		const auto sparse_region_id = sparse | transform(mem_fn(&ElementType::Identifier));
 		copy(iota(Type::RegionIdentifier {}) | stride(RegionIdentifierStride) | take(size), sparse_region_id.begin());
 
 		WHEN("Sparse range is viewed as a dense range") {
@@ -102,7 +103,7 @@ TEMPLATE_LIST_TEST_CASE("ToDense: Convert from a range of sparse matrix elements
 
 				const auto match_fill_value = AllMatch(Predicate<ValueType>(bind_front(equal_to {}, FillValue),
 					"Region identifier that does not present in the sparse range should be assigned with a specified fixed value."));
-				CHECK_THAT(dense_value, RangeEquals(sparse | transform(mem_fn(&SparseType::Value))));
+				CHECK_THAT(dense_value, RangeEquals(sparse | transform(mem_fn(&ElementType::Value))));
 				CHECK_THAT(dense_fill, match_fill_value);
 
 				CHECK_THAT(dense_view, SizeIs(DenseSize));
@@ -115,9 +116,10 @@ TEMPLATE_LIST_TEST_CASE("ToDense: Convert from a range of sparse matrix elements
 
 }
 
-TEMPLATE_LIST_TEST_CASE("ToSparse: Convert from a range of dense values to sparse matrix elements that uses the corresponding index as region identifier", "[Container][SparseMatrixElement]", SparseTypeList) {
-	using SparseType = TestType;
-	using ValueType = typename SparseType::ValueType;
+TEMPLATE_LIST_TEST_CASE("ToSparse: Convert from a range of dense values to sparse matrix elements that uses the corresponding index as region identifier",
+	"[Container][SparseMatrixElement]", ElementTypeList) {
+	using ElementType = TestType;
+	using ValueType = typename ElementType::ValueType;
 
 	GIVEN("A range of dense values") {
 		static constexpr Type::RegionIdentifier RegionIdentifierStride = 6U;
@@ -138,7 +140,7 @@ TEMPLATE_LIST_TEST_CASE("ToSparse: Convert from a range of dense values to spars
 					| chunk(RegionIdentifierStride)
 					| transform(bind_back(bit_or {}, drop(1U)))
 					| join
-					| transform([](const auto it) static constexpr noexcept { return make_from_tuple<SparseType>(it); });
+					| transform([](const auto it) static constexpr noexcept { return make_from_tuple<ElementType>(it); });
 
 				CHECK_THAT(sparse_view, RangeEquals(dense_value));
 				CHECK(distance(sparse_view) == distance(dense_value));

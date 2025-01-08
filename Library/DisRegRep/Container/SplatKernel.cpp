@@ -33,7 +33,7 @@ namespace {
 }
 
 template<DenseKernelBinaryOperator Op>
-void Dense::modify(const IndexType region_id, Op op, const ValueType amount) noexcept(
+constexpr void Dense::modify(const IndexType region_id, Op op, const ValueType amount) noexcept(
 	std::is_nothrow_invocable_v<Op, ValueType, ValueType>) {
 	ValueType& importance = this->Importance_[region_id];
 	if constexpr (is_same_v<Op, minus<>>) {
@@ -43,7 +43,7 @@ void Dense::modify(const IndexType region_id, Op op, const ValueType amount) noe
 }
 
 template<DenseKernelBinaryOperator Op>
-void Dense::modify(const Importance& importance, Op op) noexcept(std::is_nothrow_move_constructible_v<Op>) {
+constexpr void Dense::modify(const Importance& importance, Op op) noexcept(std::is_nothrow_move_constructible_v<Op>) {
 	const auto [region_id, value] = importance;
 	this->modify(region_id, std::move(op), value);
 }

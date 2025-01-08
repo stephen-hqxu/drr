@@ -6,6 +6,7 @@
 #include <glm/vector_relational.hpp>
 
 #include <span>
+#include <tuple>
 
 #include <algorithm>
 #include <execution>
@@ -15,7 +16,8 @@ namespace SpltCoef = DisRegRep::Container::SplattingCoefficient;
 using SpltCoef::BasicDense, SpltCoef::BasicSparse;
 using DisRegRep::Core::Type::RegionImportance, DisRegRep::Core::Type::RegionMask;
 
-using std::span;
+using std::span,
+	std::tie, std::apply;
 using std::for_each, std::all_of,
 	std::execution::par_unseq;
 using std::mem_fn;
@@ -51,7 +53,8 @@ bool BasicSparse<V>::isSorted() const {
 
 template<typename V>
 typename BasicSparse<V>::SizeType BasicSparse<V>::sizeByte() const noexcept {
-	return span(this->Offset).size_bytes() + span(this->SparseMatrix).size_bytes();
+	return apply([](const auto&... matrix) static constexpr noexcept { return (span(matrix).size_bytes() + ...); },
+		tie(this->Offset, this->SparseMatrix));
 }
 
 template<typename V>
@@ -68,9 +71,10 @@ void BasicSparse<V>::resize(const Dimension3Type dim) {
 }
 
 #define INSTANTIATE_DENSE(TYPE) template class DisRegRep::Container::SplattingCoefficient::BasicDense<TYPE>
-INSTANTIATE_DENSE(RegionImportance);
-INSTANTIATE_DENSE(RegionMask);
-
 #define INSTANTIATE_SPARSE(TYPE) template class DisRegRep::Container::SplattingCoefficient::BasicSparse<TYPE>
-INSTANTIATE_SPARSE(RegionImportance);
-INSTANTIATE_SPARSE(RegionMask);
+
+#define INSTANTIATE_ALL(TYPE) \
+	INSTANTIATE_DENSE(TYPE); \
+	INSTANTIATE_SPARSE(TYPE)
+INSTANTIATE_ALL(RegionImportance);
+INSTANTIATE_ALL(RegionMask);

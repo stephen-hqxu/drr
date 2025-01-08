@@ -97,11 +97,11 @@ private:
 
 	//Modify one region by some amount.
 	template<Internal_::DenseKernelBinaryOperator Op>
-	void modify(IndexType, Op, ValueType) noexcept(std::is_nothrow_invocable_v<Op, ValueType, ValueType>);
+	constexpr void modify(IndexType, Op, ValueType) noexcept(std::is_nothrow_invocable_v<Op, ValueType, ValueType>);
 
 	//Modify one region by a given sparse importance matrix element.
 	template<Internal_::DenseKernelBinaryOperator Op>
-	void modify(const SparseMatrixElement::Importance&, Op) noexcept(std::is_nothrow_move_constructible_v<Op>);
+	constexpr void modify(const SparseMatrixElement::Importance&, Op) noexcept(std::is_nothrow_move_constructible_v<Op>);
 
 	//Modify all regions by some amount.
 	template<Internal_::DenseKernelBinaryOperator Op, DenseImportanceRange Importance>

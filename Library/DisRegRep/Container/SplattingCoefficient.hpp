@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <execution>
+#include <iterator>
 #include <ranges>
 
 #include <memory>
@@ -153,7 +154,7 @@ public:
 		template<std::ranges::forward_range Value>
 		requires std::ranges::common_range<Value>
 			  && std::indirectly_copyable<std::ranges::const_iterator_t<Value>, ProxyIterator>
-				 constexpr const ValueProxy& operator=(Value&& value) const
+				 const ValueProxy& operator=(Value&& value) const
 				 requires(!IsConstant)
 		{
 			using std::copy, std::execution::unseq, std::ranges::cbegin, std::ranges::cend;
@@ -174,6 +175,33 @@ public:
 	constexpr BasicDense& operator=(BasicDense&&) noexcept = default;
 
 	constexpr ~BasicDense() = default;
+
+	/**
+	 * @brief Get the index mapping of the dense matrix.
+	 *
+	 * @return Index mapping.
+	 */
+	[[nodiscard]] constexpr const MappingType& mapping() const noexcept {
+		return this->Mapping;
+	}
+
+	/**
+	 * @brief Get the linear size of the dense matrix.
+	 *
+	 * @return The total number of splatting coefficient stored.
+	 */
+	[[nodiscard]] constexpr IndexType size() const noexcept {
+		return this->DenseMatrix.size();
+	}
+
+	/**
+	 * @brief Check if the dense matrix is empty.
+	 *
+	 * @return True if empty.
+	 */
+	[[nodiscard]] constexpr bool empty() const noexcept {
+		return this->DenseMatrix.empty();
+	}
 
 	/**
 	 * @brief Get the size of the dense matrix in bytes.
@@ -306,24 +334,6 @@ public:
 		}
 
 		/**
-		 * @brief Append a range of dense matrix to the view in this proxy.
-		 *
-		 * @tparam Value Type of range value.
-		 *
-		 * @param value Values to be appended.
-		 *
-		 * @return Self.
-		 */
-		template<std::ranges::input_range Value>
-		requires std::is_convertible_v<std::ranges::range_value_t<Value>, ValueType>
-		constexpr const ValueProxy& operator=(Value&& value) const
-		requires(!IsConstant)
-		{
-			*this = std::forward<Value>(value) | SparseMatrixElement::ToSparse;
-			return *this;
-		}
-
-		/**
 		 * @brief Append a range of sparse matrix to the view in this proxy.
 		 *
 		 * @tparam Value Type of range value.
@@ -340,6 +350,24 @@ public:
 			auto& [_, next] = this->PairwiseOffset;
 			this->ElementContainer->append_range(std::forward<Value>(value));
 			next = this->ElementContainer->size();
+			return *this;
+		}
+
+		/**
+		 * @brief Append a range of dense matrix to the view in this proxy.
+		 *
+		 * @tparam Value Type of range value.
+		 *
+		 * @param value Values to be appended.
+		 *
+		 * @return Self.
+		 */
+		template<std::ranges::input_range Value>
+		requires std::is_convertible_v<std::ranges::range_value_t<Value>, ValueType>
+		constexpr const ValueProxy& operator=(Value&& value) const
+		requires(!IsConstant)
+		{
+			*this = std::forward<Value>(value) | SparseMatrixElement::ToSparse;
 			return *this;
 		}
 
@@ -372,6 +400,36 @@ public:
 	 * @return True if all sorted.
 	 */
 	[[nodiscard]] bool isSorted() const;
+
+	/**
+	 * @brief Get the index mapping of the sparse matrix.
+	 *
+	 * @note Since sparse matrix is only *partially* sparse, i.e. the per-region splatting coefficient axis is sparse, the mapping only
+	 * maps the desne axes.
+	 *
+	 * @return Index mapping.
+	 */
+	[[nodiscard]] constexpr const OffsetMappingType& mapping() const noexcept {
+		return this->OffsetMapping;
+	}
+
+	/**
+	 * @brief Get the linear size of the sparse matrix.
+	 *
+	 * @return The total number of splatting coefficient stored.
+	 */
+	[[nodiscard]] constexpr IndexType size() const noexcept {
+		return this->SparseMatrix.size();
+	}
+
+	/**
+	 * @brief Check if the sparse matrix is empty.
+	 *
+	 * @return True if empty.
+	 */
+	[[nodiscard]] constexpr bool empty() const noexcept {
+		return this->SparseMatrix.empty();
+	}
 
 	/**
 	 * @brief Get the size of the sparse matrix in bytes.
@@ -417,5 +475,17 @@ public:
 	}
 
 };
+
+/**
+ * `Mat` is a specialisation of `BasicDense`.
+ */
+template<typename Mat>
+concept IsDense = std::is_same_v<Mat, BasicDense<typename Mat::ValueType>>;
+
+/**
+ * `Mat` is a specialisation of `BasicSparse`.
+ */
+template<typename Mat>
+concept IsSparse = std::is_same_v<Mat, BasicSparse<typename Mat::ValueType>>;
 
 }
