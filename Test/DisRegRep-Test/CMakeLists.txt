@@ -4,7 +4,7 @@ include(Catch)
 add_executable(${DRR_CURRENT_TARGET})
 add_subdirectory(Container)
 add_subdirectory(Core)
-# add_subdirectory(Splatting)
+add_subdirectory(Splatting)
 
 drrTargetSource(${DRR_CURRENT_TARGET}
 HEADER

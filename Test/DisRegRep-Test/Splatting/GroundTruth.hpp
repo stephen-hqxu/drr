@@ -1,36 +1,17 @@
 #pragma once
 
-#include "../Factory/RegionMapFactory.hpp"
-#include "../Filter/RegionMapFilter.hpp"
-
-#include <span>
-
-namespace DisRegRep::Launch {
+#include <DisRegRep/Splatting/BaseFullConvolution.hpp>
 
 /**
- * @brief A self test to verify the correctness of region filters.
-*/
-namespace FilterTester {
-
-template<size_t TestSize>
-struct TestDescription {
-
-	const RegionMapFactory* Factory;
-	std::span<const RegionMapFilter* const, TestSize> Filter;
-
-};
+ * @brief Precomputed region feature splatting dataset.
+ */
+namespace DisRegRep::Test::Splatting::GroundTruth {
 
 /**
- * @brief Perform self test.
- * 
- * @tparam TestSize The test size.
- * @param desc The test description.
- * 
- * @return The test result status.
-*/
-template<size_t TestSize>
-bool test(const TestDescription<TestSize>&);
-
-}
+ * @brief Check splatting coefficients computed by full convolution.
+ *
+ * @param full_conv A full convolution splatting.
+ */
+void checkFullConvolution(DisRegRep::Splatting::BaseFullConvolution&);
 
 }

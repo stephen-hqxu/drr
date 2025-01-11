@@ -108,7 +108,7 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(FastFullOccupancy) {
 	using ScratchMemoryType = ScratchMemory<ContainerTrait>;
 	const auto [regionfield, offset, extent] = info;
 
-	const SizeType d = this->diametre(),
+	const SizeType d = BaseFullConvolution::diametre(this->Radius),
 		//Padding does not include the centre element (only the halo), so minus one from the diametre.
 		d_halo = d - 1U;
 

@@ -29,15 +29,17 @@ protected:
 	 */
 	void validate(const InvokeInfo&) const;
 
+public:
+
 	/**
 	 * @brief Calculate the kernel diametre with the current radius.
 	 *
-	 * @note The kernel diametre is always a positive odd number.
+	 * @param r The kernel radius.
 	 *
-	 * @return The kernel diametre.
+	 * @return The kernel diametre, which is always a positive odd number.
 	 */
-	[[nodiscard]] constexpr SizeType diametre() const noexcept {
-		return 2U * this->Radius + 1U;
+	[[nodiscard]] constexpr static SizeType diametre(const RadiusType r) noexcept {
+		return 2U * r + 1U;
 	}
 
 	/**

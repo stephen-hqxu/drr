@@ -77,19 +77,20 @@ class BasicDense {
 public:
 
 	using ValueType = V;
-	using ConstValue = std::add_const_t<ValueType>;
+	using ElementType = ValueType;
+	using ConstElement = std::add_const_t<ElementType>;
 	using IndexType = Type::IndexType;
 
 	using Dimension3Type = Type::Dimension3Type;
 
 	using ExtentType = std::dextents<IndexType, 3U>;
 	using LayoutType = Type::LayoutType;
-	using MdSpanType = std::mdspan<ValueType, ExtentType, LayoutType>;
+	using MdSpanType = std::mdspan<ElementType, ExtentType, LayoutType>;
 	using MappingType = typename MdSpanType::mapping_type;
 
 private:
 
-	using DataContainerType = std::vector<ValueType, Core::UninitialisedAllocator<ValueType>>;
+	using DataContainerType = std::vector<ElementType, Core::UninitialisedAllocator<ElementType>>;
 
 	MappingType Mapping;
 	DataContainerType DenseMatrix;
@@ -110,13 +111,13 @@ public:
 
 		static constexpr bool IsConstant = Const;
 
-		using ProxyElementType = std::conditional_t<IsConstant, ConstValue, ValueType>;
-		using ProxyViewType = std::span<ProxyElementType>;
-		using ProxyIterator = typename ProxyViewType::iterator;
+		using ProxyElementType = std::conditional_t<IsConstant, ConstElement, ElementType>;
+		using ProxyElementViewType = std::span<ProxyElementType>;
+		using ProxyElementIterator = typename ProxyElementViewType::iterator;
 
 	private:
 
-		ProxyViewType Span;
+		ProxyElementViewType Span;
 
 	public:
 
@@ -128,8 +129,8 @@ public:
 		 * @param r A range of values.
 		 */
 		template<typename R>
-		requires std::is_constructible_v<ProxyViewType, R>
-		constexpr ValueProxy(R&& r) noexcept(std::is_nothrow_constructible_v<ProxyViewType, R>) : Span(std::forward<R>(r)) { }
+		requires std::is_constructible_v<ProxyElementViewType, R>
+		constexpr ValueProxy(R&& r) noexcept(std::is_nothrow_constructible_v<ProxyElementViewType, R>) : Span(std::forward<R>(r)) { }
 
 		constexpr ~ValueProxy() = default;
 
@@ -138,7 +139,7 @@ public:
 		 *
 		 * @return A view of values.
 		 */
-		[[nodiscard]] constexpr ProxyViewType operator*() const noexcept {
+		[[nodiscard]] constexpr ProxyElementViewType operator*() const noexcept {
 			return this->Span;
 		}
 
@@ -153,7 +154,7 @@ public:
 		 */
 		template<std::ranges::forward_range Value>
 		requires std::ranges::common_range<Value>
-			  && std::indirectly_copyable<std::ranges::const_iterator_t<Value>, ProxyIterator>
+			  && std::indirectly_copyable<std::ranges::const_iterator_t<Value>, ProxyElementIterator>
 				 const ValueProxy& operator=(Value&& value) const
 				 requires(!IsConstant)
 		{
@@ -487,5 +488,11 @@ concept IsDense = std::is_same_v<Mat, BasicDense<typename Mat::ValueType>>;
  */
 template<typename Mat>
 concept IsSparse = std::is_same_v<Mat, BasicSparse<typename Mat::ValueType>>;
+
+/**
+ * `Mat` is a splatting coefficient matrix;
+ */
+template<typename Mat>
+concept Is = IsDense<Mat> || IsSparse<Mat>;
 
 }

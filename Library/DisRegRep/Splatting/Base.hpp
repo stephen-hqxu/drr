@@ -36,6 +36,15 @@
 //Do `DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR` with the correct qualifier for splatting implementations.
 #define DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR_IMPL DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR(,)
 
+//Set the general information fields for a splatting method.
+#define DRR_SPLATTING_SET_INFO(NAME, TRANSPOSED) \
+	[[nodiscard]] constexpr std::string_view name() const noexcept override { \
+		return NAME; \
+	} \
+	[[nodiscard]] constexpr bool isTransposed() const noexcept override { \
+		return TRANSPOSED; \
+	}
+
 namespace DisRegRep::Splatting {
 
 /**
@@ -77,6 +86,16 @@ public:
 	 * @return The splatting method name.
 	 */
 	[[nodiscard]] virtual constexpr std::string_view name() const noexcept = 0;
+
+	/**
+	 * @brief Determine if the resulting region feature splatting coefficient matrix is transposed of the input.
+	 *
+	 * @note If the return value is True, it can be done by either transposing the regionfield matrix or transposing the output to
+	 * obtain the original result because matrix transpose is an invertible operation.
+	 *
+	 * @return True if the result is transposed.
+	 */
+	[[nodiscard]] virtual constexpr bool isTransposed() const noexcept = 0;
 
 	/**
 	 * @brief Invoke to compute region feature splatting coefficients on a given regionfield. The splatting does not need to

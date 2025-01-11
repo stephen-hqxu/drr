@@ -2,8 +2,6 @@
 
 #include "BaseFullConvolution.hpp"
 
-#include <string_view>
-
 namespace DisRegRep::Splatting {
 
 /**
@@ -24,9 +22,7 @@ public:
 
 	constexpr ~FastFullOccupancy() override = default;
 
-	[[nodiscard]] constexpr std::string_view name() const noexcept override {
-		return "F+";
-	}
+	DRR_SPLATTING_SET_INFO("F+", true)
 
 	DRR_SPLATTING_DECLARE_FUNCTOR_ALL_IMPL;
 

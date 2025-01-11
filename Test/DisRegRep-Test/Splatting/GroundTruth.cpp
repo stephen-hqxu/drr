@@ -1,172 +1,165 @@
-#include <DisRegRep/Launch/FilterTester.hpp>
+#include <DisRegRep-Test/Splatting/GroundTruth.hpp>
 
-#include <DisRegRep/Format.hpp>
-#include <DisRegRep/Maths/Arithmetic.hpp>
-#include <DisRegRep/Container/RegionMap.hpp>
-#include <DisRegRep/Container/BlendHistogram.hpp>
+#include <DisRegRep/Container/Regionfield.hpp>
+#include <DisRegRep/Container/SparseMatrixElement.hpp>
+#include <DisRegRep/Container/SplattingCoefficient.hpp>
 
-#include "Utility.hpp"
+#include <DisRegRep/Core/Arithmetic.hpp>
+#include <DisRegRep/Core/Type.hpp>
+
+#include <DisRegRep/Splatting/BaseFullConvolution.hpp>
+#include <DisRegRep/Splatting/Trait.hpp>
+
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <catch2/matchers/catch_matchers_range_equals.hpp>
+#include <catch2/catch_test_macros.hpp>
+
+#include <array>
 
 #include <any>
-#include <array>
-#include <string_view>
 #include <tuple>
 
 #include <algorithm>
 #include <functional>
+#include <iterator>
 #include <ranges>
 
-#include <type_traits>
 #include <utility>
 
-#include <cstdint>
+#include <concepts>
 
-using std::array, std::tuple,
-	std::string_view, std::any;
-using std::ranges::copy, std::ranges::all_of, std::ranges::adjacent_find,
-	std::views::enumerate;
+namespace GndTth = DisRegRep::Test::Splatting::GroundTruth;
+namespace SpMatElem = DisRegRep::Container::SparseMatrixElement;
+namespace SpltCoef = DisRegRep::Container::SplattingCoefficient;
+namespace Type = DisRegRep::Core::Type;
+using DisRegRep::Container::Regionfield,
+	DisRegRep::Core::Arithmetic::Normalise,
+	DisRegRep::Splatting::BaseFullConvolution;
 
-using std::get, std::apply,
-	std::make_index_sequence, std::index_sequence;
-using std::is_same_v;
+using Catch::Matchers::WithinAbs, Catch::Matchers::RangeEquals;
 
-using namespace DisRegRep::Format;
-namespace BH = DisRegRep::BlendHistogram;
-using DisRegRep::RegionMap, DisRegRep::RegionMapFactory, DisRegRep::RegionMapFilter;
-using DisRegRep::Arithmetic::kernelArea;
-using namespace DisRegRep::Launch;
+using std::array, std::to_array;
+using std::any, std::tuple, std::apply;
+using std::ranges::copy, std::ranges::all_of,
+	std::bind_front, std::bind_back, std::identity,
+	std::indirect_binary_predicate,
+	std::views::transform, std::views::join, std::views::zip_transform, std::views::all,
+	std::ranges::viewable_range,
+	std::ranges::range_const_reference_t, std::ranges::const_iterator_t;
+using std::floating_point;
 
 namespace {
 
-constexpr array<Region_t, 64u> TestRegionMapTemplate = {
-	0, 2, 1, 3, 1, 1, 1, 2,
-	0, 1, 1, 2, 2, 2, 2, 0,
-	3, 3, 0, 3, 2, 2, 1, 0,
-	0, 1, 2, 0, 2, 2, 0, 2,
-	3, 0, 3, 2, 1, 2, 2, 3,
-	0, 3, 0, 2, 1, 0, 3, 2,
-	0, 1, 0, 2, 0, 0, 0, 0,
-	3, 3, 0, 3, 3, 3, 1, 0
-};
-constexpr struct {
+namespace Reference {
 
-	SizeVec2 Dimension = { 8u, 8u },
-		Offset = { 2u, 2u },
-		Extent = { 4u, 4u };
-	Radius_t Radius = 2u;
-	Region_t RegionCount = 4u;
+namespace Regionfield {
 
-} TestRegionMapInfo { };
+constexpr auto Dimension = ::Regionfield::DimensionType(6U, 7U);
+constexpr auto Value = to_array<::Regionfield::ValueType>({
+	2, 3, 3, 3, 2, 2,
+	1, 0, 2, 1, 3, 3,
+	2, 2, 3, 0, 3, 1,
+	1, 2, 0, 3, 1, 1,
+	2, 3, 3, 2, 1, 2,
+	3, 3, 0, 0, 1, 3,
+	2, 0, 1, 2, 3, 2
+});
+constexpr auto RegionCount = std::ranges::max(Value) + 1U;
 
-RegionMap createTestRegionMap() {
-	RegionMap rm;
-	rm.reshape(::TestRegionMapInfo.Dimension);
-	rm.RegionCount = ::TestRegionMapInfo.RegionCount;
-
-	copy(::TestRegionMapTemplate, rm.begin());
-	return rm;
-}
-
-BH::DenseNorm createTestSingleHistogram() {
-	BH::DenseNorm hist;
-	const auto write = [&hist, norm_factor = 1.0 * kernelArea(::TestRegionMapInfo.Radius)]
-	(const array<Bin_t, ::TestRegionMapInfo.RegionCount> bin, const uint8_t x, const uint8_t y) -> void {
-		hist(bin, x, y, norm_factor);
-	};
-	hist.resize(::TestRegionMapInfo.Extent, ::TestRegionMapInfo.RegionCount);
-
-	//bin 0-3
-	write({ 6, 6, 7, 6 }, 0, 0);
-	write({ 3, 7, 11, 4 }, 1, 0);
-	write({ 3, 7, 12, 3 }, 2, 0);
-	write({ 4, 5, 13, 3 }, 3, 0);
-	//bin 4-7
-	write({ 7, 5, 7, 6 }, 0, 1);
-	write({ 5, 5, 11, 4 }, 1, 1);
-	write({ 5, 4, 13, 3 }, 2, 1);
-	write({ 5, 3, 14, 3 }, 3, 1);
-	//bin 8-11
-	write({ 9, 4, 6, 6 }, 0, 2);
-	write({ 8, 4, 9, 4 }, 1, 2);
-	write({ 9, 3, 10, 3 }, 2, 2);
-	write({ 8, 3, 11, 3 }, 3, 2);
-	//bin 12-15
-	write({ 9, 4, 5, 7 }, 0, 3);
-	write({ 8, 4, 7, 6 }, 1, 3);
-	write({ 9, 3, 8, 5 }, 2, 3);
-	write({ 8, 3, 9, 5 }, 3, 3);
-
-	return hist;
-}
-
-constexpr RegionMapFilter::LaunchDescription createLaunchDescription(const RegionMap& region_map) noexcept {
-	return {
-		.Map = &region_map,
-		.Offset = ::TestRegionMapInfo.Offset,
-		.Extent = ::TestRegionMapInfo.Extent,
-		.Radius = ::TestRegionMapInfo.Radius
-	};
+[[nodiscard]] ::Regionfield load(const bool transpose) {
+	::Regionfield rf;
+	rf.RegionCount = RegionCount;
+	rf.resize(Dimension);
+	copy(Value, rf.span().begin());
+	return transpose ? rf.transpose() : std::move(rf);
 }
 
 }
 
-template<size_t TestSize>
-bool FilterTester::test(const TestDescription<TestSize>& desc) {
-	const auto [factory, filter] = desc;
-	const RegionMap region_map = ::createTestRegionMap();
-	const BH::DenseNorm hist_ground_truth = ::createTestSingleHistogram();
-	const RegionMapFilter::LaunchDescription launch_desc = ::createLaunchDescription(region_map);
+namespace FullConvolution {
 
-	/**********************
-	 * Generate histogram
-	 *********************/
-	array<array<any, TestSize>, Utility::AllFilterTagSize> hist_mem;
-	array<BH::SparseNormSorted, TestSize> sorted_hist_mem;
-	tuple<
-		array<const BH::DenseNorm*, TestSize>,
-		array<const BH::SparseNormSorted*, TestSize>,
-		array<const BH::SparseNormSorted*, TestSize>
-	> hist;
-	
-	const auto generate_histogram = [&filter, &launch_desc, &sorted_hist_mem]
-		<typename Tag>(const Tag run_tag, auto& hist_mem, auto& hist) -> void {
-		for (const auto [i, curr_filter_ptr] : enumerate(filter)) {
-			const RegionMapFilter& curr_filter = *curr_filter_ptr;
+constexpr BaseFullConvolution::RadiusType Radius = 2U;
+constexpr auto Offset = BaseFullConvolution::DimensionType(Radius),
+	Extent = BaseFullConvolution::DimensionType(2U, 3U);
 
-			any& curr_hist_mem = hist_mem[i];
-			curr_filter.tryAllocateHistogram(run_tag, launch_desc, curr_hist_mem);
-			if constexpr (is_same_v<Tag, Utility::RMFT::SCSH>) {
-				sorted_hist_mem[i] = std::move(const_cast<BH::SparseNormUnsorted&>(curr_filter(run_tag, launch_desc, curr_hist_mem)));
-				hist[i] = &sorted_hist_mem[i];
-			} else {
-				hist[i] = &curr_filter(run_tag, launch_desc, curr_hist_mem);
-			}
-		}
-	};
-	const auto generate_all_histogram = [&generate_histogram, &hist_mem, &hist]
-		<size_t... I>(index_sequence<I...>) -> void {
-		(generate_histogram(get<I>(Utility::AllFilterTag), hist_mem[I], get<I>(hist)), ...);
-	};
-	generate_all_histogram(make_index_sequence<Utility::AllFilterTagSize> { });
+template<typename T>
+using SplattingCoefficientMatrixType = array<array<T, Regionfield::RegionCount>, Extent.x * Extent.y>;
 
-	/*************************
-	 * Ground truth test
-	 ************************/
-	constexpr static auto deref = [](const auto* const ptr) constexpr static noexcept -> const auto& {
-		return *ptr;
-	};
+constexpr auto SplattingCoefficientMatrixDense = [] static consteval noexcept {
+	static constexpr SplattingCoefficientMatrixType<Type::RegionImportance> Importance {{
+		{ 3, 5, 8, 9 }, { 3, 5, 7, 10 },
+		{ 5, 6, 6, 8 }, { 5, 6, 5, 9 },
+		{ 5, 5, 7, 8 }, { 5, 6, 6, 8 }
+	}};
+	static constexpr Type::RegionMask NormFactor =
+		BaseFullConvolution::kernelNormalisationFactor(BaseFullConvolution::diametre(Radius));
 
-	const bool gt_test_status = apply([&hist_ground_truth](const auto&... hist) {
-		return (all_of(hist, [&hist_ground_truth](const auto& hist) { return hist == hist_ground_truth; }, deref) && ...);
-	}, hist);
-	const bool same_type_cmp_test_status = apply([](const auto&... hist) {
-		return ((adjacent_find(hist, std::not_equal_to { }, deref) == hist.cend()) && ...);
-	}, hist);
-	const bool cross_type_cmp_test_status = apply([](const auto& first_hist, const auto&... other_hist) {
-		return ((deref(first_hist.front()) == deref(other_hist.front())) && ...);
-	}, hist);
+	SplattingCoefficientMatrixType<Type::RegionMask> mask {};
+	auto mask_join = mask | join;
+	copy(Importance | transform(bind_back(Normalise, NormFactor)) | join, mask_join.begin());
+	return mask;
+}();
+constexpr auto SplattingCoefficientMatrixSparse = [] static consteval noexcept {
+	SplattingCoefficientMatrixType<SpMatElem::Mask> sparse_mask {};
+	auto sparse_mask_join = sparse_mask | join;
+	copy(SplattingCoefficientMatrixDense | transform(bind_front(SpMatElem::ToSparse)) | join, sparse_mask_join.begin());
+	return sparse_mask;
+}();
 
-	return gt_test_status && same_type_cmp_test_status && cross_type_cmp_test_status;
+bool compare(const floating_point auto source, const floating_point auto target) {
+	return WithinAbs(target, 1e-6F).match(source);
 }
 
-template bool FilterTester::test<2u>(const FilterTester::TestDescription<2u>&);
+template<
+	SpltCoef::Is Matrix,
+	viewable_range Ref,
+	indirect_binary_predicate<
+		const_iterator_t<typename Matrix::template ValueProxy<true>::ProxyElementViewType>,
+		const_iterator_t<range_const_reference_t<Ref>>
+	> Comp
+>
+void compare(const Matrix& matrix, const Ref& reference, Comp comp) {
+	CHECK_THAT(matrix.range() | transform([](const auto proxy) static constexpr noexcept { return *proxy; }),
+		RangeEquals(reference | all,
+			[&comp](const auto source, const auto target) { return all_of(zip_transform(comp, source, target), identity {}); }));
+}
+
+template<SpltCoef::IsDense Matrix>
+void compare(const Matrix& matrix) {
+	compare(matrix, SplattingCoefficientMatrixDense, compare<Type::RegionMask, Type::RegionMask>);
+}
+
+template<SpltCoef::IsSparse Matrix>
+void compare(const Matrix& matrix) {
+	compare(matrix, SplattingCoefficientMatrixSparse, [](const auto source, const auto target) static {
+		const auto [src_region_id, src_value] = source;
+		const auto [tgt_region_id, tgt_value] = target;
+		return src_region_id == tgt_region_id && compare(src_value, tgt_value);
+	});
+}
+
+}
+
+}
+
+}
+
+void GndTth::checkFullConvolution(BaseFullConvolution& full_conv) {
+	apply([&full_conv](const auto... trait) {
+		const Regionfield rf = Reference::Regionfield::load(full_conv.isTransposed());
+		full_conv.Radius = Reference::FullConvolution::Radius;
+
+		const BaseFullConvolution::InvokeInfo invoke_info {
+			.Regionfield = &rf,
+			.Offset = Reference::FullConvolution::Offset,
+			.Extent = Reference::FullConvolution::Extent
+		};
+		any memory;
+
+		(Reference::FullConvolution::compare(full_conv(trait, invoke_info, memory)), ...);
+	}, tuple<
+		DRR_SPLATTING_TRAIT_CONTAINER(Dense, Dense),
+		DRR_SPLATTING_TRAIT_CONTAINER(Dense, Sparse),
+		DRR_SPLATTING_TRAIT_CONTAINER(Sparse, Sparse)
+	> {});
+}

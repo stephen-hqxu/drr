@@ -47,7 +47,7 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(VanillaFullOccupancy) {
 	auto& [kernel_memory, output_memory] = ImplementationHelper::allocate<ScratchMemoryType>(
 		memory, typename ScratchMemoryType::ExtentType(regionfield->RegionCount, extent));
 
-	const SizeType d = this->diametre();
+	const SizeType d = BaseFullConvolution::diametre(this->Radius);
 
 	const auto element_rg = [r = this->Radius, &offset, &extent]<std::size_t... I>(index_sequence<I...>) constexpr noexcept {
 		return cartesian_product(iota(offset[I] - r) | take(extent[I])...);
