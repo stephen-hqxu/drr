@@ -151,9 +151,12 @@ inline constexpr auto Normalise = Core::Range::RangeAdaptorClosure(
 				&& ((Is<Value> && std::is_convertible_v<typename Value::ValueType, Factor>) || std::is_convertible_v<Value, Factor>))
 	(Element&& element, const Factor factor) static constexpr noexcept(
 		std::is_nothrow_constructible_v<std::decay_t<Element>, Element>) -> auto {
-		using Core::Arithmetic::Normalise, std::views::transform, std::mem_fn;
+		using Core::Arithmetic::Normalise,
+			std::views::zip, std::views::transform, std::mem_fn, std::make_from_tuple;
 		if constexpr (Is<Value>) {
-			return std::forward<Element>(element) | transform(mem_fn(&Value::Value)) | Normalise(factor);
+			const auto normalised_value = element | transform(mem_fn(&Value::Value)) | Normalise(factor);
+			return zip(element | transform(mem_fn(&Value::Identifier)), normalised_value)
+				 | transform([](const auto it) static constexpr noexcept { return make_from_tuple<Basic<Factor>>(it); });
 		} else {
 			return Normalise(std::forward<Element>(element), factor);
 		}

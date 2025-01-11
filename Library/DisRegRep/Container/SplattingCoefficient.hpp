@@ -240,7 +240,7 @@ public:
 	 * @return A transposed 2D range to the dense matrix.
 	 */
 	[[nodiscard]] constexpr std::ranges::view auto rangeTransposed2d() const noexcept {
-		return this->range() | Core::Arithmetic::ViewTransposed2d(this->Mapping.extents().extent(2U));
+		return this->range() | Core::Arithmetic::ViewTransposed2d(this->Mapping.extents().extent(1U));
 	}
 
 };

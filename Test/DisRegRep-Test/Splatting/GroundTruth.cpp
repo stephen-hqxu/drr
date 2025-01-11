@@ -54,8 +54,9 @@ namespace Reference {
 
 namespace Regionfield {
 
-constexpr auto Dimension = ::Regionfield::DimensionType(6U, 7U);
+constexpr auto Dimension = ::Regionfield::DimensionType(6U, 8U);
 constexpr auto Value = to_array<::Regionfield::ValueType>({
+	0, 0, 0, 0, 0, 0,
 	2, 3, 3, 3, 2, 2,
 	1, 0, 2, 1, 3, 3,
 	2, 2, 3, 0, 3, 1,
@@ -79,8 +80,10 @@ constexpr auto RegionCount = std::ranges::max(Value) + 1U;
 namespace FullConvolution {
 
 constexpr BaseFullConvolution::RadiusType Radius = 2U;
-constexpr auto Offset = BaseFullConvolution::DimensionType(Radius),
-	Extent = BaseFullConvolution::DimensionType(2U, 3U);
+constexpr auto Offset = BaseFullConvolution::DimensionType(Radius, Radius + 1U),
+	OffsetTransposed = BaseFullConvolution::DimensionType(Offset.y, Offset.x),
+	Extent = BaseFullConvolution::DimensionType(2U, 3U),
+	ExtentTransposed = BaseFullConvolution::DimensionType(Extent.y, Extent.x);
 
 template<typename T>
 using SplattingCoefficientMatrixType = array<array<T, Regionfield::RegionCount>, Extent.x * Extent.y>;
@@ -130,7 +133,8 @@ void compare(const Matrix& matrix) {
 }
 
 template<SpltCoef::IsSparse Matrix>
-void compare(const Matrix& matrix) {
+void compare(Matrix& matrix) {
+	matrix.sort();
 	compare(matrix, SplattingCoefficientMatrixSparse, [](const auto source, const auto target) static {
 		const auto [src_region_id, src_value] = source;
 		const auto [tgt_region_id, tgt_value] = target;
@@ -146,13 +150,14 @@ void compare(const Matrix& matrix) {
 
 void GndTth::checkFullConvolution(BaseFullConvolution& full_conv) {
 	apply([&full_conv](const auto... trait) {
-		const Regionfield rf = Reference::Regionfield::load(full_conv.isTransposed());
+		const bool transposed = full_conv.isTransposed();
+		const Regionfield rf = Reference::Regionfield::load(transposed);
 		full_conv.Radius = Reference::FullConvolution::Radius;
 
 		const BaseFullConvolution::InvokeInfo invoke_info {
 			.Regionfield = &rf,
-			.Offset = Reference::FullConvolution::Offset,
-			.Extent = Reference::FullConvolution::Extent
+			.Offset = transposed ? Reference::FullConvolution::OffsetTransposed : Reference::FullConvolution::Offset,
+			.Extent = transposed ? Reference::FullConvolution::ExtentTransposed : Reference::FullConvolution::Extent
 		};
 		any memory;
 
