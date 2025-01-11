@@ -22,14 +22,9 @@ public:
 
 	RadiusType Radius {}; /**< Radius of the convolution kernel. No convolution is performed if radius is zero. */
 
-protected:
+	[[nodiscard]] DimensionType minimumRegionfieldDimension(const InvokeInfo&) const noexcept override;
 
-	/**
-	 * @brief Check if given parameters are valid to be used for splatting methods that use full convolution.
-	 */
-	void validate(const InvokeInfo&) const;
-
-public:
+	[[nodiscard]] DimensionType minimumOffset(const InvokeInfo&) const noexcept override;
 
 	/**
 	 * @brief Calculate the kernel diametre with the current radius.

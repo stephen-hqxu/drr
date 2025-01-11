@@ -7,6 +7,7 @@ HEADER
 	Trait
 	VanillaFullOccupancy
 SOURCE
+	Base
 	BaseFullConvolution
 	FastFullOccupancy
 	VanillaFullOccupancy

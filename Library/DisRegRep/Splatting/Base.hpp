@@ -68,6 +68,17 @@ public:
 
 	};
 
+protected:
+
+	/**
+	 * @brief Check if given parameters are valid to be used for the selected splatting method.
+	 *
+	 * @param info The invoke info.
+	 */
+	virtual void validate(const InvokeInfo&) const;
+
+public:
+
 	constexpr Base() noexcept = default;
 
 	Base(const Base&) = delete;
@@ -96,6 +107,24 @@ public:
 	 * @return True if the result is transposed.
 	 */
 	[[nodiscard]] virtual constexpr bool isTransposed() const noexcept = 0;
+
+	/**
+	 * @brief Minimum regionfield matrix dimension required by the given parameters.
+	 *
+	 * @param info The invoke info.
+	 *
+	 * @return Minimum regionfield dimension.
+	 */
+	[[nodiscard]] virtual DimensionType minimumRegionfieldDimension(const InvokeInfo&) const noexcept;
+
+	/**
+	 * @brief Minimum regionfield matrix coordinate offset required by the given parameters.
+	 *
+	 * @param info The invoke info.
+	 *
+	 * @return Minimum offset.
+	 */
+	[[nodiscard]] virtual DimensionType minimumOffset(const InvokeInfo&) const noexcept;
 
 	/**
 	 * @brief Invoke to compute region feature splatting coefficients on a given regionfield. The splatting does not need to

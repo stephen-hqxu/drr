@@ -7,7 +7,6 @@
 
 #include <algorithm>
 #include <ranges>
-#include <utility>
 
 #include <cstddef>
 
@@ -64,7 +63,7 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(VanillaFullOccupancy) {
 	transform(kernel_rg, output_memory.range().begin(),
 		[&kernel_memory, norm_factor = BaseFullConvolution::kernelNormalisationFactor(d)](auto kernel) noexcept {
 			kernel_memory.clear();
-			for_each(std::move(kernel), [&kernel_memory](const auto region_id) noexcept { kernel_memory.increment(region_id); });
+			for_each(kernel, [&kernel_memory](const auto region_id) noexcept { kernel_memory.increment(region_id); });
 			return Container::SplatKernel::toMask(kernel_memory, norm_factor);
 		});
 
