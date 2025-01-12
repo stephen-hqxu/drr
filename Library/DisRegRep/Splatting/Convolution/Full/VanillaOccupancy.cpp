@@ -1,4 +1,5 @@
-#include <DisRegRep/Splatting/VanillaFullOccupancy.hpp>
+#include <DisRegRep/Splatting/Convolution/Full/VanillaOccupancy.hpp>
+#include <DisRegRep/Splatting/Convolution/Base.hpp>
 #include <DisRegRep/Splatting/ImplementationHelper.hpp>
 
 #include <DisRegRep/Container/SplatKernel.hpp>
@@ -10,7 +11,7 @@
 
 #include <cstddef>
 
-using DisRegRep::Splatting::VanillaFullOccupancy;
+using DisRegRep::Splatting::Convolution::Full::VanillaOccupancy;
 
 using std::views::cartesian_product, std::views::iota, std::views::transform,
 	std::views::take, std::views::join;
@@ -38,7 +39,7 @@ public:
 
 }
 
-DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(VanillaFullOccupancy) {
+DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(VanillaOccupancy) {
 	this->validate(info);
 
 	using ScratchMemoryType = ScratchMemory<ContainerTrait>;
@@ -46,7 +47,7 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(VanillaFullOccupancy) {
 	auto& [kernel_memory, output_memory] = ImplementationHelper::allocate<ScratchMemoryType>(
 		memory, typename ScratchMemoryType::ExtentType(regionfield->RegionCount, extent));
 
-	const SizeType d = BaseFullConvolution::diametre(this->Radius);
+	const SizeType d = Convolution::Base::diametre(this->Radius);
 
 	const auto element_rg = [r = this->Radius, &offset, &extent]<std::size_t... I>(index_sequence<I...>) constexpr noexcept {
 		return cartesian_product(iota(offset[I] - r) | take(extent[I])...);
@@ -61,7 +62,7 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(VanillaFullOccupancy) {
 
 	using std::ranges::transform, std::ranges::for_each;
 	transform(kernel_rg, output_memory.range().begin(),
-		[&kernel_memory, norm_factor = BaseFullConvolution::kernelNormalisationFactor(d)](auto kernel) noexcept {
+		[&kernel_memory, norm_factor = Base::kernelNormalisationFactor(d)](auto kernel) noexcept {
 			kernel_memory.clear();
 			for_each(kernel, [&kernel_memory](const auto region_id) noexcept { kernel_memory.increment(region_id); });
 			return Container::SplatKernel::toMask(kernel_memory, norm_factor);
@@ -70,4 +71,4 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(VanillaFullOccupancy) {
 	return output_memory;
 }
 
-DRR_SPLATTING_DEFINE_FUNCTOR_ALL(VanillaFullOccupancy)
+DRR_SPLATTING_DEFINE_FUNCTOR_ALL(VanillaOccupancy)

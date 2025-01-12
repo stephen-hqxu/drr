@@ -1,20 +1,17 @@
 #pragma once
 
-#include "Base.hpp"
-
-#include <DisRegRep/Core/Type.hpp>
+#include "../Base.hpp"
 
 #include <cstdint>
 
-namespace DisRegRep::Splatting {
+namespace DisRegRep::Splatting::Convolution {
 
 /**
  * @brief A specialised way of computing region feature splatting coefficient is by utilisation of 2D convolution (because regionfield
- * in this project is defined as a 2D matrix). As begin a *full* convolution, all elements covered by the kernel are taken to derive
- * the result. Implementations shall use different criterion to compute region importance, which is one of the most importance
- * coefficient.
+ * in this project is defined as a 2D matrix). Implementations shall use different criterion to compute region importance, which is one
+ * of the most importance coefficient.
  */
-class BaseFullConvolution : public Base {
+class Base : public Splatting::Base {
 public:
 
 	using RadiusType = std::uint_fast16_t;
@@ -33,20 +30,8 @@ public:
 	 *
 	 * @return The kernel diametre, which is always a positive odd number.
 	 */
-	[[nodiscard]] constexpr static SizeType diametre(const RadiusType r) noexcept {
+	[[nodiscard]] static constexpr SizeType diametre(const RadiusType r) noexcept {
 		return 2U * r + 1U;
-	}
-
-	/**
-	 * @brief Calculate the factor to normalise from region importance to region mask by finding the kernel area, given kernel
-	 * diametre.
-	 *
-	 * @param d The kernel diametre.
-	 *
-	 * @return The normalisation factor.
-	 */
-	[[nodiscard]] constexpr static Core::Type::RegionMask kernelNormalisationFactor(const SizeType d) noexcept {
-		return d * d;
 	}
 
 };

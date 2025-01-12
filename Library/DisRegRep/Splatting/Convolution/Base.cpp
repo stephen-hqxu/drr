@@ -1,12 +1,12 @@
-#include <DisRegRep/Splatting/BaseFullConvolution.hpp>
+#include <DisRegRep/Splatting/Convolution/Base.hpp>
 #include <DisRegRep/Splatting/Base.hpp>
 
-using DisRegRep::Splatting::BaseFullConvolution;
+using DisRegRep::Splatting::Convolution::Base;
 
-BaseFullConvolution::DimensionType BaseFullConvolution::minimumRegionfieldDimension(const InvokeInfo& info) const noexcept {
-	return this->Base::minimumRegionfieldDimension(info) + this->Radius;
+Base::DimensionType Base::minimumRegionfieldDimension(const InvokeInfo& info) const noexcept {
+	return this->Splatting::Base::minimumRegionfieldDimension(info) + this->Radius;
 }
 
-BaseFullConvolution::DimensionType BaseFullConvolution::minimumOffset(const InvokeInfo&) const noexcept {
+Base::DimensionType Base::minimumOffset(const InvokeInfo&) const noexcept {
 	return DimensionType(this->Radius);
 }

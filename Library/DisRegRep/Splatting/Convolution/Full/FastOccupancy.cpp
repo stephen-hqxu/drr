@@ -1,4 +1,5 @@
-#include <DisRegRep/Splatting/FastFullOccupancy.hpp>
+#include <DisRegRep/Splatting/Convolution/Full/FastOccupancy.hpp>
+#include <DisRegRep/Splatting/Convolution/Base.hpp>
 #include <DisRegRep/Splatting/ImplementationHelper.hpp>
 
 #include <DisRegRep/Container/SplatKernel.hpp>
@@ -21,7 +22,7 @@
 #include <cassert>
 
 namespace SpltKn = DisRegRep::Container::SplatKernel;
-using DisRegRep::Splatting::FastFullOccupancy;
+using DisRegRep::Splatting::Convolution::Full::FastOccupancy;
 
 using std::tuple, std::make_tuple;
 using std::ranges::for_each,
@@ -47,7 +48,7 @@ public:
 	typename ContainerTrait::MaskOutputType Vertical;
 
 	//(region count, width, height)
-	void resize(const tuple<ExtentType, FastFullOccupancy::SizeType> arg) {
+	void resize(const tuple<ExtentType, FastOccupancy::SizeType> arg) {
 		auto [extent, padding] = arg;
 		this->Kernel.resize(extent.x);
 		this->Vertical.resize(extent);
@@ -102,13 +103,13 @@ void conv1d(
 
 }
 
-DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(FastFullOccupancy) {
+DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(FastOccupancy) {
 	this->validate(info);
 
 	using ScratchMemoryType = ScratchMemory<ContainerTrait>;
 	const auto [regionfield, offset, extent] = info;
 
-	const SizeType d = BaseFullConvolution::diametre(this->Radius),
+	const SizeType d = Convolution::Base::diametre(this->Radius),
 		//Padding does not include the centre element (only the halo), so minus one from the diametre.
 		d_halo = d - 1U;
 
@@ -134,7 +135,7 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(FastFullOccupancy) {
 		kernel_memory,
 		vertical_memory.range().begin(),
 		d,
-		[norm_factor = BaseFullConvolution::kernelNormalisationFactor(d)](
+		[norm_factor = Base::kernelNormalisationFactor(d)](
 			const auto& km) constexpr noexcept { return SpltKn::toMask(km, norm_factor); },
 		[](const auto& proxy) static constexpr noexcept { return *proxy; }
 	);
@@ -142,4 +143,4 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(FastFullOccupancy) {
 	return vertical_memory;
 }
 
-DRR_SPLATTING_DEFINE_FUNCTOR_ALL(FastFullOccupancy)
+DRR_SPLATTING_DEFINE_FUNCTOR_ALL(FastOccupancy)

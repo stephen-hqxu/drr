@@ -7,7 +7,7 @@
 #include <DisRegRep/Core/Arithmetic.hpp>
 #include <DisRegRep/Core/Type.hpp>
 
-#include <DisRegRep/Splatting/BaseFullConvolution.hpp>
+#include <DisRegRep/Splatting/Convolution/Full/Base.hpp>
 #include <DisRegRep/Splatting/Trait.hpp>
 
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -32,9 +32,9 @@ namespace GndTth = DisRegRep::Test::Splatting::GroundTruth;
 namespace SpMatElem = DisRegRep::Container::SparseMatrixElement;
 namespace SpltCoef = DisRegRep::Container::SplattingCoefficient;
 namespace Type = DisRegRep::Core::Type;
+namespace Splt = DisRegRep::Splatting;
 using DisRegRep::Container::Regionfield,
-	DisRegRep::Core::Arithmetic::Normalise,
-	DisRegRep::Splatting::BaseFullConvolution;
+	DisRegRep::Core::Arithmetic::Normalise;
 
 using Catch::Matchers::WithinAbs, Catch::Matchers::RangeEquals;
 
@@ -77,13 +77,15 @@ constexpr auto RegionCount = std::ranges::max(Value) + 1U;
 
 }
 
-namespace FullConvolution {
+namespace Convolution::Full {
 
-constexpr BaseFullConvolution::RadiusType Radius = 2U;
-constexpr auto Offset = BaseFullConvolution::DimensionType(Radius, Radius + 1U),
-	OffsetTransposed = BaseFullConvolution::DimensionType(Offset.y, Offset.x),
-	Extent = BaseFullConvolution::DimensionType(2U, 3U),
-	ExtentTransposed = BaseFullConvolution::DimensionType(Extent.y, Extent.x);
+using Splt::Convolution::Full::Base;
+
+constexpr Base::RadiusType Radius = 2U;
+constexpr auto Offset = Base::DimensionType(Radius, Radius + 1U),
+	OffsetTransposed = Base::DimensionType(Offset.y, Offset.x),
+	Extent = Base::DimensionType(2U, 3U),
+	ExtentTransposed = Base::DimensionType(Extent.y, Extent.x);
 
 template<typename T>
 using SplattingCoefficientMatrixType = array<array<T, Regionfield::RegionCount>, Extent.x * Extent.y>;
@@ -94,8 +96,7 @@ constexpr auto SplattingCoefficientMatrixDense = [] static consteval noexcept {
 		{ 5, 6, 6, 8 }, { 5, 6, 5, 9 },
 		{ 5, 5, 7, 8 }, { 5, 6, 6, 8 }
 	}};
-	static constexpr Type::RegionMask NormFactor =
-		BaseFullConvolution::kernelNormalisationFactor(BaseFullConvolution::diametre(Radius));
+	static constexpr Type::RegionMask NormFactor = Base::kernelNormalisationFactor(Base::diametre(Radius));
 
 	SplattingCoefficientMatrixType<Type::RegionMask> mask {};
 	auto mask_join = mask | join;
@@ -148,20 +149,22 @@ void compare(Matrix& matrix) {
 
 }
 
-void GndTth::checkFullConvolution(BaseFullConvolution& full_conv) {
+void GndTth::checkFullConvolution(Splt::Convolution::Full::Base& full_conv) {
+	namespace CurrentRef = Reference::Convolution::Full;
+
 	apply([&full_conv](const auto... trait) {
 		const bool transposed = full_conv.isTransposed();
 		const Regionfield rf = Reference::Regionfield::load(transposed);
-		full_conv.Radius = Reference::FullConvolution::Radius;
+		full_conv.Radius = CurrentRef::Radius;
 
-		const BaseFullConvolution::InvokeInfo invoke_info {
+		const CurrentRef::Base::InvokeInfo invoke_info {
 			.Regionfield = &rf,
-			.Offset = transposed ? Reference::FullConvolution::OffsetTransposed : Reference::FullConvolution::Offset,
-			.Extent = transposed ? Reference::FullConvolution::ExtentTransposed : Reference::FullConvolution::Extent
+			.Offset = transposed ? CurrentRef::OffsetTransposed : CurrentRef::Offset,
+			.Extent = transposed ? CurrentRef::ExtentTransposed : CurrentRef::Extent
 		};
 		any memory;
 
-		(Reference::FullConvolution::compare(full_conv(trait, invoke_info, memory)), ...);
+		(CurrentRef::compare(full_conv(trait, invoke_info, memory)), ...);
 	}, tuple<
 		DRR_SPLATTING_TRAIT_CONTAINER(Dense, Dense),
 		DRR_SPLATTING_TRAIT_CONTAINER(Dense, Sparse),

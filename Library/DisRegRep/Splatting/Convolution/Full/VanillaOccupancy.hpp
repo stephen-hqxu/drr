@@ -1,22 +1,22 @@
 #pragma once
 
-#include "BaseFullConvolution.hpp"
+#include "Base.hpp"
 
-namespace DisRegRep::Splatting {
+namespace DisRegRep::Splatting::Convolution::Full {
 
 /**
  * @brief A vanilla (a.k.a. naive or brute-force) convolution-based splatting coefficient computer by the occupancy of each region.
  */
-class VanillaFullOccupancy final : public BaseFullConvolution {
+class VanillaOccupancy final : public Base {
 private:
 
 	DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR_IMPL;
 
 public:
 
-	constexpr VanillaFullOccupancy() noexcept = default;
+	constexpr VanillaOccupancy() noexcept = default;
 
-	constexpr ~VanillaFullOccupancy() override = default;
+	constexpr ~VanillaOccupancy() override = default;
 
 	DRR_SPLATTING_SET_INFO("F-", false)
 
