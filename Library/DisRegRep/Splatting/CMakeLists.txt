@@ -1,14 +1,10 @@
+add_subdirectory(Convolution)
+
 drrTargetSource(
 HEADER
 	Base
-	BaseFullConvolution
-	FastFullOccupancy
 	ImplementationHelper
 	Trait
-	VanillaFullOccupancy
 SOURCE
 	Base
-	BaseFullConvolution
-	FastFullOccupancy
-	VanillaFullOccupancy
 )

@@ -6,7 +6,7 @@ add_subdirectory(Container)
 add_subdirectory(Core)
 add_subdirectory(Splatting)
 
-drrTargetSource(${DRR_CURRENT_TARGET}
+drrTargetSource(
 HEADER
 	StringMaker
 )
