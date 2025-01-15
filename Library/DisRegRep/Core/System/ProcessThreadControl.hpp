@@ -36,6 +36,8 @@ inline constexpr auto MinPriority = PriorityLimit::min(),
  *
  * @param priority New priority set to.
  * @param thread Thread whose priority is to be set. Default to the calling thread if not given.
+ *
+ * @exception std::system_error For any exception thrown by system API.
  */
 void setPriority(Priority, std::jthread* = nullptr);
 
@@ -44,6 +46,8 @@ void setPriority(Priority, std::jthread* = nullptr);
  *
  * @param affinity_mask New affinity mask set to.
  * @param thread Thread whose affinity mask is to be set. Default to the calling thread if not given.
+ *
+ * @exception std::system_error For any exception thrown by system API.
  */
 void setAffinityMask(AffinityMask, std::jthread* = nullptr);
 
