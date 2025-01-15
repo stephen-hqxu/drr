@@ -40,20 +40,20 @@ public:
 }
 
 DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(VanillaOccupancy) {
-	this->validate(info);
+	this->validate(regionfield, info);
 
 	using ScratchMemoryType = ScratchMemory<ContainerTrait>;
-	const auto [regionfield, offset, extent] = info;
+	const auto [offset, extent, radius] = dynamic_cast<const InvokeInfo&>(info).tuple();
 	auto& [kernel_memory, output_memory] = ImplementationHelper::allocate<ScratchMemoryType>(
-		memory, typename ScratchMemoryType::ExtentType(regionfield->RegionCount, extent));
+		memory, typename ScratchMemoryType::ExtentType(regionfield.RegionCount, extent));
 
-	const SizeType d = Convolution::Base::diametre(this->Radius);
+	const SizeType d = Convolution::Base::diametre(radius);
 
-	const auto element_rg = [r = this->Radius, &offset, &extent]<std::size_t... I>(index_sequence<I...>) constexpr noexcept {
-		return cartesian_product(iota(offset[I] - r) | take(extent[I])...);
+	const auto element_rg = [radius, &offset, &extent]<std::size_t... I>(index_sequence<I...>) constexpr noexcept {
+		return cartesian_product(iota(offset[I] - radius) | take(extent[I])...);
 	}(index_sequence<1U, 0U> {});
 	const auto kernel_rg = element_rg
-		| transform([d, rf_2d = regionfield->range2d()](const auto idx) constexpr noexcept {
+		| transform([d, rf_2d = regionfield.range2d()](const auto idx) constexpr noexcept {
 			const auto [y, x] = idx;
 			return rf_2d
 				| Core::Arithmetic::SubRange2d(DimensionType(x, y), DimensionType(d))

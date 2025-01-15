@@ -12,6 +12,6 @@ namespace DisRegRep::Test::Splatting::GroundTruth {
  *
  * @param full_conv A full convolution splatting.
  */
-void checkFullConvolution(DisRegRep::Splatting::Convolution::Full::Base&);
+void checkFullConvolution(const DisRegRep::Splatting::Convolution::Full::Base&);
 
 }

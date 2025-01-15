@@ -2,6 +2,8 @@
 
 #include "../Base.hpp"
 
+#include <tuple>
+
 #include <cstdint>
 
 namespace DisRegRep::Splatting::Convolution {
@@ -14,14 +16,24 @@ namespace DisRegRep::Splatting::Convolution {
 class Base : public Splatting::Base {
 public:
 
+	using BaseInvokeInfo = Splatting::Base::InvokeInfo;
+
 	using RadiusType = std::uint_fast16_t;
 	using SizeType = std::uint_fast32_t;
 
-	RadiusType Radius {}; /**< Radius of the convolution kernel. No convolution is performed if radius is zero. */
+	struct InvokeInfo : BaseInvokeInfo {
 
-	[[nodiscard]] DimensionType minimumRegionfieldDimension(const InvokeInfo&) const noexcept override;
+		RadiusType Radius {}; /**< Radius of the convolution kernel. No convolution is performed if radius is zero. */
 
-	[[nodiscard]] DimensionType minimumOffset(const InvokeInfo&) const noexcept override;
+		[[nodiscard]] constexpr auto tuple() const noexcept {
+			return std::make_tuple(this->Offset, this->Extent, this->Radius);
+		}
+
+	};
+
+	[[nodiscard]] DimensionType minimumRegionfieldDimension(const BaseInvokeInfo&) const noexcept override;
+
+	[[nodiscard]] DimensionType minimumOffset(const BaseInvokeInfo&) const noexcept override;
 
 	/**
 	 * @brief Calculate the kernel diametre with the current radius.

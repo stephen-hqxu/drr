@@ -14,8 +14,9 @@
 #define DRR_SPLATTING_DECLARE_FUNCTOR(QUAL, KERNEL, OUTPUT) \
 	DRR_SPLATTING_TRAIT_CONTAINER(KERNEL, OUTPUT)::MaskOutputType& QUAL operator()( \
 		const DRR_SPLATTING_TRAIT_CONTAINER(KERNEL, OUTPUT) container_trait, \
-		const DisRegRep::Splatting::Base::InvokeInfo& info, \
-		std::any& memory \
+		const DisRegRep::Container::Regionfield& regionfield, \
+		std::any& memory, \
+		const DisRegRep::Splatting::Base::InvokeInfo& info \
 	) const
 //Do `DRR_SPLATTING_DECLARE_FUNCTOR` for every valid combination of container implementations.
 #define DRR_SPLATTING_DECLARE_FUNCTOR_ALL(PREFIX, SUFFIX) \
@@ -30,8 +31,9 @@
 #define DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR(FUNC_QUAL, QUAL) \
 	template<DisRegRep::Splatting::Trait::IsContainer ContainerTrait> \
 	FUNC_QUAL ContainerTrait::MaskOutputType& QUAL invokeImpl( \
-		const DisRegRep::Splatting::Base::InvokeInfo& info, \
-		std::any& memory \
+		const DisRegRep::Container::Regionfield& regionfield, \
+		std::any& memory, \
+		const DisRegRep::Splatting::Base::InvokeInfo& info \
 	) const
 //Do `DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR` with the correct qualifier for splatting implementations.
 #define DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR_IMPL DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR(,)
@@ -61,10 +63,14 @@ public:
 	>;
 
 	struct InvokeInfo {
+	private:
 
-		const Container::Regionfield* Regionfield;
-		DimensionType Offset, /**< Coordinate of the first point on `Regionfield` included for splatting. */
-			Extent; /**< Extent covering the area on `Regionfield` to be splatted. */
+		virtual consteval void forcePolymorphic() const noexcept { }
+
+	public:
+
+		DimensionType Offset, /**< Coordinate of the first point on the regionfield included for splatting. */
+			Extent; /**< Extent covering the area on the regionfield where splatting are performed. */
 
 	};
 
@@ -73,9 +79,10 @@ protected:
 	/**
 	 * @brief Check if given parameters are valid to be used for the selected splatting method.
 	 *
+	 * @param regionfield Regionfield used for splatting.
 	 * @param info The invoke info.
 	 */
-	virtual void validate(const InvokeInfo&) const;
+	virtual void validate(const Container::Regionfield&, const InvokeInfo&) const;
 
 public:
 
@@ -113,7 +120,7 @@ public:
 	 *
 	 * @param info The invoke info.
 	 *
-	 * @return Minimum regionfield dimension.
+	 * @return Minimum regionfield dimension to be allocated by @link Container::Regionfield::resize.
 	 */
 	[[nodiscard]] virtual DimensionType minimumRegionfieldDimension(const InvokeInfo&) const noexcept;
 
@@ -122,7 +129,7 @@ public:
 	 *
 	 * @param info The invoke info.
 	 *
-	 * @return Minimum offset.
+	 * @return Minimum offset for @link InvokeInfo::Offset.
 	 */
 	[[nodiscard]] virtual DimensionType minimumOffset(const InvokeInfo&) const noexcept;
 
@@ -131,11 +138,12 @@ public:
 	 * perform boundary checking, and the application should adjust offset to handle potential out-of-bound access.
 	 *
 	 * @param container_trait Specify the container trait.
-	 * @param info The invoke info.
+	 * @param regionfield Splatting coefficients are computed for this regionfield.
 	 * @param memory The scratch memory to be used in this invocation. The type is erased to allow implementation-defined behaviours.
 	 * It is recommended to use the same memory instance across different invocation with the same `container_trait` to enable memory
 	 * reuse. Otherwise, existing contents captured in `memory` will be destroyed if it does not contain a valid type used by the
 	 * specific implementation.
+	 * @param info The invoke info.
 	 *
 	 * @return The generated region mask for this regionfield whose memory is sourced from `memory`. It is safe to modify its contents
 	 * should the application wish to.
