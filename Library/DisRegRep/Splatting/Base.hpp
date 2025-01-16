@@ -63,11 +63,6 @@ public:
 	>;
 
 	struct InvokeInfo {
-	private:
-
-		virtual consteval void forcePolymorphic() const noexcept { }
-
-	public:
 
 		DimensionType Offset, /**< Coordinate of the first point on the regionfield included for splatting. */
 			Extent; /**< Extent covering the area on the regionfield where splatting are performed. */

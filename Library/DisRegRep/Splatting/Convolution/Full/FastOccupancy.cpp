@@ -107,9 +107,9 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(FastOccupancy) {
 	this->validate(regionfield, info);
 
 	using ScratchMemoryType = ScratchMemory<ContainerTrait>;
-	const auto [offset, extent, radius] = dynamic_cast<const InvokeInfo&>(info).tuple();
+	const auto [offset, extent] = info;
 
-	const SizeType d = Convolution::Base::diametre(radius),
+	const SizeType d = Convolution::Base::diametre(this->Radius),
 		//Padding does not include the centre element (only the halo), so minus one from the diametre.
 		d_halo = d - 1U;
 
@@ -121,7 +121,7 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(FastOccupancy) {
 	//In horizontal scanline, this overlaps with the 1D kernel.
 	//In vertical scanline, this includes the padding.
 	conv1d(
-		regionfield.range2d() | Core::Arithmetic::SubRange2d(offset - radius, extent + d_halo),
+		regionfield.range2d() | Core::Arithmetic::SubRange2d(offset - this->Radius, extent + d_halo),
 		kernel_memory,
 		horizontal_memory.range().begin(),
 		d,

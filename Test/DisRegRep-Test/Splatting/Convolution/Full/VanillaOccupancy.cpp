@@ -9,7 +9,7 @@ using DisRegRep::Splatting::Convolution::Full::VanillaOccupancy;
 SCENARIO("Use a brute-force 2D convolution to compute splatting coefficients from a regionfield", "[Splatting][VanillaFullOccupancy]") {
 
 	GIVEN("A vanilla full occupancy splatting") {
-		const VanillaOccupancy splatting;
+		VanillaOccupancy splatting;
 
 		WHEN("It is invoked with ground truth data") {
 

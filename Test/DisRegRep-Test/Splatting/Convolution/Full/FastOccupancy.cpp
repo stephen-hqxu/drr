@@ -9,7 +9,7 @@ using DisRegRep::Splatting::Convolution::Full::FastOccupancy;
 SCENARIO("Use an optimised 2D convolution to compute splatting coefficients from a regionfield", "[Splatting][FastFullOccupancy]") {
 
 	GIVEN("A fast full occupancy splatting") {
-		const FastOccupancy splatting;
+		FastOccupancy splatting;
 
 		WHEN("It is invoked with ground truth data") {
 

@@ -149,17 +149,18 @@ void compare(Matrix& matrix) {
 
 }
 
-void GndTth::checkFullConvolution(const Splt::Convolution::Full::Base& full_conv) {
+void GndTth::checkFullConvolution(Splt::Convolution::Full::Base& full_conv) {
 	namespace CurrentRef = Reference::Convolution::Full;
 
-	apply([&full_conv](const auto... trait) {
+	full_conv.Radius = CurrentRef::Radius;
+	apply([&full_conv = std::as_const(full_conv)](const auto... trait) {
 		const bool transposed = full_conv.isTransposed();
 		const Regionfield rf = Reference::Regionfield::load(transposed);
 
-		CurrentRef::Base::InvokeInfo invoke_info;
-		invoke_info.Offset = transposed ? CurrentRef::OffsetTransposed : CurrentRef::Offset;
-		invoke_info.Extent = transposed ? CurrentRef::ExtentTransposed : CurrentRef::Extent;
-		invoke_info.Radius = CurrentRef::Radius;
+		const CurrentRef::Base::InvokeInfo invoke_info {
+			.Offset = transposed ? CurrentRef::OffsetTransposed : CurrentRef::Offset,
+			.Extent = transposed ? CurrentRef::ExtentTransposed : CurrentRef::Extent
+		};
 		any memory;
 
 		(CurrentRef::compare(full_conv(trait, rf, memory, invoke_info)), ...);
