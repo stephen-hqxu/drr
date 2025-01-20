@@ -6,6 +6,8 @@
 
 #include <DisRegRep/Core/Arithmetic.hpp>
 
+#include <tuple>
+
 #include <algorithm>
 #include <ranges>
 
@@ -13,6 +15,7 @@
 
 using DisRegRep::Splatting::Convolution::Full::VanillaOccupancy;
 
+using std::tie, std::apply;
 using std::views::cartesian_product, std::views::iota, std::views::transform,
 	std::views::take, std::views::join;
 using std::index_sequence;
@@ -35,6 +38,10 @@ public:
 		this->Output.resize(extent);
 	}
 
+	[[nodiscard]] VanillaOccupancy::SizeType sizeByte() const noexcept {
+		return apply([](const auto&... member) static noexcept { return (member.sizeByte() + ...); }, tie(this->Kernel, this->Output));
+	}
+
 };
 
 }
@@ -44,10 +51,10 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(VanillaOccupancy) {
 
 	using ScratchMemoryType = ScratchMemory<ContainerTrait>;
 	const auto [offset, extent] = info;
-	auto& [kernel_memory, output_memory] = ImplementationHelper::allocate<ScratchMemoryType>(
+	auto& [kernel_memory, output_memory] = ImplementationHelper::allocate<ScratchMemory, ContainerTrait>(
 		memory, typename ScratchMemoryType::ExtentType(regionfield.RegionCount, extent));
 
-	const SizeType d = Convolution::Base::diametre(this->Radius);
+	const KernelSizeType d = Convolution::Base::diametre(this->Radius);
 
 	const auto element_rg = [r = this->Radius, &offset, &extent]<std::size_t... I>(index_sequence<I...>) constexpr noexcept {
 		return cartesian_product(iota(offset[I] - r) | take(extent[I])...);
@@ -71,4 +78,5 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(VanillaOccupancy) {
 	return output_memory;
 }
 
+DRR_SPLATTING_DEFINE_SIZE_BYTE(VanillaOccupancy)
 DRR_SPLATTING_DEFINE_FUNCTOR_ALL(VanillaOccupancy)

@@ -10,9 +10,14 @@
 #include <DisRegRep/Splatting/Convolution/Full/Base.hpp>
 #include <DisRegRep/Splatting/Trait.hpp>
 
+#include <catch2/generators/catch_generators_adapters.hpp>
+#include <catch2/generators/catch_generators_random.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/matchers/catch_matchers_range_equals.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 #include <catch2/catch_test_macros.hpp>
+
+#include <glm/gtc/type_ptr.hpp>
 
 #include <array>
 
@@ -28,6 +33,8 @@
 
 #include <concepts>
 
+#include <cstdint>
+
 namespace GndTth = DisRegRep::Test::Splatting::GroundTruth;
 namespace SpMatElem = DisRegRep::Container::SparseMatrixElement;
 namespace SpltCoef = DisRegRep::Container::SplattingCoefficient;
@@ -36,10 +43,13 @@ namespace Splt = DisRegRep::Splatting;
 using DisRegRep::Container::Regionfield,
 	DisRegRep::Core::Arithmetic::Normalise;
 
-using Catch::Matchers::WithinAbs, Catch::Matchers::RangeEquals;
+using Catch::Matchers::WithinAbs, Catch::Matchers::RangeEquals, Catch::Matchers::ContainsSubstring;
+
+using glm::make_vec2;
 
 using std::array, std::to_array;
-using std::any, std::tuple, std::apply;
+using std::any,
+	std::tie, std::apply, std::tuple_size_v;
 using std::ranges::copy, std::ranges::all_of,
 	std::bind_front, std::bind_back, std::identity,
 	std::indirect_binary_predicate,
@@ -81,7 +91,7 @@ namespace Convolution::Full {
 
 using Splt::Convolution::Full::Base;
 
-constexpr Base::RadiusType Radius = 2U;
+constexpr Base::KernelSizeType Radius = 2U;
 constexpr auto Offset = Base::DimensionType(Radius, Radius + 1U),
 	OffsetTransposed = Base::DimensionType(Offset.y, Offset.x),
 	Extent = Base::DimensionType(2U, 3U),
@@ -149,24 +159,81 @@ void compare(Matrix& matrix) {
 
 }
 
-void GndTth::checkFullConvolution(Splt::Convolution::Full::Base& full_conv) {
-	namespace CurrentRef = Reference::Convolution::Full;
-
-	full_conv.Radius = CurrentRef::Radius;
-	apply([&full_conv = std::as_const(full_conv)](const auto... trait) {
-		const bool transposed = full_conv.isTransposed();
-		const Regionfield rf = Reference::Regionfield::load(transposed);
-
-		const CurrentRef::Base::InvokeInfo invoke_info {
-			.Offset = transposed ? CurrentRef::OffsetTransposed : CurrentRef::Offset,
-			.Extent = transposed ? CurrentRef::ExtentTransposed : CurrentRef::Extent
+void GndTth::checkMinimumRequirement(BaseConvolution& splatting) {
+	THEN("It has the correct minimum requirements") {
+		const auto size = GENERATE(take(3U, chunk(5U, random<std::uint_least8_t>(16U, 128U))));
+		const BaseConvolution::InvokeInfo invoke_info {
+			.Offset = make_vec2(size.data()),
+			.Extent = make_vec2(size.data() + 2U)
 		};
-		any memory;
+		const auto& [offset, extent] = invoke_info;
+		splatting.Radius = size.back();
 
-		(CurrentRef::compare(full_conv(trait, rf, memory, invoke_info)), ...);
-	}, tuple<
-		DRR_SPLATTING_TRAIT_CONTAINER(Dense, Dense),
-		DRR_SPLATTING_TRAIT_CONTAINER(Dense, Sparse),
-		DRR_SPLATTING_TRAIT_CONTAINER(Sparse, Sparse)
-	> {});
+		REQUIRE(splatting.minimumRegionfieldDimension(invoke_info) == extent + offset + splatting.Radius);
+		REQUIRE(splatting.minimumOffset(invoke_info) == BaseConvolution::DimensionType(splatting.Radius));
+	}
+}
+
+void GndTth::checkSplattingCoefficient(BaseFullConvolution& splatting) {
+	AND_GIVEN("An invoke specification that does not satisfy the minimum requirements") {
+		const auto size = GENERATE(take(3U, chunk(4U, random<BaseFullConvolution::KernelSizeType>(4U, 8U))));
+		const auto extent = make_vec2(size.data());
+		splatting.Radius = size[2U];
+
+		BaseFullConvolution::InvokeInfo optimal_invoke_info {
+			.Extent = extent
+		};
+		optimal_invoke_info.Offset = splatting.minimumOffset(optimal_invoke_info);
+
+		Regionfield rf;
+		rf.RegionCount = size.back();
+		rf.resize(splatting.minimumRegionfieldDimension(optimal_invoke_info));
+
+		auto invoke = [
+			&splatting = std::as_const(splatting),
+			&invoke_info = std::as_const(optimal_invoke_info),
+			&rf = std::as_const(rf),
+			memory = any()
+		]() mutable -> void {
+			apply(
+				[&](const auto... trait) { (splatting(trait, rf, memory, invoke_info), ...); }, Splt::Trait::ContainerCombination {});
+		};
+
+		WHEN("Regionfield is too small") {
+			rf.resize(rf.extent() - 1U);
+
+			REQUIRE_THROWS_WITH(invoke(), ContainsSubstring("greaterThanEqual") && ContainsSubstring("minimumRegionfieldDimension"));
+		}
+
+		WHEN("Offset is too small") {
+			optimal_invoke_info.Offset -= 1U;
+
+			REQUIRE_THROWS_WITH(invoke(), ContainsSubstring("greaterThanEqual") && ContainsSubstring("minimumOffset"));
+		}
+
+	}
+
+	WHEN("It is invoked with ground truth data") {
+		namespace CurrentRef = Reference::Convolution::Full;
+		array<any, tuple_size_v<Splt::Trait::ContainerCombination>> memory;
+
+		splatting.Radius = CurrentRef::Radius;
+		const auto result = apply([&splatting = std::as_const(splatting), &memory](const auto... trait) {
+			return apply([&splatting, trait...](auto&... memory) {
+				const bool transposed = splatting.isTransposed();
+				const Regionfield rf = Reference::Regionfield::load(transposed);
+
+				const BaseFullConvolution::InvokeInfo invoke_info {
+					.Offset = transposed ? CurrentRef::OffsetTransposed : CurrentRef::Offset,
+					.Extent = transposed ? CurrentRef::ExtentTransposed : CurrentRef::Extent
+				};
+				return tie(splatting(trait, rf, memory, invoke_info)...);
+			}, memory);
+		}, Splt::Trait::ContainerCombination {});
+
+		THEN("Splatting coefficients computed are correct") {
+			apply([](auto&... matrix) static { (CurrentRef::compare(matrix), ...); }, result);
+		}
+
+	}
 }

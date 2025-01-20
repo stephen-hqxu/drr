@@ -3,6 +3,14 @@
 #include <DisRegRep/Container/SplatKernel.hpp>
 #include <DisRegRep/Container/SplattingCoefficient.hpp>
 
+#include <array>
+#include <string_view>
+#include <tuple>
+
+#include <algorithm>
+
+#include <utility>
+
 #include <type_traits>
 
 #include <cstdint>
@@ -28,6 +36,22 @@ enum class ContainerImplementation : std::uint_fast8_t {
 };
 
 /**
+ * @brief Get a representative name of the container implementation enum.
+ *
+ * @param impl Container implementation.
+ *
+ * @return String representation of `impl`.
+ */
+[[nodiscard]] consteval std::string_view tag(const ContainerImplementation impl) noexcept {
+	using enum ContainerImplementation;
+	switch (impl) {
+	case Dense: return "D";
+	case Sparse: return "S";
+	default: std::unreachable();
+	}
+}
+
+/**
  * @brief Type traits of containers used during the computation of splatting coefficients.
  *
  * @tparam Kernel Container implementation of the splatting kernel.
@@ -44,6 +68,22 @@ public:
 
 	static constexpr ContainerImplementation KernelContainerImplementation = Kernel,
 		OutputContainerImplementation = Output;
+
+private:
+
+	static constexpr auto TagCharacter = std::apply(
+		[](const auto... impl) static consteval {
+			using std::array, std::string_view, std::ranges::copy;
+
+			array<string_view::value_type, sizeof...(impl)> ch {};
+			auto it = ch.begin();
+			((it = copy(tag(impl), it).out), ...);
+			return ch;
+		}, std::make_tuple(KernelContainerImplementation, OutputContainerImplementation));
+
+public:
+
+	static constexpr std::string_view Tag = TagCharacter; /**< Just a string representation of this container trait. */
 
 	using KernelType = SwitchContainer<
 		KernelContainerImplementation,
@@ -68,5 +108,14 @@ public:
  */
 template<typename Tr>
 concept IsContainer = std::is_same_v<Tr, Container<Tr::KernelContainerImplementation, Tr::OutputContainerImplementation>>;
+
+/**
+ * @brief All valid container trait combinations.
+ */
+using ContainerCombination = std::tuple<
+	DRR_SPLATTING_TRAIT_CONTAINER(Dense, Dense),
+	DRR_SPLATTING_TRAIT_CONTAINER(Dense, Sparse),
+	DRR_SPLATTING_TRAIT_CONTAINER(Sparse, Sparse)
+>;
 
 }

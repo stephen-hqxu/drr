@@ -81,6 +81,13 @@ public:
 	void resize(DimensionType);
 
 	/**
+	 * @brief Get regionfield matrix extent.
+	 *
+	 * @return Width and height.
+	 */
+	[[nodiscard]] DimensionType extent() const noexcept;
+
+	/**
 	 * @brief Get the linear size of the regionfield matrix.
 	 *
 	 * @return The total number of region identifiers stored.

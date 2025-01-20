@@ -114,10 +114,10 @@ inline constexpr auto SubRange2d = Range::RangeAdaptorClosure([]<
 	return std::forward<OuterR>(outer_r)
 		| drop(offset.y)
 		| take(extent.y)
-		| transform([offset_x = offset.x, extent_x = extent.x](auto inner_r) constexpr noexcept(
-			std::is_nothrow_move_constructible_v<InnerR>
+		| transform([offset_x = offset.x, extent_x = extent.x]<typename R>(R&& inner_r) constexpr noexcept(
+			std::is_nothrow_constructible_v<std::decay_t<R>, R>
 		) {
-			return std::move(inner_r)
+			return std::forward<R>(inner_r)
 				| drop(offset_x)
 				| take(extent_x);
 		});

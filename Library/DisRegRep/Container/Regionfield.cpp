@@ -3,7 +3,10 @@
 #include <DisRegRep/Core/Arithmetic.hpp>
 #include <DisRegRep/Core/Exception.hpp>
 
+#include <glm/gtc/type_ptr.hpp>
 #include <glm/vector_relational.hpp>
+
+#include <span>
 
 #include <algorithm>
 #include <execution>
@@ -15,10 +18,13 @@
 
 using DisRegRep::Container::Regionfield;
 
-using std::for_each, std::ranges::copy,
+using glm::value_ptr;
+
+using std::span;
+using std::for_each, std::ranges::reverse, std::ranges::copy,
 	std::execution::par_unseq,
 	std::views::zip;
-using std::index_sequence;
+using std::index_sequence, std::make_index_sequence;
 
 Regionfield Regionfield::transpose() const {
 	//Make a fresh copy instead of just changing the stride (as a transposed view).
@@ -29,10 +35,9 @@ Regionfield Regionfield::transpose() const {
 	//	but performance is generally poor on large matrix (even though it saves us memory) as not being parallelisable.
 	Regionfield transposed;
 	transposed.RegionCount = this->RegionCount;
-	const auto transposed_dim = [&ext = this->mapping().extents()]<std::size_t... I>(index_sequence<I...>) constexpr noexcept {
-		return DimensionType(ext.extent(I)...);
-	}(index_sequence<1U, 0U> {});
-	transposed.resize(transposed_dim);
+	DimensionType transposed_extent = this->extent();
+	reverse(::span(value_ptr(transposed_extent), DimensionType::length()));
+	transposed.resize(transposed_extent);
 
 	//Cannot use join on parallel algorithm because it is not a forward range.
 	//Mainly because of the xvalue return on the 2D range adaptor, such that inner range is not a reference type.
@@ -53,4 +58,10 @@ void Regionfield::resize(const DimensionType dim) {
 
 	this->Mapping = ExtentType(dim.x, dim.y);
 	this->Data.resize(this->Mapping.required_span_size());
+}
+
+Regionfield::DimensionType Regionfield::extent() const noexcept {
+	return [&ext = this->mapping().extents()]<std::size_t... I>(index_sequence<I...>) constexpr noexcept {
+		return DimensionType(ext.extent(I)...);
+	}(make_index_sequence<ExtentType::rank()> {});
 }

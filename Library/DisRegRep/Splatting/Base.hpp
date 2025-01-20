@@ -10,6 +10,14 @@
 
 #include <type_traits>
 
+#include <cstddef>
+
+//Declare `DisRegRep::Splatting::Base::sizeByte`.
+#define DRR_SPLATTING_DECLARE_SIZE_BYTE(PREFIX, QUAL, SUFFIX) \
+	PREFIX DisRegRep::Splatting::Base::SizeType QUAL sizeByte(const std::any& memory) const SUFFIX
+//Do `DRR_SPLATTING_DECLARE_SIZE_BYTE` for splatting implementations.
+#define DRR_SPLATTING_DECLARE_SIZE_BYTE_IMPL DRR_SPLATTING_DECLARE_SIZE_BYTE([[nodiscard]],, override)
+
 //Declare `DisRegRep::Splatting::Base::operator()`.
 #define DRR_SPLATTING_DECLARE_FUNCTOR(QUAL, KERNEL, OUTPUT) \
 	DRR_SPLATTING_TRAIT_CONTAINER(KERNEL, OUTPUT)::MaskOutputType& QUAL operator()( \
@@ -61,6 +69,7 @@ public:
 		Container::Regionfield::DimensionType,
 		Container::SplattingCoefficient::Type::Dimension2Type
 	>;
+	using SizeType = std::size_t;
 
 	struct InvokeInfo {
 
@@ -127,6 +136,17 @@ public:
 	 * @return Minimum offset for @link InvokeInfo::Offset.
 	 */
 	[[nodiscard]] virtual DimensionType minimumOffset(const InvokeInfo&) const noexcept;
+
+	/**
+	 * @brief Query the usage of scratch memory.
+	 *
+	 * @param memory Scratch memory that has been used by the current splatting method for at least one computation.
+	 *
+	 * @return Memory usage of `memory` in bytes.
+	 *
+	 * @exception std::bad_any_cast If `memory` is not a valid scratch memory for this splatting.
+	 */
+	DRR_SPLATTING_DECLARE_SIZE_BYTE([[nodiscard]] virtual,, = 0);
 
 	/**
 	 * @brief Invoke to compute region feature splatting coefficients on a given regionfield. The splatting does not need to

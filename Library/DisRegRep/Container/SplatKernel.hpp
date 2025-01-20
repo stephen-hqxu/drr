@@ -124,6 +124,8 @@ private:
 
 public:
 
+	using SizeType = ContainerType::size_type;
+
 	constexpr Dense() noexcept = default;
 
 	Dense(const Dense&) = delete;
@@ -144,6 +146,13 @@ public:
 	[[nodiscard]] constexpr IndexType size() const noexcept {
 		return this->Importance_.size();
 	}
+
+	/**
+	 * @brief Get size of the dense kernel in bytes.
+	 *
+	 * @return Dense kernel size in bytes.
+	 */
+	[[nodiscard]] SizeType sizeByte() const noexcept;
 
 	/**
 	 * @brief Check if the dense kernel is empty.
@@ -288,6 +297,8 @@ private:
 
 public:
 
+	using SizeType = std::common_type_t<ValueContainerType::size_type, OffsetContainerType::size_type>;
+
 	constexpr Sparse() noexcept = default;
 
 	Sparse(const Sparse&) = delete;
@@ -311,6 +322,13 @@ public:
 	[[nodiscard]] constexpr IndexType size() const noexcept {
 		return this->Importance_.size();
 	}
+
+	/**
+	 * @brief Get size of the sparse kernel in bytes.
+	 * 
+	 * @return Sparse kernel size in bytes.
+	 */
+	[[nodiscard]] SizeType sizeByte() const noexcept;
 
 	/**
 	 * @brief Check if sparse kernel is empty.

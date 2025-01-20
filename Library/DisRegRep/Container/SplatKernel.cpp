@@ -3,6 +3,9 @@
 
 #include <DisRegRep/Core/Type.hpp>
 
+#include <span>
+#include <tuple>
+
 #include <algorithm>
 #include <execution>
 #include <functional>
@@ -16,6 +19,7 @@ namespace SpltKn = DisRegRep::Container::SplatKernel;
 using SpltKn::Dense, SpltKn::Sparse, SpltKn::Internal_::DenseKernelBinaryOperator,
 	DisRegRep::Container::SparseMatrixElement::Importance, DisRegRep::Core::Type::RegionIdentifier;
 
+using std::span, std::tie, std::apply;
 using std::for_each, std::execution::unseq,
 	std::ranges::fill;
 using std::plus, std::minus, std::invoke;
@@ -48,6 +52,10 @@ constexpr void Dense::modify(const Importance& importance, Op op) noexcept(std::
 	this->modify(region_id, std::move(op), value);
 }
 
+Dense::SizeType Dense::sizeByte() const noexcept {
+	return ::span(this->Importance_).size_bytes();
+}
+
 void Dense::resize(const IndexType region_count) {
 	this->Importance_.resize(region_count);
 }
@@ -70,6 +78,11 @@ void Dense::decrement(const IndexType region_id) noexcept {
 
 void Dense::decrement(const Importance& importance) noexcept {
 	this->modify(importance, minus {});
+}
+
+Sparse::SizeType Sparse::sizeByte() const noexcept {
+	return apply([](const auto&... array) static constexpr noexcept { return (::span(array).size_bytes() + ...); },
+		tie(this->Importance_, this->Offset));
 }
 
 void Sparse::resize(const IndexType region_count) {

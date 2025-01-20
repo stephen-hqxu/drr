@@ -15,6 +15,10 @@
 #include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <glm/gtc/type_ptr.hpp>
+
+#include <span>
+
 #include <algorithm>
 #include <functional>
 #include <ranges>
@@ -32,6 +36,9 @@ namespace Type = DisRegRep::Core::Type;
 using Catch::Matchers::SizeIs, Catch::Matchers::IsEmpty,
 	Catch::Matchers::AllTrue, Catch::Matchers::ContainsSubstring;
 
+using glm::make_vec3, glm::value_ptr;
+
+using std::span;
 using std::ranges::fold_left_first, std::ranges::copy, std::ranges::equal,
 	std::bind_back, std::multiplies, std::bit_or,
 	std::views::zip_transform, std::views::transform;
@@ -66,19 +73,19 @@ TEMPLATE_PRODUCT_TEST_CASE("Splatting coefficient matrix allocates memory in two
 		}
 
 		WHEN("Resized") {
-			const auto dim = generateDimension<IndexType>();
-			REQUIRE_NOTHROW(matrix.resize(Dimension3Type(dim[0], dim[1], dim[2])));
+			const auto dim = make_vec3(generateDimension<IndexType>().data());
+			REQUIRE_NOTHROW(matrix.resize(dim));
 
 			AND_WHEN("Some sizes are zeros") {
 
 				THEN("Resize fails") {
 					if constexpr (IsDense) {
-						CHECK_THROWS_WITH(matrix.resize(Dimension3Type(0U, dim[1], dim[2])),
+						CHECK_THROWS_WITH(matrix.resize(Dimension3Type(0U, dim.y, dim.z)),
 							ContainsSubstring("greaterThan") && ContainsSubstring("0U"));
 					}
-					CHECK_THROWS_WITH(matrix.resize(Dimension3Type(dim[0], 0U, dim[2])),
+					CHECK_THROWS_WITH(matrix.resize(Dimension3Type(dim.x, 0U, dim.z)),
 						ContainsSubstring("greaterThan") && ContainsSubstring("0U"));
-					CHECK_THROWS_WITH(matrix.resize(Dimension3Type(dim[0], dim[1], 0U)),
+					CHECK_THROWS_WITH(matrix.resize(Dimension3Type(dim.x, dim.y, 0U)),
 						ContainsSubstring("greaterThan") && ContainsSubstring("0U"));
 				}
 
@@ -86,7 +93,7 @@ TEMPLATE_PRODUCT_TEST_CASE("Splatting coefficient matrix allocates memory in two
 
 			THEN("Matrix memory is allocated with the correct size") {
 				if constexpr (IsDense) {
-					REQUIRE_THAT(matrix, SizeIs(*fold_left_first(dim, multiplies {})));
+					REQUIRE_THAT(matrix, SizeIs(*fold_left_first(span(value_ptr(dim), Dimension3Type::length()), multiplies {})));
 					REQUIRE_THAT(matrix, !IsEmpty());
 				} else {
 					REQUIRE_THAT(matrix, IsEmpty());
@@ -103,15 +110,14 @@ TEMPLATE_PRODUCT_TEST_CASE("Matrix that stores region splatting coefficients", "
 	MATRIX_TYPE_PRODUCT_LIST) {
 	using MatrixType = TestType;
 	using IndexType = typename MatrixType::IndexType;
-	using Dimension3Type = typename MatrixType::Dimension3Type;
 	using ValueType = typename MatrixType::ValueType;
 
 	static constexpr bool IsSparse = SpltCoef::IsSparse<MatrixType>;
 
 	GIVEN("A region splatting coefficient matrix and some coefficients") {
-		const auto dim = generateDimension<IndexType>();
+		const auto dim = make_vec3(generateDimension<IndexType>().data());
 		MatrixType matrix;
-		matrix.resize(Dimension3Type(dim[0], dim[1], dim[2]));
+		matrix.resize(dim);
 
 		//I am not going to test sparse input on sparse matrix, since sparse SCM internally views dense input as sparse anyway.
 		const auto coefficient = GENERATE_REF(take(1U, chunk(matrix.size(), map(
@@ -124,7 +130,7 @@ TEMPLATE_PRODUCT_TEST_CASE("Matrix that stores region splatting coefficients", "
 			}, random(-10.0F, 10.0F)))));
 
 		WHEN("Matrix is filled in with the coefficients") {
-			const auto input = coefficient | Arithmetic::View2d(dim[0]);
+			const auto input = coefficient | Arithmetic::View2d(dim.x);
 			const auto output = matrix.range();
 			copy(input, output.begin());
 

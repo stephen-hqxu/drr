@@ -13,11 +13,13 @@
 #include <catch2/catch_get_random_seed.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <glm/gtc/type_ptr.hpp>
+
+#include <span>
+
 #include <algorithm>
 #include <functional>
 #include <ranges>
-
-#include <utility>
 
 #include <cstddef>
 #include <cstdint>
@@ -28,10 +30,12 @@ using DisRegRep::Container::Regionfield, DisRegRep::RegionfieldGenerator::Unifor
 using Catch::Matchers::IsEmpty, Catch::Matchers::SizeIs,
 	Catch::Matchers::ContainsSubstring, Catch::Matchers::RangeEquals;
 
+using glm::make_vec2, glm::value_ptr;
+
+using std::span;
 using std::ranges::fold_left_first,
 	std::multiplies,
 	std::views::join;
-using std::index_sequence, std::make_index_sequence;
 
 SCENARIO("Regionfield is a matrix of region identifiers", "[Container][Regionfield]") {
 
@@ -44,27 +48,26 @@ SCENARIO("Regionfield is a matrix of region identifiers", "[Container][Regionfie
 		}
 
 		WHEN("Resized") {
-			const auto dim = GENERATE(take(3U, chunk(2U, random<std::uint_least8_t>(5U, 15U))));
-			REQUIRE_NOTHROW(rf.resize(Regionfield::DimensionType(dim[0], dim[1])));
+			const Regionfield::DimensionType dim =
+				make_vec2(GENERATE(take(3U, chunk(2U, random<std::uint_least8_t>(5U, 15U)))).data());
+			REQUIRE_NOTHROW(rf.resize(dim));
 
 			AND_WHEN("There is at least one of the extent component being zero") {
 
 				THEN("Matrix cannot be resized") {
-					CHECK_THROWS_WITH(rf.resize(Regionfield::DimensionType(0U, dim[1])),
-						ContainsSubstring("greaterThan") && ContainsSubstring("0U"));
+					CHECK_THROWS_WITH(
+						rf.resize(Regionfield::DimensionType(0U, dim.y)), ContainsSubstring("greaterThan") && ContainsSubstring("0U"));
 				}
 
 			}
 
 			THEN("Linear size of regionfield container is the product of each extent component") {
-				REQUIRE_THAT(rf, SizeIs(*fold_left_first(dim, multiplies {})));
+				REQUIRE_THAT(rf, SizeIs(*fold_left_first(span(value_ptr(dim), Regionfield::DimensionType::length()), multiplies {})));
 				REQUIRE_THAT(rf, !IsEmpty());
 			}
 
 			THEN("Dimension of regionfield matrix equals extent") {
-				[&extent = rf.mapping().extents(), &dim]<std::size_t... I>(index_sequence<I...>) {
-					REQUIRE(((extent.extent(I) == dim[I]) && ...));
-				}(make_index_sequence<Regionfield::MdSpanType::rank()> {});
+				REQUIRE(rf.extent() == dim);
 			}
 
 		}
@@ -74,8 +77,7 @@ SCENARIO("Regionfield is a matrix of region identifiers", "[Container][Regionfie
 			generator.Seed = Catch::getSeed();
 
 			THEN("Regionfield can be filled with region identifiers") {
-				const auto dim = GENERATE(take(2U, chunk(2U, random<std::uint_least8_t>(5U, 20U))));
-				rf.resize(Regionfield::DimensionType(dim[0], dim[1]));
+				rf.resize(make_vec2(GENERATE(take(2U, chunk(2U, random<std::uint_least8_t>(5U, 20U)))).data()));
 				rf.RegionCount = GENERATE(take(2U, random<Regionfield::ValueType>(1U, 10U)));
 				generator(rf);
 

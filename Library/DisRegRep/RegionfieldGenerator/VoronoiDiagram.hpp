@@ -6,7 +6,7 @@
 
 #include <string_view>
 
-#include <cstddef>
+#include <cstdint>
 
 namespace DisRegRep::RegionfieldGenerator {
 
@@ -16,7 +16,9 @@ namespace DisRegRep::RegionfieldGenerator {
 class VoronoiDiagram final : public Base {
 public:
 
-	std::size_t CentroidCount {}; /**< Number of centroids in the Voronoi Diagram. */
+	using SizeType = std::uint_fast16_t;
+
+	SizeType CentroidCount {}; /**< Number of centroids in the Voronoi Diagram. */
 
 	constexpr VoronoiDiagram() noexcept = default;
 

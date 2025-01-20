@@ -5,22 +5,15 @@
 
 #include <glm/vector_relational.hpp>
 
-#include <utility>
-
 #include <cstddef>
 
 using DisRegRep::Splatting::Base;
 
 using glm::all, glm::greaterThanEqual;
 
-using std::index_sequence, std::make_index_sequence;
-
 void Base::validate(const Container::Regionfield& regionfield, const InvokeInfo& info) const {
 	const auto [offset, extent] = info;
-
-	const auto rf_extent = [&ext = regionfield.mapping().extents()]<std::size_t... I>(index_sequence<I...>) constexpr noexcept {
-		return DimensionType(ext.extent(I)...);
-	}(make_index_sequence<DimensionType::length()> {});
+	const auto rf_extent = regionfield.extent();
 
 	DRR_ASSERT(regionfield.RegionCount > 0U);
 	DRR_ASSERT(all(greaterThanEqual(rf_extent, this->minimumRegionfieldDimension(info))));

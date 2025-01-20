@@ -14,10 +14,9 @@ namespace DisRegRep::Splatting::Convolution {
 class Base : public Splatting::Base {
 public:
 
-	using RadiusType = std::uint_fast16_t;
-	using SizeType = std::uint_fast32_t;
+	using KernelSizeType = std::uint_fast16_t;
 
-	RadiusType Radius {}; /**< Radius of the convolution kernel. No convolution is performed if radius is zero. */
+	KernelSizeType Radius {}; /**< Radius of the convolution kernel. No convolution is performed if radius is zero. */
 
 	[[nodiscard]] DimensionType minimumRegionfieldDimension(const InvokeInfo&) const noexcept override;
 
@@ -30,7 +29,7 @@ public:
 	 *
 	 * @return The kernel diametre, which is always a positive odd number.
 	 */
-	[[nodiscard]] static constexpr SizeType diametre(const RadiusType r) noexcept {
+	[[nodiscard]] static constexpr KernelSizeType diametre(const KernelSizeType r) noexcept {
 		return 2U * r + 1U;
 	}
 

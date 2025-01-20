@@ -24,7 +24,7 @@
 namespace SpltKn = DisRegRep::Container::SplatKernel;
 using DisRegRep::Splatting::Convolution::Full::FastOccupancy;
 
-using std::tuple, std::make_tuple;
+using std::tuple, std::make_tuple, std::tie, std::apply;
 using std::ranges::for_each,
 	std::views::take, std::views::drop, std::views::zip;
 using std::invoke, std::identity;
@@ -48,12 +48,17 @@ public:
 	typename ContainerTrait::MaskOutputType Vertical;
 
 	//(region count, width, height)
-	void resize(const tuple<ExtentType, FastOccupancy::SizeType> arg) {
+	void resize(const tuple<ExtentType, FastOccupancy::KernelSizeType> arg) {
 		auto [extent, padding] = arg;
 		this->Kernel.resize(extent.x);
 		this->Vertical.resize(extent);
 		extent.z += padding;
 		this->Horizontal.resize(extent);
+	}
+
+	[[nodiscard]] FastOccupancy::SizeType sizeByte() const noexcept {
+		return apply([](const auto&... member) static noexcept { return (member.sizeByte() + ...); },
+			tie(this->Kernel, this->Horizontal, this->Vertical));
 	}
 
 };
@@ -109,12 +114,12 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(FastOccupancy) {
 	using ScratchMemoryType = ScratchMemory<ContainerTrait>;
 	const auto [offset, extent] = info;
 
-	const SizeType d = Convolution::Base::diametre(this->Radius),
+	const KernelSizeType d = Convolution::Base::diametre(this->Radius),
 		//Padding does not include the centre element (only the halo), so minus one from the diametre.
 		d_halo = d - 1U;
 
 	//Horizontal pass requires padding above and below the matrix.
-	auto& [kernel_memory, horizontal_memory, vertical_memory] = ImplementationHelper::allocate<ScratchMemoryType>(
+	auto& [kernel_memory, horizontal_memory, vertical_memory] = ImplementationHelper::allocate<ScratchMemory, ContainerTrait>(
 		memory, make_tuple(typename ScratchMemoryType::ExtentType(regionfield.RegionCount, extent), d_halo));
 
 	//Need to read the whole halo from regionfield.
@@ -143,4 +148,5 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(FastOccupancy) {
 	return vertical_memory;
 }
 
+DRR_SPLATTING_DEFINE_SIZE_BYTE(FastOccupancy)
 DRR_SPLATTING_DEFINE_FUNCTOR_ALL(FastOccupancy)
