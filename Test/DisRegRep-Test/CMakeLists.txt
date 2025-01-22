@@ -7,6 +7,8 @@ add_subdirectory(Core)
 add_subdirectory(Splatting)
 
 drrTargetSource(
+SOURCE
+	Main
 HEADER
 	StringMaker
 )
@@ -14,7 +16,7 @@ HEADER
 target_link_libraries(${DRR_CURRENT_TARGET} PRIVATE
 	${PROJECT_NAME}::Library
 
-	Catch2::Catch2WithMain
+	Catch2::Catch2
 	glm::glm
 	range-v3::range-v3
 )
