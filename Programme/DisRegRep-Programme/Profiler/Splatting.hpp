@@ -1,150 +1,168 @@
 #pragma once
 
-#include "ThreadPool.hpp"
-#include "../Format.hpp"
-#include "../Container/RegionMap.hpp"
+#include <DisRegRep/Container/Regionfield.hpp>
 
-#include "../Factory/RegionMapFactory.hpp"
-#include "../Filter/RegionMapFilter.hpp"
+#include <DisRegRep/Core/System/ProcessThreadControl.hpp>
+#include <DisRegRep/Core/ThreadPool.hpp>
 
-#include "Utility.hpp"
+#include <DisRegRep/RegionfieldGenerator/Base.hpp>
+#include <DisRegRep/RegionfieldGenerator/VoronoiDiagram.hpp>
 
-#include <string>
+#include <DisRegRep/Splatting/Convolution/Base.hpp>
+#include <DisRegRep/Splatting/Base.hpp>
+
 #include <span>
-#include <array>
-#include <vector>
-#include <any>
+#include <string_view>
+#include <tuple>
+
+#include <memory>
 
 #include <filesystem>
+
 #include <cstdint>
 
-namespace DisRegRep::Launch {
+namespace DisRegRep::Programme::Profiler {
 
 /**
- * @brief Run and benchmark filter.
- * Filter runner utilises parallel filter benchmarking,
- *	and hence certain lifetime guarantees should be made by the calling application
- *	until execution of filter has been synchronised.
-*/
-class FilterRunner {
+ * @brief Profiler for different region feature splatting methods. Splatting profiler runs all profiling works on separate threads, and
+ * they retain the ownership of all array memory until the profiler is synchronised.
+ */
+class Splatting {
 public:
 
+	using Base = DisRegRep::Splatting::Base;
+	using BaseConvolution = DisRegRep::Splatting::Convolution::Base;
+	using DimensionType = Base::DimensionType;
+
+	using RegionCountType = Container::Regionfield::ValueType;
+	using CentroidCountType = RegionfieldGenerator::VoronoiDiagram::SizeType;
+
+	using SizeType = std::uint_fast8_t;
+
 	/**
-	 * @brief Information for sweeping a variable in a filter run.
-	 * Region map factory and filter should remain valid until the end of filter execution.
-	 * Additionally the array that holds pointers to filter should also be preserved until end of execution.
-	*/
-	struct SweepDescription {
+	 * @brief To ensure an accurate runtime measurement, it is recommended that:
+	 * - Number of thread should be set to between 1/3 and 1/2 of the total number of threads available to the system. Too few threads
+	 * would prolong the profiling run and too many may cause resource contention and OS scheduling overhead.
+	 * - Nevertheless, thread pool size should not exceed the number of bits set in the affinity mask, otherwise it would cause
+	 * contention within the thread pool.
+	 * - Thread affinities are interleaved to a separate core if running on a system with simultaneous multithreading enabled, to avoid
+	 * having the same core running on multiple threads; or even simpler, disable SMT.
+	 * - Thread affinities are set to so that they would not use any of the energy-efficient core if running on a system with
+	 * heterogeneous processors.
+	 *
+	 * @note Setting the right thread affinity is especially importance if the executing system is running on any of the Intel Core
+	 * 12th Gen and beyond due to the P/E-Core design. Utilise the P/E-Core architecture strategically!
+	 */
+	struct ThreadPoolCreateInfo {
 
-		const RegionMapFactory* Factory;
-		std::span<const RegionMapFilter* const> Filter;
+		Core::ThreadPool::SizeType Size;
+		Core::System::ProcessThreadControl::AffinityMask AffinityMask;
 
-		std::string UserTag;
+	};
+
+	struct CommonSweepInfo {
+
+		std::string_view Tag; /**< A custom tag that contains application-dependent info for identifying a result. */
+		DimensionType Extent; /**< @link Base::InvokeInfo::Extent. */
+
+	};
+
+	struct RadiusSweepInfo {
+
+		const CommonSweepInfo* CommonSweepInfo_;
+		/**
+		 * @brief Region count shall be set by the application and fixed during profiling. Regionfield matrices are automatically
+		 * allocated with the appropriate size and region identifiers are generated with each of the pairing regionfield generator.
+		 */
+		std::tuple<
+			std::span<const RegionfieldGenerator::Base* const>,
+			std::span<Container::Regionfield* const>
+		> Input;
+
+	};
+
+	struct RegionCountSweepInfo {
+
+		const CommonSweepInfo* CommonSweepInfo_;
+		std::span<const RegionfieldGenerator::Base* const> Input;
+
+	};
+
+	struct CentroidCountSweepInfo {
+
+		const CommonSweepInfo* CommonSweepInfo_;
+		RegionfieldGenerator::Base::SeedType Seed; /**< @link RegionfieldGenerator::Base::Seed. */
+		Container::Regionfield::ValueType RegionCount; /**< @link Container::Regionfield::RegionCount. */
 
 	};
 
 private:
 
-	struct RunDescription;/**< Store information of a run. */
-	//Store result of a run.
-	struct RunResult {
-
-		size_t MemoryUsage;
-
-	};
-	using RunResultSet = std::vector<RunResult>;
-
-	constexpr static size_t ThreadCount = 5u;
-
-	std::filesystem::path ReportRoot;
-
-	std::array<RegionMap, ThreadCount> Map;
-	std::array<std::array<std::any, Utility::AllFilterTagSize>, ThreadCount> Histogram;/**< One histogram per thread per tag. */
-	std::array<RunResultSet, ThreadCount> Result;
-
-	ThreadPool Worker;
-
-	std::vector<std::future<void>> PendingTask;
-
-	//Create a new report file from benchmark.
-	template<typename Tag>
-	void renderReport(Tag, const RunDescription&, const auto&) const;
-
-	template<typename Func>
-	void runFilter(Func&&, const SweepDescription&);
+	class Impl;
+	std::unique_ptr<Impl> Impl_;
 
 public:
 
 	/**
-	 * @brief Initialise a filter runner.
-	 * 
-	 * @param test_report_dir The directory where test reports are stored.
-	 * It's possible to place this directory with a common root path that is shared with other filter runners,
-	 * this constructor ensures no filesystem race occurs.
-	*/
-	FilterRunner(const std::filesystem::path&);
+	 * @brief Create a splatting profiler.
+	 *
+	 * @param result_dir Directory where profiler results are stored.
+	 * @param thread_pool_info Thread pool create info.
+	 *
+	 * @exception std::filesystem::filesystem_error If `result_dir` does not exist.
+	 */
+	Splatting(std::filesystem::path, const ThreadPoolCreateInfo&);
 
-	FilterRunner(const FilterRunner&) = delete;
+	Splatting(const Splatting&) = delete;
 
-	FilterRunner(FilterRunner&&) = delete;
+	constexpr Splatting(Splatting&&) noexcept = default;
 
-	~FilterRunner() = default;
+	Splatting& operator=(const Splatting&) = delete;
 
-	/**
-	 * @brief Wait for all filter works to finish.
-	 * All object lifetime guarantees are lifted once this function returns.
-	*/
-	void waitAll();
+	constexpr Splatting& operator=(Splatting&&) noexcept = default;
 
-	/**
-	 * @brief Profile impact of runtime by varying radius.
-	 * Memory lifetime guarantees:
-	 * - `region_map`
-	 * - The underlying array held by `radius_arr`
-	 * 
-	 * @param desc The description about the sweep.
-	 * Region map factory in this function is used for providing test details,
-	 * it will not be used to generate region map, as it should be provided by the application instead.
-	 * @param region_map The region map generated by the application to be used.
-	 * @param extent The extent of filter run area.
-	 * @param radius_arr An array of radii to be run in order.
-	*/
-	void sweepRadius(const SweepDescription&, const RegionMap&, const Format::SizeVec2&,
-		std::span<const Format::Radius_t>);
+	~Splatting() = default;
 
 	/**
-	 * @brief Profile impact of runtime by varying region count.
-	 * Region map will be automatically regenerated using different region count.
-	 * Memory lifetime guarantees:
-	 * - The underlying array held by `region_count_arr`
-	 * 
-	 * @param desc The description about the sweep.
-	 * @param extent The size of the filter area.
-	 * @param radius The radius of filter kernel.
-	 * @param region_count_arr An array of region count.
-	*/
-	void sweepRegionCount(const SweepDescription&, const Format::SizeVec2&,
-		Format::Radius_t, std::span<const Format::Region_t>);
+	 * @brief Block the current thread until all profiler threads finish. All object lifetime requirements are lifted once this call
+	 * returns.
+	 */
+	void synchronise() const;
 
 	/**
-	 * @brief Profile impact of the number of region presented on the region map.
-	 * Region map will be automatically regenerated during running this test.
-	 * Memory lifetime guarantees:
-	 * - The underlying array held by `centroid_count_arr`
-	 * 
-	 * @param desc The description about the sweep.
-	 * The `Factory` component is ignored.
-	 * @param extent The size of the filter area.
-	 * @param radius The radius of filter kernel.
-	 * @param region_count The number of region on the region map.
-	 * Note that the region count can be different from the centroid count,
-	 * this is to emulate that while a world can have many biomes,
-	 * there are only a small subset of them presented in the area.
-	 * @param random_seed The seed for random number generator.
-	 * @param centroid_count_arr An array of centroid count.
-	*/
-	void sweepCentroidCount(const SweepDescription&, const Format::SizeVec2&,
-		Format::Radius_t, Format::Region_t, std::uint64_t, std::span<const size_t>);
+	 * @brief Profile the impact of runtime by varying radius on a convolution-based splatting. Profiler will be executed by the order
+	 * of the cartesian product of $radius \times splat \times std::apply(std::views::zip, info.Input)$.
+	 *
+	 * @param splat_conv This is passed in as a flattened column-major 2D matrix of size (radius * splat), where *radius* is a sequence
+	 * of radii to be swept, and *splat* is each instance of convolution-based splatting to be profiled. As profiler is multithreaded,
+	 * the application is responsible for setting the profiling radii for each instance.
+	 * @param splat_size Number of *splat* instances in `splat_conv`.
+	 * @param info Radius sweep info.
+	 */
+	void sweepRadius(std::span<const BaseConvolution* const>, SizeType, const RadiusSweepInfo&) const;
+
+	/**
+	 * @brief Profile the impact of runtime by varying the number of regions on a regionfield, though it is not guaranteed that all
+	 * regions are actually presented on the regionfield, depends on the generator used. Regionfield memory is managed internally and
+	 * will be generated with the provided regionfield generator. Profiler will be executed by the order of the cartesian product of
+	 * $splat \times region_count \times info.Input$.
+	 *
+	 * @param splat Splatting to be profiled.
+	 * @param region_count Region count to be run in order.
+	 * @param info Region count sweep info.
+	 */
+	void sweepRegionCount(std::span<const Base* const>, std::span<const RegionCountType>, const RegionCountSweepInfo&) const;
+
+	/**
+	 * @brief Profile the impact of runtime by varying the number of regions presented on a regionfield. Similar to @link
+	 * sweepRegionCount, regionfield is automatically generated. Profiler will be executed by the order of the cartesian product of
+	 * $splat \times centroid_count \times info.Input$.
+	 *
+	 * @param splat Splatting to be profiled.
+	 * @param centroid_count Centroid count @link RegionfieldGenerator::VoronoiDiagram::CentroidCount to be run in order.
+	 * @param info Centroid count sweep info.
+	 */
+	void sweepCentroidCount(std::span<const Base* const>, std::span<const CentroidCountType>, const CentroidCountSweepInfo&) const;
 
 };
 

@@ -170,7 +170,7 @@ void GndTth::checkMinimumRequirement(BaseConvolution& splatting) {
 		splatting.Radius = size.back();
 
 		REQUIRE(splatting.minimumRegionfieldDimension(invoke_info) == extent + offset + splatting.Radius);
-		REQUIRE(splatting.minimumOffset(invoke_info) == BaseConvolution::DimensionType(splatting.Radius));
+		REQUIRE(splatting.minimumOffset() == BaseConvolution::DimensionType(splatting.Radius));
 	}
 }
 
@@ -181,9 +181,9 @@ void GndTth::checkSplattingCoefficient(BaseFullConvolution& splatting) {
 		splatting.Radius = size[2U];
 
 		BaseFullConvolution::InvokeInfo optimal_invoke_info {
+			.Offset = splatting.minimumOffset(),
 			.Extent = extent
 		};
-		optimal_invoke_info.Offset = splatting.minimumOffset(optimal_invoke_info);
 
 		Regionfield rf;
 		rf.RegionCount = size.back();

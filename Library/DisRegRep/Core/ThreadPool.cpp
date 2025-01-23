@@ -45,7 +45,7 @@ ThreadPool::ThreadPool(const SizeType size) :
 					lock.lock();
 					//Thread pool should not be killed until the task queue is empty.
 					const auto no_task = queue.empty();
-					if (no_task && token.stop_requested()) {
+					if (no_task && token.stop_requested()) [[unlikely]] {
 						return;
 					}
 					assert(!no_task);

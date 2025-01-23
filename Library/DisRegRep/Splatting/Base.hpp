@@ -131,11 +131,9 @@ public:
 	/**
 	 * @brief Minimum regionfield matrix coordinate offset required by the given parameters.
 	 *
-	 * @param info The invoke info.
-	 *
 	 * @return Minimum offset for @link InvokeInfo::Offset.
 	 */
-	[[nodiscard]] virtual DimensionType minimumOffset(const InvokeInfo&) const noexcept;
+	[[nodiscard]] virtual DimensionType minimumOffset() const noexcept;
 
 	/**
 	 * @brief Query the usage of scratch memory.

@@ -7,6 +7,6 @@ Base::DimensionType Base::minimumRegionfieldDimension(const InvokeInfo& info) co
 	return this->Splatting::Base::minimumRegionfieldDimension(info) + this->Radius;
 }
 
-Base::DimensionType Base::minimumOffset(const InvokeInfo& info) const noexcept {
-	return this->Splatting::Base::minimumOffset(info) + this->Radius;
+Base::DimensionType Base::minimumOffset() const noexcept {
+	return this->Splatting::Base::minimumOffset() + this->Radius;
 }

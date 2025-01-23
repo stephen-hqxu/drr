@@ -21,7 +21,6 @@
 #include <functional>
 #include <ranges>
 
-#include <cstddef>
 #include <cstdint>
 
 namespace Arithmetic = DisRegRep::Core::Arithmetic;

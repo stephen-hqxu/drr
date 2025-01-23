@@ -83,7 +83,7 @@ private:
 
 public:
 
-	static constexpr std::string_view Tag = TagCharacter; /**< Just a string representation of this container trait. */
+	static constexpr auto Tag = std::string_view(TagCharacter); /**< Just a string representation of this container trait. */
 
 	using KernelType = SwitchContainer<
 		KernelContainerImplementation,

@@ -128,6 +128,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${DRR_OUTPUT_ROOT}/lib)
 set(CMAKE_STATIC_LIBRARY_PREFIX ${PROJECT_NAME}-)
 
 drrAddSubdirectory(Library REDISTRIBUTABLE)
+drrAddSubdirectory(Programme)
 if(DRR_ENABLE_TEST)
 	enable_testing()
 	drrAddSubdirectory(Test)

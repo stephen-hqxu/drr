@@ -5,8 +5,6 @@
 
 #include <glm/vector_relational.hpp>
 
-#include <cstddef>
-
 using DisRegRep::Splatting::Base;
 
 using glm::all, glm::greaterThanEqual;
@@ -17,7 +15,7 @@ void Base::validate(const Container::Regionfield& regionfield, const InvokeInfo&
 
 	DRR_ASSERT(regionfield.RegionCount > 0U);
 	DRR_ASSERT(all(greaterThanEqual(rf_extent, this->minimumRegionfieldDimension(info))));
-	DRR_ASSERT(all(greaterThanEqual(offset, this->minimumOffset(info))));
+	DRR_ASSERT(all(greaterThanEqual(offset, this->minimumOffset())));
 }
 
 Base::DimensionType Base::minimumRegionfieldDimension(const InvokeInfo& info) const noexcept {
@@ -25,6 +23,6 @@ Base::DimensionType Base::minimumRegionfieldDimension(const InvokeInfo& info) co
 	return offset + extent;
 }
 
-Base::DimensionType Base::minimumOffset(const InvokeInfo&) const noexcept {
+Base::DimensionType Base::minimumOffset() const noexcept {
 	return DimensionType(0U);
 }

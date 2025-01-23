@@ -20,7 +20,7 @@ public:
 
 	[[nodiscard]] DimensionType minimumRegionfieldDimension(const InvokeInfo&) const noexcept override;
 
-	[[nodiscard]] DimensionType minimumOffset(const InvokeInfo&) const noexcept override;
+	[[nodiscard]] DimensionType minimumOffset() const noexcept override;
 
 	/**
 	 * @brief Calculate the kernel diametre with the current radius.
