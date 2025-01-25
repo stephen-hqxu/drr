@@ -1,6 +1,6 @@
 #include <DisRegRep/Container/Regionfield.hpp>
 
-#include <DisRegRep/Core/Arithmetic.hpp>
+#include <DisRegRep/Core/View/Matrix.hpp>
 #include <DisRegRep/Core/Exception.hpp>
 
 #include <glm/gtc/type_ptr.hpp>
@@ -42,8 +42,8 @@ Regionfield Regionfield::transpose() const {
 	//Cannot use join on parallel algorithm because it is not a forward range.
 	//Mainly because of the xvalue return on the 2D range adaptor, such that inner range is not a reference type.
 	const auto zip_data = zip(
-		this->Data | Core::Arithmetic::View2d(this->mapping().stride(1U)),
-		transposed.Data | Core::Arithmetic::ViewTransposed2d(transposed.mapping().stride(1U))
+		this->Data | Core::View::Matrix::View2d(this->mapping().stride(1U)),
+		transposed.Data | Core::View::Matrix::ViewTransposed2d(transposed.mapping().stride(1U))
 	);
 	for_each(par_unseq, zip_data.cbegin(), zip_data.cend(), [](const auto it) static constexpr noexcept {
 		const auto& [input, output] = it;

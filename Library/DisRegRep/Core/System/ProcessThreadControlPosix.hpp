@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <execution>
+#include <functional>
 #include <ranges>
 
 #include <cmath>
@@ -21,6 +22,7 @@ namespace DisRegRep::Core::System::ProcessThreadControl::Posix {
 using HandleType = pthread_t;
 
 using std::for_each, std::execution::unseq,
+	std::mem_fn,
 	std::views::iota, std::views::filter;
 
 [[nodiscard]] inline HandleType getCurrentThread() noexcept {
@@ -46,8 +48,7 @@ inline void setNativeThreadAffinityMask(const HandleType thread, const AffinityM
 	cpu_set_t set;
 	CPU_ZERO(&set);
 
-	auto set_mask =
-		iota(0UZ, affinity_mask.size()) | filter([affinity_mask](const auto i) constexpr noexcept { return affinity_mask.test(i); });
+	auto set_mask = iota(0UZ, affinity_mask.size()) | filter(mem_fn(&AffinityMask::test));
 	for_each(unseq, set_mask.cbegin(), set_mask.cend(), [&set](const auto i) noexcept { CPU_SET(i, &set); });
 
 	DRR_ASSERT_SYSTEM_ERROR_POSIX(pthread_setaffinity_np(thread, sizeof(set), &set));

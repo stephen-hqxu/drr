@@ -5,7 +5,8 @@
 #include <DisRegRep/Container/SplatKernel.hpp>
 #include <DisRegRep/Container/SplattingCoefficient.hpp>
 
-#include <DisRegRep/Core/Arithmetic.hpp>
+#include <DisRegRep/Core/View/Functional.hpp>
+#include <DisRegRep/Core/View/Matrix.hpp>
 
 #include <tuple>
 
@@ -19,18 +20,16 @@
 #include <concepts>
 #include <type_traits>
 
-#include <cassert>
-
 namespace SpltKn = DisRegRep::Container::SplatKernel;
 using DisRegRep::Splatting::Convolution::Full::FastOccupancy;
 
 using std::tuple, std::make_tuple, std::tie, std::apply;
 using std::ranges::for_each,
-	std::views::take, std::views::drop, std::views::zip;
-using std::invoke, std::identity;
+	std::bind_back, std::bit_or, std::invoke,
+	std::views::take, std::views::drop, std::views::zip, std::views::transform;
 
 using std::output_iterator;
-using std::ranges::forward_range,
+using std::ranges::forward_range, std::ranges::view,
 	std::ranges::range_difference_t, std::ranges::range_value_t, std::ranges::range_const_reference_t;
 using std::invocable, std::invoke_result_t;
 
@@ -69,20 +68,19 @@ template<
 	typename KernelMemoryProj,
 	forward_range Scanline = range_value_t<ScanlineRange>
 >
+requires view<Scanline>
 void conv1d(
-	const ScanlineRange scanline_rg,
+	const ScanlineRange&& scanline_rg,
 	KernelMemory& kernel_memory,
 	output_iterator<invoke_result_t<KernelMemoryProj, const KernelMemory&>> auto out,
 	const range_difference_t<Scanline> d,
-	KernelMemoryProj kernel_memory_proj,
-	invocable<range_const_reference_t<Scanline>> auto scanline_element_proj
+	KernelMemoryProj kernel_memory_proj
 ) {
-	for (const Scanline scanline : scanline_rg) [[likely]] {
+	for (const auto scanline : scanline_rg) [[likely]] {
 		kernel_memory.clear();
 
 		//Compute the initial kernel in this scanline.
-		for_each(scanline | take(d), [&kernel_memory, &proj = scanline_element_proj](
-										 const auto element) noexcept { kernel_memory.increment(invoke(proj, element)); });
+		for_each(scanline | take(d), [&kernel_memory](const auto element) noexcept { kernel_memory.increment(element); });
 		*out++ = invoke(kernel_memory_proj, std::as_const(kernel_memory));
 
 		//Kernel sliding.
@@ -93,16 +91,15 @@ void conv1d(
 		const auto decrement_rg = scanline;
 		//Last element from the next kernel.
 		const auto increment_rg = scanline | drop(d);
-		out = transform(zip(decrement_rg, increment_rg), out,
-			[&kernel_memory, &se_proj = scanline_element_proj, &km_proj = kernel_memory_proj](const auto it) noexcept {
-				const auto& [dec_element, inc_element] = it;
-				//Decrement first is slightly more efficient,
-				//	in case of sparse kernel, it will need to remove empty elements and shift following elements ahead.
-				//Increment inserts at the back.
-				kernel_memory.decrement(invoke(se_proj, dec_element));
-				kernel_memory.increment(invoke(se_proj, inc_element));
-				return invoke(km_proj, std::as_const(kernel_memory));
-			}).out;
+		out = transform(zip(decrement_rg, increment_rg), out, [&kernel_memory, &km_proj = kernel_memory_proj](const auto it) noexcept {
+			const auto& [dec_element, inc_element] = it;
+			//Decrement first is slightly more efficient,
+			//	in case of sparse kernel, it will need to remove empty elements and shift following elements ahead.
+			//Increment inserts at the back.
+			kernel_memory.decrement(dec_element);
+			kernel_memory.increment(inc_element);
+			return invoke(km_proj, std::as_const(kernel_memory));
+		}).out;
 	}
 }
 
@@ -126,23 +123,21 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(FastOccupancy) {
 	//In horizontal scanline, this overlaps with the 1D kernel.
 	//In vertical scanline, this includes the padding.
 	conv1d(
-		regionfield.range2d() | Core::Arithmetic::SubRange2d(offset - this->Radius, extent + d_halo),
+		regionfield.range2d() | Core::View::Matrix::SubRange2d(offset - this->Radius, extent + d_halo),
 		kernel_memory,
 		horizontal_memory.range().begin(),
 		d,
-		[](const auto& km) static constexpr noexcept { return km.span(); },
-		identity {}
+		[](const auto& km) static constexpr noexcept { return km.span(); }
 	);
 
 	//Repeat the same process in the vertical pass.
 	conv1d(
-		horizontal_memory.rangeTransposed2d(),
+		horizontal_memory.rangeTransposed2d() | transform(bind_back(bit_or {}, Core::View::Functional::Dereference)),
 		kernel_memory,
 		vertical_memory.range().begin(),
 		d,
 		[norm_factor = Base::kernelNormalisationFactor(d)](
-			const auto& km) constexpr noexcept { return SpltKn::toMask(km, norm_factor); },
-		[](const auto& proxy) static constexpr noexcept { return *proxy; }
+			const auto& km) constexpr noexcept { return SpltKn::toMask(km, norm_factor); }
 	);
 
 	return vertical_memory;

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Exception.hpp"
+
 #include <array>
 #include <span>
 
@@ -24,16 +26,6 @@
  */
 namespace DisRegRep::Core::XXHash {
 
-/**
- * @brief Record errors on converting byte string to application secret.
- */
-namespace ApplicationSecretStringConversionError {
-
-[[noreturn]] void StringLengthDoesNotFitApplicationSecretArray();
-[[noreturn]] void HasInvalidToken();
-
-}
-
 inline constexpr std::uint_fast8_t ApplicationSecretSize = 80U, /**< Size in byte of the secret specified by the end application. */
 	TotalSecretSize = ApplicationSecretSize * 2U; /**< Size in byte of the total secret sequence. */
 
@@ -53,24 +45,20 @@ using Input = std::span<const std::byte>;
  *
  * @return An array of application secret.
  */
-[[nodiscard]] consteval ApplicationSecret makeApplicationSecret(const std::string_view str) noexcept {
+[[nodiscard]] consteval ApplicationSecret makeApplicationSecret(const std::string_view str) {
 	using std::ranges::transform,
 		std::views::split, std::ranges::data, std::ranges::size,
 		std::from_chars, std::errc;
 
 	//Each byte has two hex characters plus a space separator, hence there are three characters per token;
 	//	the final token does not have a separator, hence minus one.
-	if (str.length() != ApplicationSecretSize * 3UZ - 1UZ) [[unlikely]] {
-		ApplicationSecretStringConversionError::StringLengthDoesNotFitApplicationSecretArray();
-	}
+	DRR_ASSERT(str.length() == ApplicationSecretSize * 3UZ - 1UZ);
 
 	ApplicationSecret secret {};
-	transform(str | split(' '), secret.begin(), [](const auto token) static consteval noexcept {
+	transform(str | split(' '), secret.begin(), [](const auto token) static consteval {
 		std::uint8_t byte {};
 		const auto first = data(token);
-		if (from_chars(first, first + size(token), byte, 16).ec != errc {}) [[unlikely]] {
-			ApplicationSecretStringConversionError::HasInvalidToken();
-		}
+		DRR_ASSERT(from_chars(first, first + size(token), byte, 16).ec == errc {});
 		return std::byte { byte };
 	});
 	return secret;

@@ -1,11 +1,8 @@
 #include <DisRegRep/Core/ThreadPool.hpp>
 
 #include <DisRegRep/Core/System/ProcessThreadControl.hpp>
+#include <DisRegRep/Core/View/Functional.hpp>
 #include <DisRegRep/Core/Exception.hpp>
-#include <DisRegRep/Core/Range.hpp>
-
-#include <range/v3/view/addressof.hpp>
-#include <range/v3/view/iota.hpp>
 
 #include <algorithm>
 #include <functional>
@@ -23,10 +20,9 @@
 namespace ProcThrCtrl = DisRegRep::Core::System::ProcessThreadControl;
 using DisRegRep::Core::ThreadPool;
 
-using ranges::views::addressof, ranges::views::iota;
-
 using std::from_range, std::ranges::for_each,
-	std::invoke, std::mem_fn, std::bind_front;
+	std::invoke, std::mem_fn, std::bind_front,
+	std::views::iota, std::views::transform;
 using std::unique_lock, std::shared_lock, std::defer_lock,
 	std::jthread, std::stop_token;
 
@@ -34,7 +30,7 @@ ThreadPool::ThreadPool(const SizeType size) :
 	Task {
 		.Semaphore = decltype(this->Task.Semaphore)(0)
 	},
-	Thread(from_range, iota(SizeType {}, size) | Range::ImpureTransform([this](const auto thread_idx) {
+	Thread(from_range, iota(SizeType {}, size) | transform([this](const auto thread_idx) {
 		return jthread(
 			[this](const stop_token token, const ThreadInfo thread_info) {
 				auto& [queue, mutex, semaphore] = this->Task;
@@ -65,11 +61,9 @@ ThreadPool::ThreadPool(const SizeType size) :
 
 ThreadPool::~ThreadPool() {
 	for_each(this->Thread, mem_fn(&jthread::request_stop));
-	//Reason why both sizes are added is because a thread needs to carry on the execution until all task queue is exhausted.
-	//However, once a task is finished, the thread will go back to the waiting sequence.
+	//Once all tasks are finished, threads will go back to the waiting sequence.
 	//Therefore, we need an additional wakeup so it can check for stopping status.
-	//To put it simple, task execution and thread stopping are two disjoint operations that we need to signal separately.
-	this->Task.Semaphore.release(this->sizeThread() + this->sizeTask());
+	this->Task.Semaphore.release(this->sizeThread());
 }
 
 ThreadPool::SizeType ThreadPool::sizeTask() const {
@@ -79,9 +73,9 @@ ThreadPool::SizeType ThreadPool::sizeTask() const {
 }
 
 void ThreadPool::setPriority(const ProcThrCtrl::Priority priority) {
-	for_each(this->Thread | addressof, bind_front(ProcThrCtrl::setPriority, priority));
+	for_each(this->Thread | View::Functional::AddressOf, bind_front(ProcThrCtrl::setPriority, priority));
 }
 
 void ThreadPool::setAffinityMask(const ProcThrCtrl::AffinityMask affinity_mask) {
-	for_each(this->Thread | addressof, bind_front(ProcThrCtrl::setAffinityMask, affinity_mask));
+	for_each(this->Thread | View::Functional::AddressOf, bind_front(ProcThrCtrl::setAffinityMask, affinity_mask));
 }

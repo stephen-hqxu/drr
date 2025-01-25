@@ -31,7 +31,7 @@ requires std::is_invocable_v<Generator>
 	std::is_nothrow_move_constructible_v<Generator>) -> std::ranges::view auto {
 	using std::invoke, std::views::repeat, std::is_nothrow_invocable_v;
 	return repeat(std::uint_fast8_t {}, n)
-		 | IrregularTransform([generator = std::move(generator)](auto) constexpr noexcept(
+		 | IrregularTransform([generator = std::move(generator)](auto) mutable constexpr noexcept(
 								  is_nothrow_invocable_v<Generator>) { return invoke(generator); });
 };
 

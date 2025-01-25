@@ -1,6 +1,6 @@
 #pragma once
 
-#include <DisRegRep/Core/Arithmetic.hpp>
+#include <DisRegRep/Core/View/Matrix.hpp>
 #include <DisRegRep/Core/Type.hpp>
 #include <DisRegRep/Core/UninitialisedAllocator.hpp>
 
@@ -141,7 +141,7 @@ public:
 	 */
 	template<typename Self>
 	[[nodiscard]] constexpr std::ranges::view auto range2d(this Self& self) noexcept {
-		return self.Data | Core::Arithmetic::View2d(self.mapping().stride(1U));
+		return self.Data | Core::View::Matrix::View2d(self.mapping().stride(1U));
 	}
 
 };

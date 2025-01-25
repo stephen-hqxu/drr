@@ -2,6 +2,7 @@
 
 #include <DisRegRep/Container/Regionfield.hpp>
 
+#include <DisRegRep/Core/View/Generate.hpp>
 #include <DisRegRep/Core/Exception.hpp>
 #include <DisRegRep/Core/Type.hpp>
 #include <DisRegRep/Core/XXHash.hpp>
@@ -9,9 +10,6 @@
 #include <glm/fwd.hpp>
 #include <glm/geometric.hpp>
 #include <glm/vec2.hpp>
-
-#include <range/v3/range/conversion.hpp>
-#include <range/v3/view/generate_n.hpp>
 
 #include <array>
 #include <span>
@@ -32,11 +30,9 @@ using DisRegRep::RegionfieldGenerator::VoronoiDiagram;
 
 using glm::u16vec2, glm::f32vec2;
 
-using ranges::to, ranges::views::generate_n;
-
 using std::array, std::span, std::vector;
 using std::apply;
-using std::ranges::min_element, std::ranges::distance,
+using std::ranges::min_element, std::ranges::distance, std::ranges::to,
 	std::execution::par_unseq,
 	std::views::iota, std::views::cartesian_product;
 using std::index_sequence;
@@ -52,12 +48,11 @@ void VoronoiDiagram::operator()(Container::Regionfield& regionfield) const {
 		[&rf_extent](const auto ext) { return UniformDistributionType(0U, rf_extent.extent(ext) - 1U); });
 
 	const auto region_centroid =
-		generate_n([&rng, &dist] {
-			return apply([&rng](auto&... dist_n) { return u16vec2(dist_n(rng)...); }, dist);
-		}, this->CentroidCount)
+		Core::View::Generate(
+			[&rng, &dist] { return apply([&rng](auto&... dist_n) { return u16vec2(dist_n(rng)...); }, dist); }, this->CentroidCount)
 		| to<vector>();
 	const auto region_assignment =
-		generate_n([dist = Base::createDistribution(regionfield), &rng]() mutable { return dist(rng); }, this->CentroidCount)
+		Core::View::Generate([dist = Base::createDistribution(regionfield), &rng]() mutable { return dist(rng); }, this->CentroidCount)
 		| to<vector<Core::Type::RegionIdentifier>>();
 
 	/*

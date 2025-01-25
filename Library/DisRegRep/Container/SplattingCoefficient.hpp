@@ -2,7 +2,7 @@
 
 #include "SparseMatrixElement.hpp"
 
-#include <DisRegRep/Core/Arithmetic.hpp>
+#include <DisRegRep/Core/View/Matrix.hpp>
 #include <DisRegRep/Core/Type.hpp>
 #include <DisRegRep/Core/UninitialisedAllocator.hpp>
 
@@ -230,7 +230,7 @@ public:
 		using ProxyType = ValueProxy<std::is_const_v<Self>>;
 
 		return self.DenseMatrix
-			 | Core::Arithmetic::View2d(self.Mapping.stride(1U))
+			 | Core::View::Matrix::View2d(self.Mapping.stride(1U))
 			 | transform([](auto region_val) static constexpr noexcept { return ProxyType(std::move(region_val)); });
 	}
 
@@ -240,7 +240,7 @@ public:
 	 * @return A transposed 2D range to the dense matrix.
 	 */
 	[[nodiscard]] constexpr std::ranges::view auto rangeTransposed2d() const noexcept {
-		return this->range() | Core::Arithmetic::ViewTransposed2d(this->Mapping.extents().extent(1U));
+		return this->range() | Core::View::Matrix::ViewTransposed2d(this->Mapping.extents().extent(1U));
 	}
 
 };
@@ -472,7 +472,7 @@ public:
 	 * @return A transposed 2D range to the sparse matrix.
 	 */
 	[[nodiscard]] constexpr std::ranges::view auto rangeTransposed2d() const noexcept {
-		return this->range() | Core::Arithmetic::ViewTransposed2d(this->OffsetMapping.stride(1U));
+		return this->range() | Core::View::Matrix::ViewTransposed2d(this->OffsetMapping.stride(1U));
 	}
 
 };

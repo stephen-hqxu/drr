@@ -3,7 +3,7 @@
 #include "ProcessThreadControl.hpp"
 #include "Error.hpp"
 
-#include <range/v3/view/linear_distribute.hpp>
+#include "../View/Arithmetic.hpp"
 
 #include <Windows.h>
 #include <WinBase.h>
@@ -15,14 +15,14 @@
 #include <functional>
 #include <iterator>
 
+#include <cstdint>
+
 /**
  * @brief Control process and thread with Windows API.
  */
 namespace DisRegRep::Core::System::ProcessThreadControl::Windows {
 
 using HandleType = HANDLE;
-
-using ranges::views::linear_distribute;
 
 using std::array;
 using std::ranges::find_if,
@@ -43,12 +43,13 @@ inline void setNativeThreadPriority(const HandleType thread, const Priority prio
 		THREAD_PRIORITY_HIGHEST
 	};
 	static constexpr auto PriorityValueProgression =
-		linear_distribute(MinPriority, Priority { MaxPriority - 1 }, SystemPriorityProgression.size());
+		View::Arithmetic::LinSpace(MinPriority, Priority { MaxPriority - 1 }, SystemPriorityProgression.size());
 
 	const auto priority_band_it = find_if(PriorityValueProgression, bind_front(less_equal {}, priority));
-	const int system_priority = priority_band_it == PriorityValueProgression.end()
-								  ? THREAD_PRIORITY_TIME_CRITICAL
-								  : SystemPriorityProgression[distance(PriorityValueProgression.begin(), priority_band_it)];
+	const int system_priority =
+		priority_band_it == PriorityValueProgression.end()
+			? THREAD_PRIORITY_TIME_CRITICAL
+			: SystemPriorityProgression[static_cast<std::uint_fast8_t>(distance(PriorityValueProgression.begin(), priority_band_it))];
 	DRR_ASSERT_SYSTEM_ERROR_WINDOWS(SetThreadPriority(thread, system_priority));
 }
 

@@ -55,6 +55,8 @@ private:
 	class Iterator {
 	public:
 
+		friend class CacheLatestView;
+
 		using value_type = Value;
 		using difference_type = Difference;
 		using iterator_concept = std::input_iterator_tag;
@@ -132,6 +134,8 @@ private:
 	class Sentinel {
 	private:
 
+		friend class CacheLatestView;
+
 		ViewSentinel End = ViewSentinel();
 
 		explicit constexpr Sentinel(CacheLatestView& parent)
@@ -140,7 +144,7 @@ private:
 
 	public:
 
-		Sentinel() noexcept(std::is_nothrow_default_constructible_v<ViewSentinel>) = default;
+		constexpr Sentinel() noexcept(std::is_nothrow_default_constructible_v<ViewSentinel>) = default;
 
 		Sentinel(const Sentinel&) noexcept(std::is_nothrow_copy_constructible_v<ViewSentinel>) = default;
 
@@ -182,6 +186,18 @@ public:
 
 	explicit constexpr CacheLatestView(ViewType base) noexcept(std::is_nothrow_move_constructible_v<ViewType>) :
 		Base(std::move(base)) { }
+
+	CacheLatestView(const CacheLatestView&)
+		noexcept(std::is_nothrow_copy_constructible_v<ViewType> && std::is_nothrow_copy_constructible_v<CacheValueType>) = default;
+
+	CacheLatestView(CacheLatestView&&)
+		noexcept(std::is_nothrow_move_constructible_v<ViewType> && std::is_nothrow_move_constructible_v<CacheValueType>) = default;
+
+	CacheLatestView& operator=(const CacheLatestView&)
+		noexcept(std::is_nothrow_copy_assignable_v<ViewType> && std::is_nothrow_copy_assignable_v<CacheValueType>) = default;
+
+	CacheLatestView& operator=(CacheLatestView&&)
+		noexcept(std::is_nothrow_move_assignable_v<ViewType> && std::is_nothrow_move_assignable_v<CacheValueType>) = default;
 
 	~CacheLatestView() = default;
 

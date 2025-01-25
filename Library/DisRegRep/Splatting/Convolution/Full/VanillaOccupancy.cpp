@@ -4,7 +4,7 @@
 
 #include <DisRegRep/Container/SplatKernel.hpp>
 
-#include <DisRegRep/Core/Arithmetic.hpp>
+#include <DisRegRep/Core/View/Matrix.hpp>
 
 #include <tuple>
 
@@ -63,7 +63,7 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(VanillaOccupancy) {
 		| transform([d, rf_2d = regionfield.range2d()](const auto idx) constexpr noexcept {
 			const auto [y, x] = idx;
 			return rf_2d
-				| Core::Arithmetic::SubRange2d(DimensionType(x, y), DimensionType(d))
+				| Core::View::Matrix::SubRange2d(DimensionType(x, y), DimensionType(d))
 				| join;
 		  });
 

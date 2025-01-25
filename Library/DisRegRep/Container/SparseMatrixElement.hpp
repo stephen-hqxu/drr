@@ -1,10 +1,10 @@
 #pragma once
 
-#include <DisRegRep/Core/Arithmetic.hpp>
-#include <DisRegRep/Core/Range.hpp>
-#include <DisRegRep/Core/Type.hpp>
+#include <DisRegRep/Core/View/Arithmetic.hpp>
+#include <DisRegRep/Core/View/IrregularTransform.hpp>
+#include <DisRegRep/Core/View/RangeAdaptorClosure.hpp>
 
-#include <range/v3/view/iota.hpp>
+#include <DisRegRep/Core/Type.hpp>
 
 #include <tuple>
 
@@ -72,14 +72,20 @@ concept ImportanceRange = std::is_same_v<std::ranges::range_value_t<R>, Importan
  *
  * @return A range of dense matrix.
  */
-inline constexpr auto ToDense = Core::Range::RangeAdaptorClosure(
-	[]<std::ranges::input_range Sparse, typename Value = typename std::ranges::range_value_t<Sparse>::ValueType>
-	requires Is<std::ranges::range_value_t<Sparse>> && std::is_nothrow_copy_constructible_v<Value>
+inline constexpr auto ToDense = Core::View::RangeAdaptorClosure([]<
+	std::ranges::viewable_range Sparse,
+	typename SparseValue = std::ranges::range_value_t<Sparse>,
+	typename SparseConstIterator = std::ranges::const_iterator_t<Sparse>,
+	typename Value = typename SparseValue::ValueType
+>
+	requires std::ranges::input_range<Sparse> && Is<SparseValue>
 	(Sparse&& sparse, const Core::Type::RegionIdentifier region_count, const Value fill_value = {}) static constexpr noexcept(
-		std::is_nothrow_move_constructible_v<std::ranges::const_iterator_t<Sparse>>) -> auto {
-		using Core::Range::ImpureTransform;
-		using ranges::views::iota;
-		using std::ranges::cbegin, std::ranges::cend,
+		std::is_nothrow_invocable_v<decltype(std::ranges::cbegin), SparseConstIterator>
+		&& std::is_nothrow_invocable_v<decltype(std::ranges::cend), SparseConstIterator>
+		&& std::is_nothrow_copy_constructible_v<Value>
+	) -> std::ranges::view auto {
+		using Core::View::IrregularTransform;
+		using std::ranges::cbegin, std::ranges::cend, std::views::iota,
 			std::ranges::forward_range, std::ranges::is_sorted, std::mem_fn;
 		if constexpr (forward_range<Sparse>) {
 			//Must be sorted by region identifier
@@ -91,7 +97,7 @@ inline constexpr auto ToDense = Core::Range::RangeAdaptorClosure(
 		//A way to maintain the original range category is
 		//	by using binary search to find the element given a dense region ID (O(N log N)).
 		return iota(Core::Type::RegionIdentifier {}, region_count)
-			 | ImpureTransform(
+			 | IrregularTransform(
 				 [fill_value, it = cbegin(sparse), end = cend(sparse)](const auto dense_region_id) mutable constexpr noexcept {
 					 if (it == end) {
 						 return fill_value;
@@ -120,22 +126,25 @@ inline constexpr auto ToDense = Core::Range::RangeAdaptorClosure(
  * @return A range of sparse matrix element.
  */
 inline constexpr auto ToSparse =
-	Core::Range::RangeAdaptorClosure([]<std::ranges::viewable_range Dense, typename Value = std::ranges::range_value_t<Dense>>
-		requires std::ranges::input_range<Dense> && std::equality_comparable<Value> && std::is_nothrow_copy_constructible_v<Value>
+	Core::View::RangeAdaptorClosure([]<std::ranges::viewable_range Dense, typename Value = std::ranges::range_value_t<Dense>>
+		requires std::ranges::input_range<Dense> && std::equality_comparable<Value>
 		(Dense&& dense, const Value ignore_value = {}) static constexpr noexcept(
-			std::is_nothrow_constructible_v<std::decay_t<Dense>, Dense>) -> auto {
+			std::is_nothrow_constructible_v<std::remove_cvref_t<Dense>, Dense> && std::is_nothrow_copy_constructible_v<Value>)
+			-> std::ranges::view auto {
 			using std::make_from_tuple;
 			using std::views::enumerate, std::views::filter, std::views::transform;
 			return std::forward<Dense>(dense)
-				 | enumerate
-				 | filter([ignore_value](const auto it) constexpr noexcept { return std::get<1U>(it) != ignore_value; })
-				 | transform([](const auto it) static constexpr noexcept { return make_from_tuple<Basic<Value>>(it); });
+				| enumerate
+				| filter([ignore_value](const auto it) constexpr noexcept(
+					noexcept(std::declval<Value>() != std::declval<Value>())) { return std::get<1U>(it) != ignore_value; })
+				| transform([](const auto it) static constexpr noexcept(
+					std::is_nothrow_copy_constructible_v<Value>) { return make_from_tuple<Basic<Value>>(it); });
 		});
 
 /**
  * @brief Normalise values in a range of dense or sparse matrix.
  *
- * @link Core::Arithmetic::Normalise
+ * @link Core::View::Arithmetic::Normalise
  *
  * @tparam Element Type of range of matrix element.
  * @tparam Factor Type of normalising value.
@@ -145,18 +154,22 @@ inline constexpr auto ToSparse =
  *
  * @return Normalised range.
  */
-inline constexpr auto Normalise = Core::Range::RangeAdaptorClosure(
+inline constexpr auto Normalise = Core::View::RangeAdaptorClosure(
 	[]<std::ranges::viewable_range Element, std::floating_point Factor, typename Value = std::ranges::range_value_t<Element>>
 	requires(std::ranges::input_range<Element>
 				&& ((Is<Value> && std::is_convertible_v<typename Value::ValueType, Factor>) || std::is_convertible_v<Value, Factor>))
 	(Element&& element, const Factor factor) static constexpr noexcept(
-		std::is_nothrow_constructible_v<std::decay_t<Element>, Element>) -> auto {
-		using Core::Arithmetic::Normalise,
+		std::is_nothrow_constructible_v<std::remove_cvref_t<Element>, Element>) -> std::ranges::view auto {
+		using Core::View::Arithmetic::Normalise,
 			std::views::zip, std::views::transform, std::mem_fn, std::make_from_tuple;
 		if constexpr (Is<Value>) {
-			const auto normalised_value = element | transform(mem_fn(&Value::Value)) | Normalise(factor);
-			return zip(element | transform(mem_fn(&Value::Identifier)), normalised_value)
-				 | transform([](const auto it) static constexpr noexcept { return make_from_tuple<Basic<Factor>>(it); });
+			const auto normalised_value = element
+				| transform(mem_fn(&Value::Value))
+				| Normalise(factor);
+			return zip(element
+				| transform(mem_fn(&Value::Identifier)), normalised_value)
+				| transform([](const auto it) static constexpr noexcept(
+					std::is_nothrow_copy_constructible_v<Factor>) { return make_from_tuple<Basic<Factor>>(it); });
 		} else {
 			return Normalise(std::forward<Element>(element), factor);
 		}

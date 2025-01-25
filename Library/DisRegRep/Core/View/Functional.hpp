@@ -2,7 +2,6 @@
 
 #include "RangeAdaptorClosure.hpp"
 
-#include <iterator>
 #include <ranges>
 
 #include <memory>
@@ -46,8 +45,8 @@ struct Cast {
 inline constexpr auto AddressOf = RangeAdaptorClosure([]<std::ranges::viewable_range R>
 	requires std::ranges::input_range<R> && std::is_lvalue_reference_v<std::ranges::range_reference_t<R>>
 	(R&& r) static constexpr noexcept(std::is_nothrow_constructible_v<std::remove_cvref_t<R>, R>) -> std::ranges::view auto {
-		using std::views::transform, std::ranges::range_value_t, std::to_address;
-		return std::forward<R>(r) | transform(to_address<range_value_t<R>>);
+		using std::views::transform, std::addressof;
+		return std::forward<R>(r) | transform([](auto& obj) static constexpr noexcept { return addressof(obj); });
 	});
 
 /**
@@ -61,7 +60,7 @@ inline constexpr auto AddressOf = RangeAdaptorClosure([]<std::ranges::viewable_r
  */
 inline constexpr auto Dereference =
 	RangeAdaptorClosure([]<std::ranges::viewable_range R, typename Value = std::ranges::range_value_t<R>>
-		requires std::ranges::input_range<R> && std::indirectly_readable<Value>
+		requires std::ranges::input_range<R> && requires(Value value) { *value; }
 		(R&& r) static constexpr noexcept(std::is_nothrow_constructible_v<std::remove_cvref_t<R>, R>) -> std::ranges::view auto {
 			using std::views::transform;
 			return std::forward<R>(r)
