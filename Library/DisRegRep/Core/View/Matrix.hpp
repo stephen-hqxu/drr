@@ -1,45 +1,23 @@
 #pragma once
 
-#include "Range.hpp"
+#include "RangeAdaptorClosure.hpp"
 
 #include <glm/vec2.hpp>
 
-#include <functional>
 #include <ranges>
+
+#include <utility>
 
 #include <concepts>
 #include <type_traits>
-#include <utility>
 
 /**
- * @brief Standard algebraic operations.
+ * @brief View a linear range as a multi-dimension matrix with support for basic linear algebraic operations.
  */
-namespace DisRegRep::Core::Arithmetic {
-
-/**
- * @brief Normalise each value in a range.
- *
- * @library STL
- *
- * @tparam R Range type.
- * @tparam Factor Normalising value type.
- *
- * @param r Input range of values.
- * @param factor Normalising factor. Each value in the range is multiplied by a reciprocal of this.
- *
- * @return Normalised range.
- */
-inline constexpr auto Normalise = Range::RangeAdaptorClosure([]<std::ranges::viewable_range R, std::floating_point Factor>
-	requires std::ranges::input_range<R> && std::is_convertible_v<std::ranges::range_const_reference_t<R>, Factor>
-	(R&& r, const Factor factor) static constexpr noexcept(std::is_nothrow_constructible_v<std::decay_t<R>, R>) -> auto {
-		using std::views::repeat, std::views::zip_transform, std::multiplies;
-		return zip_transform(multiplies {}, std::forward<R>(r), repeat(Factor { 1 } / factor));
-	});
+namespace DisRegRep::Core::View::Matrix {
 
 /**
  * @brief View a range as a 2D range.
- *
- * @library STL
  *
  * @tparam R Range type.
  *
@@ -49,18 +27,16 @@ inline constexpr auto Normalise = Range::RangeAdaptorClosure([]<std::ranges::vie
  * @return 2D view of `r`.
  */
 inline constexpr auto View2d =
-	Range::RangeAdaptorClosure([]<std::ranges::viewable_range R, std::integral Stride = std::ranges::range_difference_t<R>>
+	RangeAdaptorClosure([]<std::ranges::viewable_range R, std::integral Stride = std::ranges::range_difference_t<R>>
 		requires std::ranges::forward_range<R>
 		(R&& r, const Stride stride) static constexpr noexcept(
-			std::is_nothrow_constructible_v<std::decay_t<R>, R>) -> std::ranges::view auto {
+			std::is_nothrow_constructible_v<std::remove_cvref_t<R>, R>) -> std::ranges::view auto {
 			using std::views::chunk;
 			return std::forward<R>(r) | chunk(stride);
 		});
 
 /**
  * @brief View a range as a transposed 2D range.
- *
- * @library STL
  *
  * @tparam R Range type.
  * @tparam Stride Stride type.
@@ -70,7 +46,7 @@ inline constexpr auto View2d =
  *
  * @return Transposed 2D view of `r`.
  */
-inline constexpr auto ViewTransposed2d = Range::RangeAdaptorClosure(
+inline constexpr auto ViewTransposed2d = RangeAdaptorClosure(
 	[]<std::ranges::viewable_range R, std::integral Stride = std::ranges::range_difference_t<R>>
 	requires std::ranges::forward_range<R>
 	(R&& r, const Stride stride) static constexpr noexcept(noexcept(std::forward<R>(r) | std::views::all)) -> std::ranges::view auto {
@@ -86,8 +62,6 @@ inline constexpr auto ViewTransposed2d = Range::RangeAdaptorClosure(
 /**
  * @brief View a sub-range of a column-major 2D range.
  *
- * @library STL
- *
  * @tparam OuterR Outer range type.
  * @tparam InnerR Inner range type.
  *
@@ -99,7 +73,7 @@ inline constexpr auto ViewTransposed2d = Range::RangeAdaptorClosure(
  *
  * @return 2D sub-range of `outer_r`.
  */
-inline constexpr auto SubRange2d = Range::RangeAdaptorClosure([]<
+inline constexpr auto SubRange2d = RangeAdaptorClosure([]<
 	std::ranges::viewable_range OuterR,
 	std::ranges::viewable_range InnerR = std::ranges::range_reference_t<OuterR>,
 	std::integral Size = std::common_type_t<std::ranges::range_difference_t<OuterR>, std::ranges::range_difference_t<InnerR>>
@@ -108,14 +82,14 @@ inline constexpr auto SubRange2d = Range::RangeAdaptorClosure([]<
 	const glm::vec<2U, Size> offset,
 	const glm::vec<2U, Size> extent
 ) static constexpr noexcept(
-	std::is_nothrow_constructible_v<std::decay_t<OuterR>, OuterR>
+	std::is_nothrow_constructible_v<std::remove_cvref_t<OuterR>, OuterR>
 ) -> std::ranges::view auto {
 	using std::views::drop, std::views::take, std::views::transform;
 	return std::forward<OuterR>(outer_r)
 		| drop(offset.y)
 		| take(extent.y)
 		| transform([offset_x = offset.x, extent_x = extent.x]<typename R>(R&& inner_r) constexpr noexcept(
-			std::is_nothrow_constructible_v<std::decay_t<R>, R>
+			std::is_nothrow_constructible_v<std::remove_cvref_t<R>, R>
 		) {
 			return std::forward<R>(inner_r)
 				| drop(offset_x)

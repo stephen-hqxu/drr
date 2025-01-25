@@ -9,7 +9,6 @@ PRIVATE
 	${PROJECT_NAME}::xxHash
 PUBLIC
 	glm::glm
-	range-v3::range-v3
 )
 
 drrSourceGroup()

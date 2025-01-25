@@ -1,0 +1,10 @@
+drrTargetSource(
+HEADER
+	Error
+	Platform
+	ProcessThreadControl
+	ProcessThreadControlPosix
+	ProcessThreadControlWindows
+SOURCE
+	ProcessThreadControl
+)

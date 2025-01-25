@@ -34,7 +34,6 @@ endif()
 ### Dependency ###
 ##################
 find_package(glm 1 CONFIG REQUIRED)
-find_package(range-v3 0.12.0 CONFIG REQUIRED)
 find_package(xxHash 0.8 CONFIG REQUIRED)
 
 add_subdirectory(External)

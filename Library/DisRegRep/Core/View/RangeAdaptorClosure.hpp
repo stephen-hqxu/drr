@@ -1,10 +1,6 @@
 #pragma once
 
-#include <range/v3/view/cache1.hpp>
-#include <range/v3/view/transform.hpp>
-
 #include <functional>
-#include <iterator>
 #include <ranges>
 
 #include <utility>
@@ -12,10 +8,7 @@
 #include <concepts>
 #include <type_traits>
 
-/**
- * @brief Additional range views and adaptors.
- */
-namespace DisRegRep::Core::Range {
+namespace DisRegRep::Core::View {
 
 /**
  * `F` can be used as a range function.
@@ -25,8 +18,6 @@ concept RangeApplicator = std::move_constructible<F> && std::is_object_v<F>;
 
 /**
  * @brief Common range adaptor closure that takes a single range as argument.
- *
- * @library STL
  * 
  * @tparam F Range functor that consumes a range.
  */
@@ -51,6 +42,14 @@ public:
 	 */
 	explicit constexpr RangeAdaptorClosure(F f) noexcept(std::is_nothrow_move_constructible_v<FunctionType>) :
 		Function(std::move(f)) { }
+
+	RangeAdaptorClosure(const RangeAdaptorClosure&) noexcept(std::is_nothrow_copy_constructible_v<FunctionType>) = default;
+
+	RangeAdaptorClosure(RangeAdaptorClosure&&) noexcept(std::is_nothrow_move_constructible_v<FunctionType>) = default;
+
+	RangeAdaptorClosure& operator=(const RangeAdaptorClosure&) noexcept(std::is_nothrow_copy_assignable_v<FunctionType>) = default;
+
+	RangeAdaptorClosure& operator=(RangeAdaptorClosure&&) noexcept(std::is_nothrow_move_assignable_v<FunctionType>) = default;
 
 	constexpr ~RangeAdaptorClosure() = default;
 
@@ -90,28 +89,5 @@ public:
 	}
 
 };
-
-/**
- * @brief Apply a transformation to each element in the range. Differ from `std::views::transform`, the transformation function is
- * allowed to be impure. The resulting range is single-pass due to caching.
- *
- * @library range-v3
- *
- * @tparam R Input range type.
- * @tparam F Transformation function type.
- *
- * @param r Input range whose elements are to be transformed.
- * @param f Transformation function to be applied.
- *
- * @return Transformed range.
- */
-inline constexpr auto ImpureTransform = RangeAdaptorClosure([]<std::ranges::viewable_range R, RangeApplicator F>
-	requires std::ranges::input_range<R> && std::indirectly_unary_invocable<F, std::ranges::iterator_t<R>>
-	(R&& r, F f) static constexpr noexcept(
-		std::is_nothrow_constructible_v<std::decay_t<R>, R>&& std::is_nothrow_move_constructible_v<F>) -> auto {
-		//This cache views force the range to be an input range, and each element in the preceding range will be dereferenced exactly
-		//	once, thus eliminating the possibility of calling the impure function more than once per iteration.
-		return std::forward<R>(r) | ranges::views::transform(std::move(f)) | ranges::views::cache1;
-	});
 
 }

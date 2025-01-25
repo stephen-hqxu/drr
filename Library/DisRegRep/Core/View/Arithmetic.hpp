@@ -1,0 +1,65 @@
+#pragma once
+
+#include "Functional.hpp"
+#include "RangeAdaptorClosure.hpp"
+
+#include <glm/fwd.hpp>
+
+#include <functional>
+#include <ranges>
+
+#include <utility>
+
+#include <concepts>
+#include <type_traits>
+
+/**
+ * @brief Standard algebraic operations.
+ */
+namespace DisRegRep::Core::View::Arithmetic {
+
+/**
+ * @brief Normalise each value in a range.
+ *
+ * @tparam R Range type.
+ * @tparam Factor Normalising value type.
+ *
+ * @param r Input range of values.
+ * @param factor Normalising factor. Each value in the range is multiplied by a reciprocal of this.
+ *
+ * @return Normalised range.
+ */
+inline constexpr auto Normalise = RangeAdaptorClosure([]<std::ranges::viewable_range R, std::floating_point Factor>
+	requires std::ranges::input_range<R> && std::is_convertible_v<std::ranges::range_reference_t<R>, Factor>
+	(R&& r, const Factor factor) static constexpr noexcept(
+		std::is_nothrow_constructible_v<std::remove_cvref_t<R>, R>) -> std::ranges::view auto {
+		using std::views::repeat, std::views::zip_transform, std::multiplies;
+		return zip_transform(multiplies {}, std::forward<R>(r), repeat(Factor { 1 } / factor));
+	});
+
+/**
+ * @brief Get a range of evenly spaced numbers over a specified interval in [from, to].
+ *
+ * @tparam T Interval type. This is also used as the range type.
+ * @tparam N Step size type.
+ *
+ * @param from Interval start.
+ * @param to Interval end.
+ * @param n Number of step.
+ *
+ * @return Linearly spaced range.
+ */
+inline constexpr auto LinSpace = []<typename T, std::unsigned_integral N>
+requires std::is_arithmetic_v<T>
+(const T from, const std::type_identity_t<T> to, const N n) static constexpr noexcept -> std::ranges::view auto {
+	using std::bind_front, std::plus, std::multiplies,
+		std::views::zip_transform, std::views::iota, std::views::repeat, std::views::transform,
+		std::cmp_greater,
+		std::conditional_t, std::is_floating_point_v;
+	using DeltaType = conditional_t<is_floating_point_v<T>, T, glm::float64_t>;
+	return zip_transform(multiplies {}, iota(N {}, n), repeat(cmp_greater(n, 1) ? (to - from) / static_cast<DeltaType>(n - 1) : 0))
+		| transform(bind_front(plus {}, from))
+		| Functional::Cast<T>;
+};
+
+}
