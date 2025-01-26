@@ -1,10 +1,6 @@
-#include <DisRegRep/Core/Arithmetic.hpp>
+#include <DisRegRep/Core/View/Matrix.hpp>
 
 #include <DisRegRep-Test/StringMaker.hpp>
-
-#include <catch2/generators/catch_generators_adapters.hpp>
-#include <catch2/generators/catch_generators_random.hpp>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -18,22 +14,19 @@
 #include <string_view>
 
 #include <algorithm>
-#include <functional>
 #include <ranges>
+
+#include <utility>
 
 #include <cstdint>
 
-namespace Arithmetic = DisRegRep::Core::Arithmetic;
-
-using Catch::Matchers::WithinAbs;
+namespace Matrix = DisRegRep::Core::View::Matrix;
 
 using glm::u8vec2;
 
-using std::array, std::string_view;
-using std::ranges::transform, std::ranges::fold_left_first,
-	std::plus,
-	std::views::cartesian_product, std::views::iota, std::views::enumerate,
-	std::ranges::range_value_t;
+using std::array;
+using std::ranges::transform,
+	std::views::cartesian_product, std::views::iota, std::views::enumerate;
 
 namespace {
 
@@ -59,28 +52,7 @@ enum class View2dCategory : std::uint_fast8_t {
 
 }
 
-SCENARIO("Normalise: Divide a range of numeric values by a factor", "[Core][Arithmetic]") {
-
-	GIVEN("A range of values") {
-		const auto size = GENERATE(take(3U, random<std::uint_fast8_t>(5U, 20U)));
-		const auto number = GENERATE_COPY(take(1U, chunk(size, random<std::int_least8_t>(-100, 100))));
-
-		WHEN("Values are normalised by their sum") {
-			const auto sum = 1.0F * *fold_left_first(number, plus {});
-			const auto normalised_number = number | Arithmetic::Normalise(sum);
-
-			THEN("Sum of normalised values equals one") {
-				const auto normalised_sum = *fold_left_first(normalised_number, plus {});
-				CHECK_THAT(normalised_sum, WithinAbs(1.0F, 1e-4F));
-			}
-
-		}
-
-	}
-
-}
-
-TEMPLATE_TEST_CASE_SIG("View2d/ViewTransposed2d/SubRange2d: View a linear range as a 2D matrix, or transposed, or as a sub-matrix", "[Core][Arithmetic]",
+TEMPLATE_TEST_CASE_SIG("View2d/ViewTransposed2d/SubRange2d: View a linear range as a 2D matrix, or transposed, or as a sub-matrix", "[Core][View][Matrix]",
 	((View2dCategory Cat), Cat), View2dCategory::Normal, View2dCategory::Transposed, View2dCategory::SubView) {
 	using enum View2dCategory;
 
@@ -91,15 +63,17 @@ TEMPLATE_TEST_CASE_SIG("View2d/ViewTransposed2d/SubRange2d: View a linear range 
 			case Normal: return "2D"sv;
 			case Transposed: return "transposed 2D"sv;
 			case SubView: return "sub-2D"sv;
+			default:
+				std::unreachable();
 			}
 		}();
 
 		WHEN("A " << ViewText << " view is formed") {
 			static constexpr auto Offset = u8vec2(2U, 1U), Extent = u8vec2(1U, 2U);
 
-			static constexpr auto MeshGrid2d = MeshGrid::Data | Arithmetic::View2d(MeshGrid::Width);
-			static constexpr auto MeshGrid2dT = MeshGrid::Data | Arithmetic::ViewTransposed2d(MeshGrid::Width);
-			static constexpr auto SubMeshGrid2d = MeshGrid2d | Arithmetic::SubRange2d(Offset, Extent);
+			static constexpr auto MeshGrid2d = MeshGrid::Data | Matrix::View2d(MeshGrid::Width);
+			static constexpr auto MeshGrid2dT = MeshGrid::Data | Matrix::ViewTransposed2d(MeshGrid::Width);
+			static constexpr auto SubMeshGrid2d = MeshGrid2d | Matrix::SubRange2d(Offset, Extent);
 
 			static constexpr auto CheckIdx = [](const auto& rg, const u8vec2 offset = {}) static -> void {
 				for (const auto [y, outer] : rg | enumerate) [[likely]] {
@@ -127,6 +101,8 @@ TEMPLATE_TEST_CASE_SIG("View2d/ViewTransposed2d/SubRange2d: View a linear range 
 					break;
 				case SubView: CheckIdx(SubMeshGrid2d, Offset);
 					break;
+				default:
+					std::unreachable();
 				}
 			}
 

@@ -1,6 +1,6 @@
 #include <DisRegRep/Container/Regionfield.hpp>
 
-#include <DisRegRep/Core/Arithmetic.hpp>
+#include <DisRegRep/Core/View/Matrix.hpp>
 
 #include <DisRegRep/RegionfieldGenerator/Uniform.hpp>
 
@@ -23,7 +23,7 @@
 
 #include <cstdint>
 
-namespace Arithmetic = DisRegRep::Core::Arithmetic;
+namespace View = DisRegRep::Core::View;
 using DisRegRep::Container::Regionfield, DisRegRep::RegionfieldGenerator::Uniform;
 
 using Catch::Matchers::IsEmpty, Catch::Matchers::SizeIs,
@@ -100,7 +100,7 @@ SCENARIO("Regionfield is a matrix of region identifiers", "[Container][Regionfie
 					}
 
 					THEN("Data are transposed") {
-						auto rf_view_t = rf.span() | Arithmetic::ViewTransposed2d(rf.mapping().stride(1U)) | join;
+						auto rf_view_t = rf.span() | View::Matrix::ViewTransposed2d(rf.mapping().stride(1U)) | join;
 						CHECK_THAT(rf_t.range2d() | join, RangeEquals(rf_view_t));
 					}
 

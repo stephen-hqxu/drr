@@ -4,7 +4,8 @@
 #include <DisRegRep/Container/SparseMatrixElement.hpp>
 #include <DisRegRep/Container/SplattingCoefficient.hpp>
 
-#include <DisRegRep/Core/Arithmetic.hpp>
+#include <DisRegRep/Core/View/Arithmetic.hpp>
+#include <DisRegRep/Core/View/Functional.hpp>
 #include <DisRegRep/Core/Type.hpp>
 
 #include <DisRegRep/Splatting/Convolution/Full/Base.hpp>
@@ -38,10 +39,10 @@
 namespace GndTth = DisRegRep::Test::Splatting::GroundTruth;
 namespace SpMatElem = DisRegRep::Container::SparseMatrixElement;
 namespace SpltCoef = DisRegRep::Container::SplattingCoefficient;
+namespace View = DisRegRep::Core::View;
 namespace Type = DisRegRep::Core::Type;
 namespace Splt = DisRegRep::Splatting;
-using DisRegRep::Container::Regionfield,
-	DisRegRep::Core::Arithmetic::Normalise;
+using DisRegRep::Container::Regionfield;
 
 using Catch::Matchers::WithinAbs, Catch::Matchers::RangeEquals, Catch::Matchers::ContainsSubstring;
 
@@ -110,7 +111,7 @@ constexpr auto SplattingCoefficientMatrixDense = [] static consteval noexcept {
 
 	SplattingCoefficientMatrixType<Type::RegionMask> mask {};
 	auto mask_join = mask | join;
-	copy(Importance | transform(bind_back(Normalise, NormFactor)) | join, mask_join.begin());
+	copy(Importance | transform(bind_back(View::Arithmetic::Normalise, NormFactor)) | join, mask_join.begin());
 	return mask;
 }();
 constexpr auto SplattingCoefficientMatrixSparse = [] static consteval noexcept {
@@ -133,7 +134,7 @@ template<
 	> Comp
 >
 void compare(const Matrix& matrix, const Ref& reference, Comp comp) {
-	CHECK_THAT(matrix.range() | transform([](const auto proxy) static constexpr noexcept { return *proxy; }),
+	CHECK_THAT(matrix.range() | View::Functional::Dereference,
 		RangeEquals(reference | all,
 			[&comp](const auto source, const auto target) { return all_of(zip_transform(comp, source, target), identity {}); }));
 }

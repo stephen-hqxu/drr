@@ -61,8 +61,6 @@ concept ImportanceRange = std::is_same_v<std::ranges::range_value_t<R>, Importan
  *
  * @note The returned view is an input range.
  *
- * @library range-v3
- *
  * @tparam Sparse Type of sparse range.
  * @tparam Value Type of region data.
  *
@@ -113,8 +111,6 @@ inline constexpr auto ToDense = Core::View::RangeAdaptorClosure([]<
 
 /**
  * @brief Format a range that contains dense region data to use sparse matrix for storage.
- *
- * @library STL
  *
  * @tparam Dense Type of dense range.
  * @tparam Value Type of region data.

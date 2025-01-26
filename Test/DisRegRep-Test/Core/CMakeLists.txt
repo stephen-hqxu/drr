@@ -1,5 +1,6 @@
+add_subdirectory(View)
+
 drrTargetSource(
 SOURCE
-	Arithmetic
 	ThreadPool
 )

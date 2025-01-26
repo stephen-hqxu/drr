@@ -33,8 +33,8 @@ inline constexpr auto Normalise = RangeAdaptorClosure([]<std::ranges::viewable_r
 	requires std::ranges::input_range<R> && std::is_convertible_v<std::ranges::range_reference_t<R>, Factor>
 	(R&& r, const Factor factor) static constexpr noexcept(
 		std::is_nothrow_constructible_v<std::remove_cvref_t<R>, R>) -> std::ranges::view auto {
-		using std::views::repeat, std::views::zip_transform, std::multiplies;
-		return zip_transform(multiplies {}, std::forward<R>(r), repeat(Factor { 1 } / factor));
+		using std::views::transform, std::bind_front, std::multiplies;
+		return std::forward<R>(r) | transform(bind_front(multiplies {}, Factor { 1 } / factor));
 	});
 
 /**
@@ -53,11 +53,12 @@ inline constexpr auto LinSpace = []<typename T, std::unsigned_integral N>
 requires std::is_arithmetic_v<T>
 (const T from, const std::type_identity_t<T> to, const N n) static constexpr noexcept -> std::ranges::view auto {
 	using std::bind_front, std::plus, std::multiplies,
-		std::views::zip_transform, std::views::iota, std::views::repeat, std::views::transform,
+		std::views::iota, std::views::transform,
 		std::cmp_greater,
 		std::conditional_t, std::is_floating_point_v;
 	using DeltaType = conditional_t<is_floating_point_v<T>, T, glm::float64_t>;
-	return zip_transform(multiplies {}, iota(N {}, n), repeat(cmp_greater(n, 1) ? (to - from) / static_cast<DeltaType>(n - 1) : 0))
+	return iota(N {}, n)
+		| transform(bind_front(multiplies {}, cmp_greater(n, 1) ? (to - from) / static_cast<DeltaType>(n - 1) : 0))
 		| transform(bind_front(plus {}, from))
 		| Functional::Cast<T>;
 };

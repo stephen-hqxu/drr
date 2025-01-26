@@ -2,7 +2,8 @@
 
 #include <DisRegRep/Container/SparseMatrixElement.hpp>
 
-#include <DisRegRep/Core/Arithmetic.hpp>
+#include <DisRegRep/Core/View/Functional.hpp>
+#include <DisRegRep/Core/View/Matrix.hpp>
 #include <DisRegRep/Core/Type.hpp>
 
 #include <catch2/generators/catch_generators_adapters.hpp>
@@ -30,7 +31,7 @@
 
 namespace SpltCoef = DisRegRep::Container::SplattingCoefficient;
 namespace SpMatElem = DisRegRep::Container::SparseMatrixElement;
-namespace Arithmetic = DisRegRep::Core::Arithmetic;
+namespace View = DisRegRep::Core::View;
 namespace Type = DisRegRep::Core::Type;
 
 using Catch::Matchers::SizeIs, Catch::Matchers::IsEmpty,
@@ -40,7 +41,7 @@ using glm::make_vec3, glm::value_ptr;
 
 using std::span;
 using std::ranges::fold_left_first, std::ranges::copy, std::ranges::equal,
-	std::bind_back, std::multiplies, std::bit_or,
+	std::bind_front, std::bind_back, std::multiplies, std::bit_or,
 	std::views::zip_transform, std::views::transform;
 using std::unsigned_integral, std::is_unsigned_v;
 
@@ -130,24 +131,17 @@ TEMPLATE_PRODUCT_TEST_CASE("Matrix that stores region splatting coefficients", "
 			}, random(-10.0F, 10.0F)))));
 
 		WHEN("Matrix is filled in with the coefficients") {
-			const auto input = coefficient | Arithmetic::View2d(dim.x);
+			const auto input = coefficient | View::Matrix::View2d(dim.x);
 			const auto output = matrix.range();
 			copy(input, output.begin());
 
 			THEN("Coefficients in the matrix equal the input coefficients") {
-				auto input_compatible = [&input] constexpr noexcept {
-					if constexpr (IsSparse) {
-						return input | transform(bind_back(bit_or {}, SpMatElem::ToSparse));
-					} else {
-						return input;
-					}
-				}();
-				CHECK_THAT(zip_transform(
-					equal,
-					//ranges::views::indirect would be a perfect fit, just a pity it is not compatible with std::views.
-					output | transform([](const auto proxy) static constexpr noexcept { return *proxy; }),
-					input_compatible
-				), AllTrue());
+				const auto equal_2d = bind_front(zip_transform, equal, output | View::Functional::Dereference);
+				if constexpr (IsSparse) {
+					CHECK_THAT(equal_2d(input | transform(bind_back(bit_or {}, SpMatElem::ToSparse))), AllTrue());
+				} else {
+					CHECK_THAT(equal_2d(input), AllTrue());
+				}
 			}
 
 		}
