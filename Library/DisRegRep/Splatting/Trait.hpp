@@ -79,7 +79,7 @@ private:
 			auto it = ch.begin();
 			((it = copy(tag(impl), it).out), ...);
 			return ch;
-		}, std::make_tuple(KernelContainerImplementation, OutputContainerImplementation));
+		}, std::tuple(KernelContainerImplementation, OutputContainerImplementation));
 
 public:
 

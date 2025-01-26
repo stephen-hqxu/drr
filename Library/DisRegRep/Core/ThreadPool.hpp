@@ -139,7 +139,7 @@ private:
 		using InvokeResult = std::tuple<std::type_identity<std::invoke_result_t<Task, ThreadInfoArgumentType>>...>;
 		using InvokeResultTrait = decltype(std::apply(
 			[]<typename Result0, typename... Result>(std::type_identity<Result0>, std::type_identity<Result>...) {
-				using std::make_tuple, std::tuple, std::future,
+				using std::tuple, std::future,
 					std::bool_constant, std::conjunction_v, std::is_same, std::conditional_t;
 
 				static constexpr bool Identical = conjunction_v<is_same<Result0, Result>...>;
@@ -148,7 +148,7 @@ private:
 					tuple<future<Result0>, future<Result>...>
 				>;
 
-				return make_tuple(
+				return tuple(
 					bool_constant<Identical> {},
 					Future {}
 				);
@@ -238,7 +238,7 @@ public:
 	template<std::ranges::input_range TaskRange, typename TaskTrait = ApplicationTaskTrait<std::ranges::range_value_t<TaskRange>>>
 	void enqueue(TaskRange&& task_range, const std::output_iterator<typename TaskTrait::Future> auto out_it) {
 		using std::vector, std::array, std::to_array,
-			std::make_tuple, std::apply,
+			std::tuple, std::apply,
 			std::ranges::to, std::views::as_rvalue, std::views::transform, std::views::join,
 			std::make_unique, std::unique_lock;
 		static constexpr auto getFuture = [](const auto& task) static -> auto {
@@ -249,7 +249,7 @@ public:
 		//Not a mistake, we make a copy of each task.
 		auto task = std::forward<TaskRange>(task_range) | transform([](auto task_tuple) static {
 			return apply([]<typename... Task>(
-							 Task&... task) static { return make_tuple(make_unique<ApplicationTask<Task>>(std::move(task))...); },
+							 Task&... task) static { return tuple(make_unique<ApplicationTask<Task>>(std::move(task))...); },
 				task_tuple);
 		}) | to<vector>();
 
@@ -262,7 +262,7 @@ public:
 		} else {
 			using std::ranges::transform;
 			transform(task, out_it, [](const auto& app_task_tuple) static {
-				return apply([](const auto&... task) static { return make_tuple(getFuture(task)...); }, app_task_tuple);
+				return apply([](const auto&... task) static { return tuple(getFuture(task)...); }, app_task_tuple);
 			});
 		}
 		{

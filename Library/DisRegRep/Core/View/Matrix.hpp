@@ -30,7 +30,7 @@ inline constexpr auto View2d =
 	RangeAdaptorClosure([]<std::ranges::viewable_range R, std::integral Stride = std::ranges::range_difference_t<R>>
 		requires std::ranges::forward_range<R>
 		(R&& r, const Stride stride) static constexpr noexcept(
-			std::is_nothrow_constructible_v<std::remove_cvref_t<R>, R>) -> std::ranges::view auto {
+			std::is_nothrow_constructible_v<std::views::all_t<R>, R>) -> std::ranges::view auto {
 			using std::views::chunk;
 			return std::forward<R>(r) | chunk(stride);
 		});
@@ -46,18 +46,16 @@ inline constexpr auto View2d =
  *
  * @return Transposed 2D view of `r`.
  */
-inline constexpr auto ViewTransposed2d = RangeAdaptorClosure(
-	[]<std::ranges::viewable_range R, std::integral Stride = std::ranges::range_difference_t<R>>
-	requires std::ranges::forward_range<R>
-	(R&& r, const Stride stride) static constexpr noexcept(noexcept(std::forward<R>(r) | std::views::all)) -> std::ranges::view auto {
-		using std::views::all, std::views::iota, std::views::transform, std::views::drop;
-		return iota(Stride {}, stride)
-			| transform([r = std::forward<R>(r) | all, stride](const auto offset) constexpr noexcept {
-				return r
-					| drop(offset)
-					| std::views::stride(stride);
+inline constexpr auto ViewTransposed2d =
+	RangeAdaptorClosure([]<std::ranges::viewable_range R, std::integral Stride = std::ranges::range_difference_t<R>>
+		requires std::ranges::forward_range<R>
+		(R&& r, const Stride stride) static constexpr noexcept(
+			std::is_nothrow_constructible_v<std::views::all_t<R>, R>) -> std::ranges::view auto {
+			using std::views::all, std::views::iota, std::views::transform, std::views::drop;
+			return iota(Stride {}, stride) | transform([r = std::forward<R>(r) | all, stride](const auto offset) constexpr noexcept {
+				return r | drop(offset) | std::views::stride(stride);
 			});
-	});
+		});
 
 /**
  * @brief View a sub-range of a column-major 2D range.
@@ -82,14 +80,14 @@ inline constexpr auto SubRange2d = RangeAdaptorClosure([]<
 	const glm::vec<2U, Size> offset,
 	const glm::vec<2U, Size> extent
 ) static constexpr noexcept(
-	std::is_nothrow_constructible_v<std::remove_cvref_t<OuterR>, OuterR>
+	std::is_nothrow_constructible_v<std::views::all_t<OuterR>, OuterR>
 ) -> std::ranges::view auto {
 	using std::views::drop, std::views::take, std::views::transform;
 	return std::forward<OuterR>(outer_r)
 		| drop(offset.y)
 		| take(extent.y)
 		| transform([offset_x = offset.x, extent_x = extent.x]<typename R>(R&& inner_r) constexpr noexcept(
-			std::is_nothrow_constructible_v<std::remove_cvref_t<R>, R>
+			std::is_nothrow_constructible_v<std::views::all_t<R>, R>
 		) {
 			return std::forward<R>(inner_r)
 				| drop(offset_x)

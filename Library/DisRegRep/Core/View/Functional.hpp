@@ -22,7 +22,7 @@ struct Cast {
 	template<std::ranges::viewable_range R>
 	requires std::ranges::input_range<R> && std::is_convertible_v<std::ranges::range_reference_t<R>, To>
 	[[nodiscard]] static constexpr std::ranges::view auto operator()(R&& r)
-		noexcept(std::is_nothrow_constructible_v<std::remove_cvref_t<R>, R>) {
+		noexcept(std::is_nothrow_constructible_v<std::views::all_t<R>, R>) {
 		using std::views::transform;
 		return std::forward<R>(r)
 			 | transform([]<typename Value>(Value&& value) static constexpr noexcept(
@@ -44,7 +44,7 @@ struct Cast {
  */
 inline constexpr auto AddressOf = RangeAdaptorClosure([]<std::ranges::viewable_range R>
 	requires std::ranges::input_range<R> && std::is_lvalue_reference_v<std::ranges::range_reference_t<R>>
-	(R&& r) static constexpr noexcept(std::is_nothrow_constructible_v<std::remove_cvref_t<R>, R>) -> std::ranges::view auto {
+	(R&& r) static constexpr noexcept(std::is_nothrow_constructible_v<std::views::all_t<R>, R>) -> std::ranges::view auto {
 		using std::views::transform, std::addressof;
 		return std::forward<R>(r) | transform([](auto& obj) static constexpr noexcept { return addressof(obj); });
 	});
@@ -61,10 +61,11 @@ inline constexpr auto AddressOf = RangeAdaptorClosure([]<std::ranges::viewable_r
 inline constexpr auto Dereference =
 	RangeAdaptorClosure([]<std::ranges::viewable_range R, typename Value = std::ranges::range_value_t<R>>
 		requires std::ranges::input_range<R> && requires(Value value) { *value; }
-		(R&& r) static constexpr noexcept(std::is_nothrow_constructible_v<std::remove_cvref_t<R>, R>) -> std::ranges::view auto {
+		(R&& r) static constexpr noexcept(std::is_nothrow_constructible_v<std::views::all_t<R>, R>) -> std::ranges::view auto {
 			using std::views::transform;
 			return std::forward<R>(r)
-				 | transform([]<typename V>(V&& v) static noexcept(noexcept(*std::declval<Value>())) { return *std::forward<V>(v); });
+				 | transform([]<typename V>(V&& v) static noexcept(
+								 noexcept(*std::declval<Value>())) -> decltype(auto) { return *std::forward<V>(v); });
 		});
 
 /**

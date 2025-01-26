@@ -45,13 +45,13 @@ public:
 
 	constexpr Base() noexcept = default;
 
-	Base(const Base&) = delete;
+	constexpr Base(const Base&) noexcept = default;
 
-	Base(Base&&) = delete;
+	constexpr Base(Base&&) noexcept = default;
 
-	Base& operator=(const Base&) = delete;
+	constexpr Base& operator=(const Base&) noexcept = default;
 
-	Base& operator=(Base&&) = delete;
+	constexpr Base& operator=(Base&&) noexcept = default;
 
 	virtual constexpr ~Base() = default;
 

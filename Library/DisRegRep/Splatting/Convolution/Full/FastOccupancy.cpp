@@ -23,7 +23,7 @@
 namespace SpltKn = DisRegRep::Container::SplatKernel;
 using DisRegRep::Splatting::Convolution::Full::FastOccupancy;
 
-using std::tuple, std::make_tuple, std::tie, std::apply;
+using std::tuple, std::tie, std::apply;
 using std::ranges::for_each,
 	std::bind_back, std::bit_or, std::invoke,
 	std::views::take, std::views::drop, std::views::zip, std::views::transform;
@@ -117,7 +117,7 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(FastOccupancy) {
 
 	//Horizontal pass requires padding above and below the matrix.
 	auto& [kernel_memory, horizontal_memory, vertical_memory] = ImplementationHelper::allocate<ScratchMemory, ContainerTrait>(
-		memory, make_tuple(typename ScratchMemoryType::ExtentType(regionfield.RegionCount, extent), d_halo));
+		memory, tuple(typename ScratchMemoryType::ExtentType(regionfield.RegionCount, extent), d_halo));
 
 	//Need to read the whole halo from regionfield.
 	//In horizontal scanline, this overlaps with the 1D kernel.

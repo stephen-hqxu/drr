@@ -84,7 +84,7 @@ protected:
 	 * @brief Check if given parameters are valid to be used for the selected splatting method.
 	 *
 	 * @param regionfield Regionfield used for splatting.
-	 * @param info The invoke info.
+	 * @param info @link InvokeInfo.
 	 */
 	virtual void validate(const Container::Regionfield&, const InvokeInfo&) const;
 
@@ -92,13 +92,13 @@ public:
 
 	constexpr Base() noexcept = default;
 
-	Base(const Base&) = delete;
+	constexpr Base(const Base&) noexcept = default;
 
-	Base(Base&&) = delete;
+	constexpr Base(Base&&) noexcept = default;
 
-	Base& operator=(const Base&) = delete;
+	constexpr Base& operator=(const Base&) noexcept = default;
 
-	Base& operator=(Base&&) = delete;
+	constexpr Base& operator=(Base&&) noexcept = default;
 
 	virtual constexpr ~Base() = default;
 
@@ -122,7 +122,7 @@ public:
 	/**
 	 * @brief Minimum regionfield matrix dimension required by the given parameters.
 	 *
-	 * @param info The invoke info.
+	 * @param info @link InvokeInfo.
 	 *
 	 * @return Minimum regionfield dimension to be allocated by @link Container::Regionfield::resize.
 	 */
@@ -156,7 +156,7 @@ public:
 	 * It is recommended to use the same memory instance across different invocation with the same `container_trait` to enable memory
 	 * reuse. Otherwise, existing contents captured in `memory` will be destroyed if it does not contain a valid type used by the
 	 * specific implementation.
-	 * @param info The invoke info.
+	 * @param info @link InvokeInfo.
 	 *
 	 * @return The generated region mask for this regionfield whose memory is sourced from `memory`. It is safe to modify its contents
 	 * should the application wish to.

@@ -125,7 +125,7 @@ inline constexpr auto ToSparse =
 	Core::View::RangeAdaptorClosure([]<std::ranges::viewable_range Dense, typename Value = std::ranges::range_value_t<Dense>>
 		requires std::ranges::input_range<Dense> && std::equality_comparable<Value>
 		(Dense&& dense, const Value ignore_value = {}) static constexpr noexcept(
-			std::is_nothrow_constructible_v<std::remove_cvref_t<Dense>, Dense> && std::is_nothrow_copy_constructible_v<Value>)
+			std::is_nothrow_constructible_v<std::views::all_t<Dense>, Dense> && std::is_nothrow_copy_constructible_v<Value>)
 			-> std::ranges::view auto {
 			using std::make_from_tuple;
 			using std::views::enumerate, std::views::filter, std::views::transform;
@@ -155,7 +155,7 @@ inline constexpr auto Normalise = Core::View::RangeAdaptorClosure(
 	requires(std::ranges::input_range<Element>
 				&& ((Is<Value> && std::is_convertible_v<typename Value::ValueType, Factor>) || std::is_convertible_v<Value, Factor>))
 	(Element&& element, const Factor factor) static constexpr noexcept(
-		std::is_nothrow_constructible_v<std::remove_cvref_t<Element>, Element>) -> std::ranges::view auto {
+		std::is_nothrow_constructible_v<std::views::all_t<Element>, Element>) -> std::ranges::view auto {
 		using Core::View::Arithmetic::Normalise,
 			std::views::zip, std::views::transform, std::mem_fn, std::make_from_tuple;
 		if constexpr (Is<Value>) {
@@ -167,7 +167,7 @@ inline constexpr auto Normalise = Core::View::RangeAdaptorClosure(
 				| transform([](const auto it) static constexpr noexcept(
 					std::is_nothrow_copy_constructible_v<Factor>) { return make_from_tuple<Basic<Factor>>(it); });
 		} else {
-			return Normalise(std::forward<Element>(element), factor);
+			return std::forward<Element>(element) | Normalise(factor);
 		}
 	});
 
