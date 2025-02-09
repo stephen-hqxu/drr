@@ -4,6 +4,7 @@
 #include <DisRegRep/Container/SplattingCoefficient.hpp>
 
 #include <DisRegRep/Core/System/ProcessThreadControl.hpp>
+#include <DisRegRep/Core/View/Functional.hpp>
 #include <DisRegRep/Core/Exception.hpp>
 #include <DisRegRep/Core/ThreadPool.hpp>
 
@@ -57,7 +58,6 @@
 #include <cstdint>
 
 using DisRegRep::Programme::Profiler::Splatting;
-namespace SpltCoef = DisRegRep::Container::SplattingCoefficient;
 namespace Splt = DisRegRep::Splatting;
 using Splt::Trait::ContainerCombination;
 
@@ -170,7 +170,10 @@ public:
 
 	struct ExtraResult {
 
-		using MemoryUsageType = common_type_t<SpltCoef::DenseMask::SizeType, SpltCoef::SparseMask::SizeType>;
+		using MemoryUsageType = common_type_t<
+			Container::SplattingCoefficient::DenseMask::SizeType,
+			Container::SplattingCoefficient::SparseMask::SizeType
+		>;
 
 		MemoryUsageType MemoryUsage;
 
@@ -521,6 +524,8 @@ public:
 Splatting::Splatting(fs::path result_dir, const ThreadPoolCreateInfo& thread_pool_info) :
 	Impl_(make_unique<Impl>(std::move(result_dir), thread_pool_info)) { }
 
+Splatting::~Splatting() = default;
+
 void Splatting::synchronise() const {
 	this->Impl_->synchronise();
 }
@@ -550,11 +555,11 @@ void Splatting::sweepRadius(
 		bench.title("Radius");
 
 		for (any memory;
-			const auto* const current_splat : splat) [[likely]] {
-			bench.run(toString(current_splat->Radius).data(), [&invoke_info, container_trait, rf, &memory, current_splat] {
-				nb::doNotOptimizeAway((*current_splat)(container_trait, *rf, memory, invoke_info));
+			const auto& current_splat : splat | Core::View::Functional::Dereference) [[likely]] {
+			bench.run(toString(current_splat.Radius).data(), [&invoke_info, container_trait, rf, &memory, &current_splat] {
+				nb::doNotOptimizeAway(current_splat(container_trait, *rf, memory, invoke_info));
 			});
-			extra_result->record(*current_splat, memory);
+			extra_result->record(current_splat, memory);
 		}
 		impl.writeResult(container_trait, bench, profile_info);
 	}, Impl::SubmitInfo {

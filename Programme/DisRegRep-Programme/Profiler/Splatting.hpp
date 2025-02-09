@@ -33,8 +33,11 @@ public:
 	using Base = DisRegRep::Splatting::Base;
 	using BaseConvolution = DisRegRep::Splatting::Convolution::Base;
 	using DimensionType = Base::DimensionType;
+	using KernelSizeType = BaseConvolution::KernelSizeType;
 
 	using RegionCountType = Container::Regionfield::ValueType;
+
+	using SeedType = RegionfieldGenerator::Base::SeedType;
 	using CentroidCountType = RegionfieldGenerator::VoronoiDiagram::SizeType;
 
 	using SizeType = std::uint_fast8_t;
@@ -91,8 +94,8 @@ public:
 	struct CentroidCountSweepInfo {
 
 		const CommonSweepInfo* CommonSweepInfo_;
-		RegionfieldGenerator::Base::SeedType Seed; /**< @link RegionfieldGenerator::Base::Seed. */
-		Container::Regionfield::ValueType RegionCount; /**< @link Container::Regionfield::RegionCount. */
+		SeedType Seed; /**< @link RegionfieldGenerator::Base::Seed. */
+		RegionCountType RegionCount; /**< @link Container::Regionfield::RegionCount. */
 
 	};
 
@@ -107,7 +110,7 @@ public:
 	 * @brief Create a splatting profiler.
 	 *
 	 * @param result_dir Directory where profiler results are stored.
-	 * @param thread_pool_info Thread pool create info.
+	 * @param thread_pool_info @link ThreadPoolCreateInfo.
 	 *
 	 * @exception std::filesystem::filesystem_error If `result_dir` does not exist.
 	 */
@@ -121,7 +124,7 @@ public:
 
 	constexpr Splatting& operator=(Splatting&&) noexcept = default;
 
-	~Splatting() = default;
+	~Splatting();
 
 	/**
 	 * @brief Block the current thread until all profiler threads finish. All object lifetime requirements are lifted once this call
@@ -137,7 +140,7 @@ public:
 	 * of radii to be swept, and *splat* is each instance of convolution-based splatting to be profiled. As profiler is multithreaded,
 	 * the application is responsible for setting the profiling radii for each instance.
 	 * @param splat_size Number of *splat* instances in `splat_conv`.
-	 * @param info Radius sweep info.
+	 * @param info @link RadiusSweepInfo.
 	 */
 	void sweepRadius(std::span<const BaseConvolution* const>, SizeType, const RadiusSweepInfo&) const;
 
@@ -149,7 +152,7 @@ public:
 	 *
 	 * @param splat Splatting to be profiled.
 	 * @param region_count Region count to be run in order.
-	 * @param info Region count sweep info.
+	 * @param info @link RegionCountSweepInfo.
 	 */
 	void sweepRegionCount(std::span<const Base* const>, std::span<const RegionCountType>, const RegionCountSweepInfo&) const;
 
@@ -160,7 +163,7 @@ public:
 	 *
 	 * @param splat Splatting to be profiled.
 	 * @param centroid_count Centroid count @link RegionfieldGenerator::VoronoiDiagram::CentroidCount to be run in order.
-	 * @param info Centroid count sweep info.
+	 * @param info @link CentroidCountSweepInfo.
 	 */
 	void sweepCentroidCount(std::span<const Base* const>, std::span<const CentroidCountType>, const CentroidCountSweepInfo&) const;
 
