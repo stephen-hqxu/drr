@@ -1,11 +1,13 @@
 #include <DisRegRep-Programme/Profiler/Driver.hpp>
 #include <DisRegRep-Programme/Profiler/Splatting.hpp>
+#include <DisRegRep-Programme/YamlConverter.hpp>
 
 #include <DisRegRep/Container/Regionfield.hpp>
 
 #include <DisRegRep/Core/System/ProcessThreadControl.hpp>
 #include <DisRegRep/Core/View/Arithmetic.hpp>
 #include <DisRegRep/Core/View/Functional.hpp>
+#include <DisRegRep/Core/Exception.hpp>
 
 #include <DisRegRep/RegionfieldGenerator/Base.hpp>
 #include <DisRegRep/RegionfieldGenerator/Uniform.hpp>
@@ -13,6 +15,9 @@
 
 #include <DisRegRep/Splatting/Convolution/Full/FastOccupancy.hpp>
 #include <DisRegRep/Splatting/Convolution/Full/VanillaOccupancy.hpp>
+
+#include <yaml-cpp/node/convert.h>
+#include <yaml-cpp/node/node.h>
 
 #include <array>
 #include <span>
@@ -25,8 +30,15 @@
 #include <algorithm>
 #include <ranges>
 
+#include <chrono>
+#include <format>
 #include <memory>
 #include <utility>
+
+#include <filesystem>
+
+#include <exception>
+#include <system_error>
 
 #include <concepts>
 #include <type_traits>
@@ -37,12 +49,16 @@ namespace Prof = DisRegRep::Programme::Profiler;
 namespace Drv = Prof::Driver;
 namespace View = DisRegRep::Core::View;
 
+namespace fs = std::filesystem;
 using std::array, std::to_array, std::span, std::vector;
 using std::string_view;
 using std::tuple, std::tie, std::apply, std::make_from_tuple;
 using std::ranges::to,
 	std::views::transform, std::views::zip;
-using std::index_sequence, std::make_index_sequence;
+using std::format,
+	std::index_sequence, std::make_index_sequence;
+using std::throw_with_nested,
+	std::make_error_code, std::errc;
 using std::derived_from,
 	std::type_identity, std::add_const_t, std::add_pointer_t;
 
@@ -108,8 +124,6 @@ void Drv::splatting(const SplattingInfo& info) {
 		RegionfieldGenerator::VoronoiDiagram,
 		DisRegRep::Splatting::Convolution::Full::FastOccupancy,
 		DisRegRep::Splatting::Convolution::Full::VanillaOccupancy;
-
-	const auto profiler = Splatting(result_dir, *thread_pool_create_info);
 
 	const tuple default_variable_radius = [&default_variable] {
 		const auto& [variable_radius, _1, _2] = default_variable;
@@ -179,6 +193,20 @@ void Drv::splatting(const SplattingInfo& info) {
 		return common_info;
 	}();
 
+	fs::path result_dir_path = result_dir;
+	try {
+		DRR_ASSERT(fs::is_directory(result_dir_path));
+	} catch (const Core::Exception& e) {
+		throw_with_nested(fs::filesystem_error(e.what(), result_dir_path, make_error_code(errc::not_a_directory)));
+	}
+	{
+		using std::chrono::zoned_time, std::chrono::current_zone, std::chrono::system_clock,
+			std::chrono::time_point_cast, std::chrono::minutes;
+		result_dir_path /= format("{:%Y-%m-%d_%H-%M}", zoned_time(current_zone(), time_point_cast<minutes>(system_clock::now())));
+	}
+	DRR_ASSERT(fs::create_directory(result_dir_path));
+
+	const auto profiler = Splatting(result_dir_path, *thread_pool_create_info);
 	profiler.sweepRadius(default_variable_radius_ptr, std::get<2U>(default_variable.Radius), {
 		.CommonSweepInfo_ = &default_common_info,
 		.Input = tuple(
@@ -203,4 +231,40 @@ void Drv::splatting(const SplattingInfo& info) {
 		.RegionCount = default_fixed.RegionCount
 	});
 	profiler.synchronise();
+}
+
+bool YAML::convert<Drv::SplattingInfo>::decode(const Node& node, ConvertType& splatting_info) {
+	if (!node.IsMap()) [[unlikely]] {
+		return false;
+	}
+	const Node &node_default = node["default"], &node_stress = node["stress"],
+		&default_fixed = node_default["fixed"], &default_variable = node_default["variable"],
+		&stress_fixed = node_stress["fixed"], &stress_variable = node_stress["variable"];
+
+	using Splatting = DisRegRep::Programme::Profiler::Splatting;
+	splatting_info = {
+		.Default = {
+			.Fixed = {
+				.Extent = default_fixed["extent"].as<Splatting::DimensionType>(),
+				.Radius = default_fixed["radius"].as<Splatting::KernelSizeType>(),
+				.RegionCount = default_fixed["region count"].as<Splatting::RegionCountType>(),
+				.CentroidCount = default_fixed["centroid count"].as<Splatting::CentroidCountType>()
+			},
+			.Variable = {
+				.Radius = default_variable["radius"].as<Drv::LinearSweepVariable<Splatting::KernelSizeType>>(),
+				.RegionCount = default_variable["region count"].as<Drv::LinearSweepVariable<Splatting::RegionCountType>>(),
+				.CentroidCount = default_variable["centroid count"].as<Drv::LinearSweepVariable<Splatting::CentroidCountType>>()
+			}
+		},
+		.Stress = {
+			.Fixed = {
+				.Extent = stress_fixed["extent"].as<Splatting::DimensionType>(),
+				.RegionCount = stress_fixed["region count"].as<Splatting::RegionCountType>()
+			},
+			.Variable = {
+				.Radius = stress_variable["radius"].as<Drv::LinearSweepVariable<Splatting::KernelSizeType>>()
+			}
+		}
+	};
+	return true;
 }

@@ -4,6 +4,10 @@ find_package(yaml-cpp 0.8 CONFIG REQUIRED)
 
 add_executable(${DRR_CURRENT_TARGET})
 add_subdirectory(Profiler)
+drrTargetSource(
+HEADER
+	YamlConverter
+)
 
 target_link_libraries(${DRR_CURRENT_TARGET} PRIVATE
 	${PROJECT_NAME}::Library
