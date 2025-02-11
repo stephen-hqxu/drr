@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.23 FATAL_ERROR)
 
+set(DRR_PROJECT_NAME "Discrete Region Representation")
 project(DisRegRep
+	VERSION 2
 	LANGUAGES CXX
-	DESCRIPTION "Discrete Region Representation: A mathematical model for discrete features and feature combination. Useful for fast procedural modelling of diverse landscape, and more."
+	DESCRIPTION "${DRR_PROJECT_NAME}: A mathematical model for discrete features and feature combination. Useful for fast procedural modelling of diverse landscape, and more."
 	HOMEPAGE_URL https://github.com/stephen-hqxu/drr
 )
 
@@ -42,16 +44,30 @@ add_subdirectory(External)
 ### Target Setup ###
 ####################
 #[[
-Add source to target `DRR_CURRENT_TARGET`. Include directory of the source are set to `DRR_CURRENT_INCLUDE_DIR`.
+Add source to target `DRR_CURRENT_TARGET`. Include directory for the source are set to `DRR_CURRENT_INCLUDE_DIR`, and for the generated are set to `DRR_CURRENT_GENERATED_INCLUDE_DIR`.
 
 @param [HEADER <header>...] Target headers. All headers are assumed to be public.
 @param [SOURCE <source>...] Target sources.
+@param [HEADER_TEMPLATE <header template>...] Target header template. They will be configured and output to the designated generated directory.
 ]]
 function(drrTargetSource)
-	cmake_parse_arguments(TARGET "" "" "HEADER;SOURCE" ${ARGV})
+	cmake_parse_arguments(TARGET "" "" "HEADER;SOURCE;HEADER_TEMPLATE" ${ARGV})
 
 	list(TRANSFORM TARGET_HEADER APPEND .hpp)
 	list(TRANSFORM TARGET_SOURCE APPEND .cpp)
+
+	list(TRANSFORM TARGET_HEADER_TEMPLATE APPEND .hpp OUTPUT_VARIABLE GeneratedHeaderFilename)
+	list(TRANSFORM TARGET_HEADER_TEMPLATE APPEND .hpp.in)
+	foreach(generated_filename IN LISTS GeneratedHeaderFilename)
+		cmake_path(ABSOLUTE_PATH generated_filename OUTPUT_VARIABLE generated_path)
+		cmake_path(RELATIVE_PATH generated_path BASE_DIRECTORY ${DRR_CURRENT_INCLUDE_DIR})
+		cmake_path(ABSOLUTE_PATH generated_path BASE_DIRECTORY ${DRR_CURRENT_GENERATED_INCLUDE_DIR})
+		list(APPEND GeneratedHeader ${generated_path})
+	endforeach()
+	foreach(input output IN ZIP_LISTS TARGET_HEADER_TEMPLATE GeneratedHeader)
+		# Not using @ to identify replacement because we are using JavaDoc-style Doxygen that may confuse CMake.
+		configure_file(${input} ${output} ESCAPE_QUOTES)
+	endforeach()
 
 	if(DRR_CURRENT_TARGET_REDISTRIBUTABLE)
 		set(RedistributableVisibility PUBLIC)
@@ -66,6 +82,10 @@ function(drrTargetSource)
 		FILE_SET HEADERS
 			BASE_DIRS ${DRR_CURRENT_INCLUDE_DIR}
 			FILES ${TARGET_HEADER}
+		FILE_SET generated_header
+			TYPE HEADERS
+			BASE_DIRS ${DRR_CURRENT_GENERATED_INCLUDE_DIR}
+			FILES ${GeneratedHeader}
 	)
 endfunction()
 
@@ -75,10 +95,18 @@ Setup source group for target `DRR_CURRENT_TARGET`.
 function(drrSourceGroup)
 	get_target_property(Source ${DRR_CURRENT_TARGET} SOURCES)
 	get_target_property(Header ${DRR_CURRENT_TARGET} HEADER_SET_HEADERS)
+	get_target_property(GeneratedHeader ${DRR_CURRENT_TARGET} HEADER_SET_generated_header)
 
 	foreach(Category IN ITEMS Source Header)
 		source_group(
 			TREE ${CMAKE_CURRENT_SOURCE_DIR}
+			PREFIX ${Category}
+			FILES ${${Category}}
+		)
+	endforeach()
+	foreach(Category IN ITEMS GeneratedHeader)
+		source_group(
+			TREE ${DRR_CURRENT_GENERATED_DIR}
 			PREFIX ${Category}
 			FILES ${${Category}}
 		)
@@ -107,6 +135,12 @@ function(drrAddSubdirectory SourceDir)
 		#	we use `<project name>-<target>/` to disambiguate from redistributable targets.
 		string(APPEND Namespace -${DRR_CURRENT_TARGET})
 	endif()
+
+	cmake_path(APPEND PROJECT_BINARY_DIR Generated ${DRR_CURRENT_TARGET} OUTPUT_VARIABLE DRR_CURRENT_GENERATED_INCLUDE_DIR)
+	cmake_path(APPEND DRR_CURRENT_GENERATED_INCLUDE_DIR ${Namespace} OUTPUT_VARIABLE DRR_CURRENT_GENERATED_DIR)
+	# Always make a directory in case the target never has any generated file added, so the base directory points to a valid path (even if it is empty).
+	file(MAKE_DIRECTORY ${DRR_CURRENT_GENERATED_INCLUDE_DIR})
+
 	add_subdirectory(${DRR_CURRENT_TARGET}/${Namespace})
 
 	if(DRR_CURRENT_TARGET_REDISTRIBUTABLE)
