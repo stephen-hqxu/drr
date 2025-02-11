@@ -1,0 +1,2 @@
+*.hpp.in linguist-language=C++
+/External/CMakeLists.txt -linguist-vendored

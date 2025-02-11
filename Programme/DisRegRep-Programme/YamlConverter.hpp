@@ -1,7 +1,6 @@
 #pragma once
 
-#include <yaml-cpp/node/convert.h>
-#include <yaml-cpp/node/node.h>
+#include <yaml-cpp/yaml.h>
 
 #include <glm/fwd.hpp>
 

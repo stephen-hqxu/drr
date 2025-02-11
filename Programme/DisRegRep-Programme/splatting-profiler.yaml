@@ -1,9 +1,10 @@
 ---
+# The profiler run utilises a global seed for all randomness.
+seed: 294053560
 # Read: ThreadPoolCreateInfo in Programme/DisRegRep-Programme/Profiler/Splatting.hpp.
 # The affinity mask under consideration constitutes an exemplar of a system endowed with an 8-core CPU and a SMT ratio of 1:2 (i.e. 8 cores/16 threads). It is noteworthy that this system is devoid of any energy-efficient cores, whilst the SMT threads are grouped in adjacent configurations. It is imperative to ascertain the CPU topology of one's system to determine the optimal affinity mask.
 thread affinity mask: 0xAAAA
-# Read: SplattingInfo in Programme/DisRegRep-Programme/Profiler/Driver.hpp.
-# It is important to note that the configuration provided is exclusively for the profiler parameter set. Other configurations are identified as requiring frequent changes and, as such, should be specified via the command line.
+# Read: SplattingInfo::ParameterSet in Programme/DisRegRep-Programme/Profiler/Driver.hpp.
 parameter set:
     default:
         fixed:

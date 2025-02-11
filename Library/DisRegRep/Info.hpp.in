@@ -13,6 +13,10 @@ namespace DisRegRep::Info {
  * @brief Revision number corresponds to the major version of set in the ${DRR_PROJECT_NAME} project. To keep versioning simple, we do not consider backward compatibility.
  */
 inline constexpr std::uint_fast8_t Revision = ${PROJECT_VERSION_MAJOR}U;
-inline constexpr std::string_view Description = "${PROJECT_DESCRIPTION}";
+inline constexpr std::string_view
+	FullName = "${DRR_PROJECT_NAME}",
+	ShortName = "${PROJECT_NAME}",
+	Description = "${PROJECT_DESCRIPTION}",
+	HomePage = "${PROJECT_HOMEPAGE_URL}";
 
 }

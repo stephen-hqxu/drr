@@ -431,6 +431,7 @@ public:
 		},
 		ThreadPool(tp_info.Size) {
 		const auto [_, affinity_mask] = tp_info;
+		DRR_ASSERT(this->ThreadPool.sizeThread() <= affinity_mask.size());
 		//We need to measure time, so better the OS does not do random schedule for the threads until we are done.
 		this->ThreadPool.setPriority(Core::System::ProcessThreadControl::MaxPriority);
 		this->ThreadPool.setAffinityMask(affinity_mask);

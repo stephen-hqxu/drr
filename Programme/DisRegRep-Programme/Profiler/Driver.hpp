@@ -2,11 +2,11 @@
 
 #include "Splatting.hpp"
 
-#include <yaml-cpp/node/convert.h>
-#include <yaml-cpp/node/node.h>
+#include <yaml-cpp/yaml.h>
 
-#include <string_view>
 #include <tuple>
+
+#include <filesystem>
 
 #include <type_traits>
 
@@ -35,47 +35,52 @@ using LinearSweepVariable = std::tuple<T, T, Splatting::SizeType>;
  */
 struct SplattingInfo {
 
-	std::string_view ResultDirectory; /**< A new directory is created in this directory where all profiler outputs are stored. */
-	const Splatting::ThreadPoolCreateInfo* ThreadPoolCreateInfo; /**< Please read this documentation carefully regarding how to tune the profiler. */
+	struct ParameterSetType {
 
+		struct {
+
+			struct {
+
+				Splatting::DimensionType Extent;
+
+				Splatting::KernelSizeType Radius;
+				Splatting::RegionCountType RegionCount;
+				Splatting::CentroidCountType CentroidCount;
+
+			} Fixed;
+			struct {
+
+				LinearSweepVariable<Splatting::KernelSizeType> Radius;
+				LinearSweepVariable<Splatting::RegionCountType> RegionCount;
+				LinearSweepVariable<Splatting::CentroidCountType> CentroidCount;
+
+			} Variable;
+
+		} Default;
+		struct {
+
+			struct {
+
+				Splatting::DimensionType Extent;
+
+				Splatting::RegionCountType RegionCount;
+
+			} Fixed;
+			struct {
+
+				LinearSweepVariable<Splatting::KernelSizeType> Radius;
+
+			} Variable;
+
+		} Stress;
+
+	};
+
+	const std::filesystem::path* ResultDirectory; /**< A new directory is created in this directory where all profiler outputs are stored. */
+	const Splatting::ThreadPoolCreateInfo* ThreadPoolCreateInfo; /**< Please read this documentation carefully regarding how to tune the profiler. */
 	Splatting::SeedType Seed;
 
-	struct {
-
-		struct {
-
-			Splatting::DimensionType Extent;
-
-			Splatting::KernelSizeType Radius;
-			Splatting::RegionCountType RegionCount;
-			Splatting::CentroidCountType CentroidCount;
-
-		} Fixed;
-		struct {
-
-			LinearSweepVariable<Splatting::KernelSizeType> Radius;
-			LinearSweepVariable<Splatting::RegionCountType> RegionCount;
-			LinearSweepVariable<Splatting::CentroidCountType> CentroidCount;
-
-		} Variable;
-
-	} Default;
-	struct {
-
-		struct {
-
-			Splatting::DimensionType Extent;
-
-			Splatting::RegionCountType RegionCount;
-
-		} Fixed;
-		struct {
-
-			LinearSweepVariable<Splatting::KernelSizeType> Radius;
-
-		} Variable;
-
-	} Stress;
+	const ParameterSetType* ParameterSet;
 
 };
 
@@ -113,9 +118,9 @@ struct convert<DisRegRep::Programme::Profiler::Driver::LinearSweepVariable<T>> {
 };
 
 template<>
-struct convert<DisRegRep::Programme::Profiler::Driver::SplattingInfo> {
+struct convert<DisRegRep::Programme::Profiler::Driver::SplattingInfo::ParameterSetType> {
 
-	using ConvertType = DisRegRep::Programme::Profiler::Driver::SplattingInfo;
+	using ConvertType = DisRegRep::Programme::Profiler::Driver::SplattingInfo::ParameterSetType;
 
 	static bool decode(const Node&, ConvertType&);
 

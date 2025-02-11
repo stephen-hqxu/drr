@@ -16,8 +16,7 @@
 #include <DisRegRep/Splatting/Convolution/Full/FastOccupancy.hpp>
 #include <DisRegRep/Splatting/Convolution/Full/VanillaOccupancy.hpp>
 
-#include <yaml-cpp/node/convert.h>
-#include <yaml-cpp/node/node.h>
+#include <yaml-cpp/yaml.h>
 
 #include <array>
 #include <span>
@@ -49,6 +48,7 @@ namespace Prof = DisRegRep::Programme::Profiler;
 namespace Drv = Prof::Driver;
 namespace View = DisRegRep::Core::View;
 
+namespace crn = std::chrono;
 namespace fs = std::filesystem;
 using std::array, std::to_array, std::span, std::vector;
 using std::string_view;
@@ -114,7 +114,8 @@ constexpr void seedGenerator(tuple<RfGen...>& generator, const Prof::Splatting::
 }
 
 void Drv::splatting(const SplattingInfo& info) {
-	const auto& [result_dir, thread_pool_create_info, seed, default_profile, stress_profile] = info;
+	const auto [result_dir, thread_pool_create_info, seed, parameter_set] = info;
+	const auto& [default_profile, stress_profile] = *parameter_set;
 	const auto& [default_fixed, default_variable] = default_profile;
 	const auto& [stress_fixed, stress_variable] = stress_profile;
 
@@ -193,20 +194,16 @@ void Drv::splatting(const SplattingInfo& info) {
 		return common_info;
 	}();
 
-	fs::path result_dir_path = result_dir;
 	try {
-		DRR_ASSERT(fs::is_directory(result_dir_path));
+		DRR_ASSERT(fs::is_directory(*result_dir));
 	} catch (const Core::Exception& e) {
-		throw_with_nested(fs::filesystem_error(e.what(), result_dir_path, make_error_code(errc::not_a_directory)));
+		throw_with_nested(fs::filesystem_error(e.what(), *result_dir, make_error_code(errc::not_a_directory)));
 	}
-	{
-		using std::chrono::zoned_time, std::chrono::current_zone, std::chrono::system_clock,
-			std::chrono::time_point_cast, std::chrono::minutes;
-		result_dir_path /= format("{:%Y-%m-%d_%H-%M}", zoned_time(current_zone(), time_point_cast<minutes>(system_clock::now())));
-	}
-	DRR_ASSERT(fs::create_directory(result_dir_path));
+	const fs::path output_dir = *result_dir / format("{:%Y-%m-%d_%H-%M}",
+		crn::zoned_time(crn::current_zone(), crn::time_point_cast<crn::minutes>(crn::system_clock::now())));
+	DRR_ASSERT(fs::create_directory(output_dir));
 
-	const auto profiler = Splatting(result_dir_path, *thread_pool_create_info);
+	const auto profiler = Splatting(output_dir, *thread_pool_create_info);
 	profiler.sweepRadius(default_variable_radius_ptr, std::get<2U>(default_variable.Radius), {
 		.CommonSweepInfo_ = &default_common_info,
 		.Input = tuple(
@@ -233,7 +230,7 @@ void Drv::splatting(const SplattingInfo& info) {
 	profiler.synchronise();
 }
 
-bool YAML::convert<Drv::SplattingInfo>::decode(const Node& node, ConvertType& splatting_info) {
+bool YAML::convert<Drv::SplattingInfo::ParameterSetType>::decode(const Node& node, ConvertType& parameter_set) {
 	if (!node.IsMap()) [[unlikely]] {
 		return false;
 	}
@@ -242,7 +239,7 @@ bool YAML::convert<Drv::SplattingInfo>::decode(const Node& node, ConvertType& sp
 		&stress_fixed = node_stress["fixed"], &stress_variable = node_stress["variable"];
 
 	using Splatting = DisRegRep::Programme::Profiler::Splatting;
-	splatting_info = {
+	parameter_set = {
 		.Default = {
 			.Fixed = {
 				.Extent = default_fixed["extent"].as<Splatting::DimensionType>(),

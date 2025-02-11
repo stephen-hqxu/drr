@@ -7,6 +7,8 @@ add_subdirectory(Profiler)
 drrTargetSource(
 HEADER
 	YamlConverter
+SOURCE
+	Main
 )
 
 target_link_libraries(${DRR_CURRENT_TARGET} PRIVATE
