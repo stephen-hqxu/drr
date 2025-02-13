@@ -1,6 +1,6 @@
 ---
 # The profiler run utilises a global seed for all randomness.
-seed: 294053560
+seed: 932619861
 # Read: ThreadPoolCreateInfo in Programme/DisRegRep-Programme/Profiler/Splatting.hpp.
 # The affinity mask under consideration constitutes an exemplar of a system endowed with an 8-core CPU and a SMT ratio of 1:2 (i.e. 8 cores/16 threads). It is noteworthy that this system is devoid of any energy-efficient cores, whilst the SMT threads are grouped in adjacent configurations. It is imperative to ascertain the CPU topology of one's system to determine the optimal affinity mask.
 thread affinity mask: 0xAAAA

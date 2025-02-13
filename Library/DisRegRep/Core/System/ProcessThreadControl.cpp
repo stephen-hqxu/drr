@@ -31,11 +31,20 @@ namespace {
 }
 
 void ProcThrCtrl::setPriority(const Priority priority, jthread* const thread) {
-	DRR_ASSERT(priority >= ProcThrCtrl::MinPriority && priority <= ProcThrCtrl::MaxPriority);
+	DRR_ASSERT(priority >= PriorityPreset::Min && priority <= PriorityPreset::Max);
 	Internal_::setNativeThreadPriority(getNativeHandle(thread), priority);
 }
 
+void ProcThrCtrl::setPriority(jthread* const thread) {
+	Internal_::setNativeThreadPriority(getNativeHandle(thread));
+}
+
 void ProcThrCtrl::setAffinityMask(const AffinityMask affinity_mask, jthread* const thread) {
+	DRR_ASSERT(affinity_mask.any());
 	DRR_ASSERT(jthread::hardware_concurrency() <= affinity_mask.size());
 	Internal_::setNativeThreadAffinityMask(getNativeHandle(thread), affinity_mask);
+}
+
+void ProcThrCtrl::setAffinityMask(jthread* const thread) {
+	Internal_::setNativeThreadAffinityMask(getNativeHandle(thread));
 }

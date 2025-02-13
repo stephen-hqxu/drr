@@ -15,8 +15,6 @@
 #include <functional>
 #include <iterator>
 
-#include <cstdint>
-
 /**
  * @brief Control process and thread with Windows API.
  */
@@ -43,18 +41,26 @@ inline void setNativeThreadPriority(const HandleType thread, const Priority prio
 		THREAD_PRIORITY_HIGHEST
 	};
 	static constexpr auto PriorityValueProgression =
-		View::Arithmetic::LinSpace(MinPriority, Priority { MaxPriority - 1 }, SystemPriorityProgression.size());
+		View::Arithmetic::LinSpace(PriorityPreset::Min, PriorityPreset::Max - 1U, SystemPriorityProgression.size());
 
 	const auto priority_band_it = find_if(PriorityValueProgression, bind_front(less_equal {}, priority));
-	const int system_priority =
-		priority_band_it == PriorityValueProgression.end()
-			? THREAD_PRIORITY_TIME_CRITICAL
-			: SystemPriorityProgression[static_cast<std::uint_fast8_t>(distance(PriorityValueProgression.begin(), priority_band_it))];
+	const int system_priority = priority_band_it == PriorityValueProgression.end()
+		? THREAD_PRIORITY_TIME_CRITICAL
+		: SystemPriorityProgression[
+			static_cast<decltype(SystemPriorityProgression)::size_type>(distance(PriorityValueProgression.begin(), priority_band_it))];
 	DRR_ASSERT_SYSTEM_ERROR_WINDOWS(SetThreadPriority(thread, system_priority));
+}
+
+inline void setNativeThreadPriority(const HandleType thread) {
+	DRR_ASSERT_SYSTEM_ERROR_WINDOWS(SetThreadPriority(thread, THREAD_PRIORITY_NORMAL));
 }
 
 inline void setNativeThreadAffinityMask(const HandleType thread, const AffinityMask affinity_mask) {
 	DRR_ASSERT_SYSTEM_ERROR_WINDOWS(SetThreadAffinityMask(thread, affinity_mask.to_ullong()));
+}
+
+inline void setNativeThreadAffinityMask(const HandleType thread) {
+	DRR_ASSERT_SYSTEM_ERROR_WINDOWS(SetThreadAffinityMask(thread, DWORD_PTR {}));
 }
 
 }

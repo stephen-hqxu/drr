@@ -23,7 +23,8 @@
 
 #include <cstdint>
 
-using DisRegRep::Core::ThreadPool, DisRegRep::Core::System::ProcessThreadControl::Priority;
+namespace PriorityPreset = DisRegRep::Core::System::ProcessThreadControl::PriorityPreset;
+using DisRegRep::Core::ThreadPool;
 
 using Catch::Matchers::RangeEquals;
 
@@ -39,7 +40,7 @@ using std::is_same_v;
 namespace {
 
 //Those fabricated tasks are pretty lightweight, so don't bother taking too much system resources.
-constexpr Priority DefaultPriority = 10U;
+constexpr auto DefaultPriority = PriorityPreset::Low;
 
 using Semaphore = counting_semaphore<16U>;
 using TaskValue = std::int_least16_t;

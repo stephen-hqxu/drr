@@ -119,7 +119,6 @@ void Drv::splatting(const SplattingInfo& info) {
 	const auto& [default_fixed, default_variable] = default_profile;
 	const auto& [stress_fixed, stress_variable] = stress_profile;
 
-	using Core::System::ProcessThreadControl::setPriority;
 	using Container::Regionfield,
 		RegionfieldGenerator::Uniform,
 		RegionfieldGenerator::VoronoiDiagram,
@@ -202,6 +201,32 @@ void Drv::splatting(const SplattingInfo& info) {
 	const fs::path output_dir = *result_dir / format("{:%Y-%m-%d_%H-%M}",
 		crn::zoned_time(crn::current_zone(), crn::time_point_cast<crn::minutes>(crn::system_clock::now())));
 	DRR_ASSERT(fs::create_directory(output_dir));
+
+	namespace ProcThrCtrl = Core::System::ProcessThreadControl;
+	[[maybe_unused]] const volatile class MainThreadSchedulerType {
+	private:
+
+		bool AffinityMasked = false;
+
+	public:
+
+		MainThreadSchedulerType(const ProcThrCtrl::AffinityMask splatting_thread_affinity_mask) {
+			ProcThrCtrl::setPriority(ProcThrCtrl::PriorityPreset::Min);
+			if (const ProcThrCtrl::AffinityMask main_thread_affinity_mask = ~splatting_thread_affinity_mask;
+				main_thread_affinity_mask.any()) {
+				ProcThrCtrl::setAffinityMask(main_thread_affinity_mask);
+				this->AffinityMasked = true;
+			}
+		}
+
+		~MainThreadSchedulerType() noexcept(false) {
+			ProcThrCtrl::setPriority();
+			if (this->AffinityMasked) {
+				ProcThrCtrl::setAffinityMask();
+			}
+		}
+
+	} main_thread_scheduler = thread_pool_create_info->AffinityMask;
 
 	const auto profiler = Splatting(output_dir, *thread_pool_create_info);
 	profiler.sweepRadius(default_variable_radius_ptr, std::get<2U>(default_variable.Radius), {
