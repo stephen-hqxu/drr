@@ -17,8 +17,9 @@
 namespace DisRegRep::Container {
 
 /**
- * @brief Regionfield is a function that tells which region a given point belongs to. In this project regionfield is constructed as a
- * 2D matrix of region identifiers. The storage uses column-major order.
+ * @brief The regionfield function is employed to determine the region to which a given point belongs. In this project, regionfield is
+ * constructed as a 2D matrix $s_{W,H}$ of region identifiers, where $W$ and $H$ denote the width and height of the matrix,
+ * respectively. The expression $s[r,c]$ is the region identifier at row $r$ and column $c$, and the column has a stride of one.
  */
 class Regionfield {
 public:
@@ -29,7 +30,7 @@ public:
 	using DimensionType = glm::vec<2U, IndexType>;
 
 	using ExtentType = std::dextents<IndexType, 2U>;
-	using LayoutType = std::layout_left;
+	using LayoutType = std::layout_right;
 	using MdSpanType = std::mdspan<ValueType, ExtentType, LayoutType>;
 	using MappingType = MdSpanType::mapping_type;
 
@@ -121,7 +122,7 @@ public:
 	 */
 	template<typename Self>
 	[[nodiscard]] constexpr auto mdspan(this Self& self) noexcept {
-		return std::mdspan(self.Data.data(), self.mapping());
+		return std::mdspan(self.Data.data(), self.Mapping);
 	}
 
 	/**
@@ -141,7 +142,7 @@ public:
 	 */
 	template<typename Self>
 	[[nodiscard]] constexpr std::ranges::view auto range2d(this Self& self) noexcept {
-		return self.Data | Core::View::Matrix::View2d(self.mapping().stride(1U));
+		return self.Data | Core::View::Matrix::View2d(self.Mapping.stride(0U));
 	}
 
 };

@@ -27,10 +27,11 @@
 #include <cstdint>
 
 /**
- * @brief Splatting coefficients are values computed by the convolution used for splatting of region features. In this project there
- * are mainly two kinds of splatting coefficients, being region importance and region mask. The splatting coefficients are stored in a
- * 3D column-major matrix, namely the splatting coefficient matrix (SCM). The Y and Z axes are used for locating points in a 2D space,
- * and the X axis is used for locating the splatting coefficients for the corresponding region.
+ * @brief Splatting coefficients are values computed for the splatting of region features, and in this project, there are two kinds of
+ * splatting coefficients: region importance and region mask. The splatting coefficients are stored in a 3D matrix $w_{W,H,N}$ (i.e.
+ * the splatting coefficient matrix (SCM)), where $W$, $H$ and $N$ denote the width, height and region count of the matrix,
+ * respectively. The expression $w[r,c,s]$ is the splatting coefficient at row $r$, column $c$ and region $s$, with the region axis
+ * having a stride of one.
  */
 namespace DisRegRep::Container::SplattingCoefficient {
 
@@ -40,12 +41,12 @@ namespace DisRegRep::Container::SplattingCoefficient {
 namespace Type {
 
 using IndexType = std::uint_fast32_t;
-using LayoutType = std::layout_left;
+using LayoutType = std::layout_right;
 
 template<glm::length_t L>
 using DimensionType = glm::vec<L, IndexType>;
 using Dimension2Type = DimensionType<2U>; /**< Point coordinate. */
-using Dimension3Type = DimensionType<3U>; /**< Region index and point coordinate. */
+using Dimension3Type = DimensionType<3U>; /**< Point coordinate and region identifier. */
 
 }
 
@@ -61,8 +62,8 @@ using DenseImportance = BasicDense<Core::Type::RegionImportance>; /**< Dense reg
 using DenseMask = BasicDense<Core::Type::RegionMask>; /**< Dense region mask. */
 
 /**
- * @brief A sparse SCM is a partial sparse matrix that uses compressed sparse row format on the axis that stores region
- * splatting coefficients (i.e. the X axis), the rest of axes remain dense.
+ * @brief A sparse SCM is a partial sparse matrix that uses compressed sparse format on the region axis (i.e. the Z axis), the rest of
+ * axes remain dense.
  *
  * @tparam V Splatting coefficient value type.
  */
@@ -100,8 +101,7 @@ public:
 	using SizeType = typename DataContainerType::size_type;
 
 	/**
-	 * @brief A proxy that acts like a lvalue reference to values along the X-axis (i.e. the per-region splatting coefficient at fixed
-	 * coordinate) of the dense matrix.
+	 * @brief A proxy that acts like a lvalue reference to values along the Z axis of the dense matrix.
 	 *
 	 * @param Const True if the values are constant.
 	 */
@@ -215,7 +215,7 @@ public:
 	 * @brief Resize the current dense matrix. All existing contents become undefined and the internal state of the matrix is reset,
 	 * thus suitable for commencing new computations.
 	 *
-	 * @param dim Provide region count, width and height of the dense matrix.
+	 * @param dim Provide width, height and region count of the dense matrix.
 	 */
 	void resize(Dimension3Type);
 
@@ -285,7 +285,7 @@ public:
 	using SizeType = std::common_type_t<OffsetContainerType::size_type, typename ElementContainerType::size_type>;
 
 	/**
-	 * @brief A proxy of values along the X-axis (i.e. the per-region splatting coefficient at fixed coordinate) of the sparse matrix.
+	 * @brief A proxy of values along the Z axis of the sparse matrix.
 	 *
 	 * @tparam Const True if the values are constant.
 	 */
@@ -405,8 +405,7 @@ public:
 	/**
 	 * @brief Get the index mapping of the sparse matrix.
 	 *
-	 * @note Since sparse matrix is only *partially* sparse, i.e. the per-region splatting coefficient axis is sparse, the mapping only
-	 * maps the desne axes.
+	 * @note Since sparse matrix is only *partially* sparse on the Z axis, the mapping only maps the dense axes.
 	 *
 	 * @return Index mapping.
 	 */
@@ -472,7 +471,7 @@ public:
 	 * @return A transposed 2D range to the sparse matrix.
 	 */
 	[[nodiscard]] constexpr std::ranges::view auto rangeTransposed2d() const noexcept {
-		return this->range() | Core::View::Matrix::ViewTransposed2d(this->OffsetMapping.stride(1U));
+		return this->range() | Core::View::Matrix::ViewTransposed2d(this->OffsetMapping.stride(0U));
 	}
 
 };

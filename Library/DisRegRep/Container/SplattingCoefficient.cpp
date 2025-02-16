@@ -1,6 +1,7 @@
 #include <DisRegRep/Container/SplattingCoefficient.hpp>
 
 #include <DisRegRep/Core/Exception.hpp>
+#include <DisRegRep/Core/MdSpan.hpp>
 #include <DisRegRep/Core/Type.hpp>
 
 #include <glm/vector_relational.hpp>
@@ -31,7 +32,7 @@ template<typename V>
 void BasicDense<V>::resize(const Dimension3Type dim) {
 	DRR_ASSERT(glm::all(glm::greaterThan(dim, Dimension3Type(0U))));
 
-	this->Mapping = ExtentType(dim.x, dim.y, dim.z);
+	this->Mapping = Core::MdSpan::toExtent(dim);
 	this->DenseMatrix.resize(this->Mapping.required_span_size());
 }
 
@@ -60,10 +61,10 @@ typename BasicSparse<V>::SizeType BasicSparse<V>::sizeByte() const noexcept {
 template<typename V>
 void BasicSparse<V>::resize(const Dimension3Type dim) {
 	//Region count is unused in sparse matrix.
-	const auto dim_wh = Type::Dimension2Type(dim.y, dim.z);
+	const Type::Dimension2Type dim_wh = dim;
 	DRR_ASSERT(glm::all(glm::greaterThan(dim_wh, Type::Dimension2Type(0U))));
 
-	this->OffsetMapping = OffsetExtentType(dim_wh.x, dim_wh.y);
+	this->OffsetMapping = Core::MdSpan::toExtent(dim_wh);
 	//Initialise starting offset for each element in the new sparse matrix.
 	this->Offset.resize(this->sizeOffset());
 	//We will be pushing new elements into the matrix, so need to clear the old ones.

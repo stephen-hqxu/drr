@@ -52,8 +52,8 @@ namespace crn = std::chrono;
 namespace fs = std::filesystem;
 using std::array, std::to_array, std::span, std::vector;
 using std::string_view;
-using std::tuple, std::tie, std::apply, std::make_from_tuple;
-using std::ranges::to,
+using std::tuple, std::tie, std::apply;
+using std::ranges::to, std::ranges::copy,
 	std::views::transform, std::views::zip;
 using std::format,
 	std::index_sequence, std::make_index_sequence;
@@ -185,11 +185,8 @@ void Drv::splatting(const SplattingInfo& info) {
 		),
 		tag = to_array<string_view>({ "Default", "Stress" })
 	] constexpr {
-		using std::ranges::transform;
-
 		array<Splatting::CommonSweepInfo, extent.size()> common_info;
-		transform(zip(tag, extent), common_info.begin(),
-			[](const auto tup) static constexpr noexcept { return make_from_tuple<Splatting::CommonSweepInfo>(tup); });
+		copy(zip(tag, extent) | View::Functional::MakeFromTuple<Splatting::CommonSweepInfo>, common_info.begin());
 		return common_info;
 	}();
 

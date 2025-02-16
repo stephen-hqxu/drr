@@ -4,6 +4,7 @@ add_subdirectory(View)
 drrTargetSource(
 HEADER
 	Exception
+	MdSpan
 	ThreadPool
 	Type
 	UninitialisedAllocator

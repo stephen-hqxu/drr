@@ -58,7 +58,7 @@ inline constexpr auto ViewTransposed2d =
 		});
 
 /**
- * @brief View a sub-range of a column-major 2D range.
+ * @brief View a sub-range of a 2D range. It is assumed that the inner range represents the Y axis that has a stride of one.
  *
  * @tparam OuterR Outer range type.
  * @tparam InnerR Inner range type.
@@ -84,14 +84,14 @@ inline constexpr auto SubRange2d = RangeAdaptorClosure([]<
 ) -> std::ranges::view auto {
 	using std::views::drop, std::views::take, std::views::transform;
 	return std::forward<OuterR>(outer_r)
-		| drop(offset.y)
-		| take(extent.y)
-		| transform([offset_x = offset.x, extent_x = extent.x]<typename R>(R&& inner_r) constexpr noexcept(
+		| drop(offset.x)
+		| take(extent.x)
+		| transform([offset_y = offset.y, extent_y = extent.y]<typename R>(R&& inner_r) constexpr noexcept(
 			std::is_nothrow_constructible_v<std::views::all_t<R>, R>
 		) {
 			return std::forward<R>(inner_r)
-				| drop(offset_x)
-				| take(extent_x);
+				| drop(offset_y)
+				| take(extent_y);
 		});
 });
 

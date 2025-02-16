@@ -2,6 +2,7 @@
 
 #include <DisRegRep/Container/Regionfield.hpp>
 
+#include <DisRegRep/Core/View/Functional.hpp>
 #include <DisRegRep/Core/View/Generate.hpp>
 #include <DisRegRep/Core/Exception.hpp>
 #include <DisRegRep/Core/Type.hpp>
@@ -24,9 +25,8 @@
 
 #include <utility>
 
-#include <cstddef>
-
 using DisRegRep::RegionfieldGenerator::VoronoiDiagram;
+using DisRegRep::Container::Regionfield;
 
 using glm::u16vec2, glm::f32vec2;
 
@@ -35,12 +35,12 @@ using std::apply;
 using std::ranges::min_element, std::ranges::distance, std::ranges::to,
 	std::execution::par_unseq,
 	std::views::iota, std::views::cartesian_product;
-using std::index_sequence;
+using std::integer_sequence, std::make_integer_sequence;
 
-void VoronoiDiagram::operator()(Container::Regionfield& regionfield) const {
+void VoronoiDiagram::operator()(Regionfield& regionfield) const {
 	DRR_ASSERT(this->CentroidCount > 0U);
 	const span rf_span = regionfield.span();
-	const Container::Regionfield::ExtentType& rf_extent = regionfield.mapping().extents();
+	const Regionfield::ExtentType& rf_extent = regionfield.mapping().extents();
 
 	auto rng = Core::XXHash::RandomEngine(this->generateSecret());
 	array<UniformDistributionType, 2U> dist;
@@ -55,22 +55,20 @@ void VoronoiDiagram::operator()(Container::Regionfield& regionfield) const {
 		Core::View::Generate([dist = Base::createDistribution(regionfield), &rng]() mutable { return dist(rng); }, this->CentroidCount)
 		| to<vector<Core::Type::RegionIdentifier>>();
 
-	/*
-	 * Find the nearest centroid for every point in the regionfield.
-	 * This is a pretty Naive algorithm, in practice it is better to use a quad tree or KD tree to find K-NN;
-	 *	omitted here for simplicity.
-	 */
-	const auto idx_rg = [&rf_extent]<std::size_t... I>(index_sequence<I...>) constexpr noexcept {
-		return cartesian_product(iota(0U, rf_extent.extent(I))...);
-	}(index_sequence<1U, 0U> {});
+	//Find the nearest centroid for every point in the regionfield.
+	//This is a pretty Naive algorithm, in practice it is better to use a quad tree or KD tree to find K-NN;
+	//	omitted here for simplicity.
+	using RankType = Regionfield::ExtentType::rank_type;
+	const auto idx_rg = [&rf_extent]<RankType... I>(integer_sequence<RankType, I...>) constexpr noexcept {
+		return cartesian_product(iota(Regionfield::IndexType {}, rf_extent.extent(I))...)
+			 | Core::View::Functional::MakeFromTuple<Regionfield::DimensionType>;
+	}(make_integer_sequence<RankType, Regionfield::ExtentType::rank()> {});
 	std::transform(par_unseq, idx_rg.cbegin(), idx_rg.cend(), rf_span.begin(),
-		[&region_centroid, &region_assignment](const auto& idx) noexcept {
-			const auto [y, x] = idx;
+		[&region_centroid, &region_assignment](const auto idx) noexcept {
 			const auto argmin = distance(region_centroid.cbegin(),
-				min_element(region_centroid, {},
-					[current_coord = f32vec2(x, y)](const f32vec2 centroid_coord) noexcept {
-						return glm::distance(current_coord, centroid_coord);
-					}));
+				min_element(region_centroid, {}, [current_coord = f32vec2(idx)](const f32vec2 centroid_coord) noexcept {
+					return glm::distance(current_coord, centroid_coord);
+				}));
 			return region_assignment[argmin];
 		});
 }

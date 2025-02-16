@@ -80,14 +80,14 @@ TEMPLATE_PRODUCT_TEST_CASE("Splatting coefficient matrix allocates memory in two
 			AND_WHEN("Some sizes are zeros") {
 
 				THEN("Resize fails") {
-					if constexpr (IsDense) {
-						CHECK_THROWS_WITH(matrix.resize(Dimension3Type(0U, dim.y, dim.z)),
-							ContainsSubstring("greaterThan") && ContainsSubstring("0U"));
-					}
+					CHECK_THROWS_WITH(matrix.resize(Dimension3Type(0U, dim.y, dim.z)),
+						ContainsSubstring("greaterThan") && ContainsSubstring("0U"));
 					CHECK_THROWS_WITH(matrix.resize(Dimension3Type(dim.x, 0U, dim.z)),
 						ContainsSubstring("greaterThan") && ContainsSubstring("0U"));
-					CHECK_THROWS_WITH(matrix.resize(Dimension3Type(dim.x, dim.y, 0U)),
-						ContainsSubstring("greaterThan") && ContainsSubstring("0U"));
+					if constexpr (IsDense) {
+						CHECK_THROWS_WITH(matrix.resize(Dimension3Type(dim.x, dim.y, 0U)),
+							ContainsSubstring("greaterThan") && ContainsSubstring("0U"));
+					}
 				}
 
 			}
@@ -131,7 +131,7 @@ TEMPLATE_PRODUCT_TEST_CASE("Matrix that stores region splatting coefficients", "
 			}, random(-10.0F, 10.0F)))));
 
 		WHEN("Matrix is filled in with the coefficients") {
-			const auto input = coefficient | View::Matrix::View2d(dim.x);
+			const auto input = coefficient | View::Matrix::View2d(dim.z);
 			const auto output = matrix.range();
 			copy(input, output.begin());
 

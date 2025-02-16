@@ -1,12 +1,11 @@
 #pragma once
 
 #include <DisRegRep/Core/View/Arithmetic.hpp>
+#include <DisRegRep/Core/View/Functional.hpp>
 #include <DisRegRep/Core/View/IrregularTransform.hpp>
 #include <DisRegRep/Core/View/RangeAdaptorClosure.hpp>
 
 #include <DisRegRep/Core/Type.hpp>
-
-#include <tuple>
 
 #include <algorithm>
 #include <functional>
@@ -127,14 +126,12 @@ inline constexpr auto ToSparse =
 		(Dense&& dense, const Value ignore_value = {}) static constexpr noexcept(
 			std::is_nothrow_constructible_v<std::views::all_t<Dense>, Dense> && std::is_nothrow_copy_constructible_v<Value>)
 			-> std::ranges::view auto {
-			using std::make_from_tuple;
 			using std::views::enumerate, std::views::filter, std::views::transform;
 			return std::forward<Dense>(dense)
 				| enumerate
 				| filter([ignore_value](const auto it) constexpr noexcept(
 					noexcept(std::declval<Value>() != std::declval<Value>())) { return std::get<1U>(it) != ignore_value; })
-				| transform([](const auto it) static constexpr noexcept(
-					std::is_nothrow_copy_constructible_v<Value>) { return make_from_tuple<Basic<Value>>(it); });
+				| Core::View::Functional::MakeFromTuple<Basic<Value>>;
 		});
 
 /**
@@ -156,18 +153,16 @@ inline constexpr auto Normalise = Core::View::RangeAdaptorClosure(
 				&& ((Is<Value> && std::is_convertible_v<typename Value::ValueType, Factor>) || std::is_convertible_v<Value, Factor>))
 	(Element&& element, const Factor factor) static constexpr noexcept(
 		std::is_nothrow_constructible_v<std::views::all_t<Element>, Element>) -> std::ranges::view auto {
-		using Core::View::Arithmetic::Normalise,
-			std::views::zip, std::views::transform, std::mem_fn, std::make_from_tuple;
+		using std::views::zip, std::views::transform, std::mem_fn;
 		if constexpr (Is<Value>) {
 			const auto normalised_value = element
 				| transform(mem_fn(&Value::Value))
-				| Normalise(factor);
+				| Core::View::Arithmetic::Normalise(factor);
 			return zip(element
 				| transform(mem_fn(&Value::Identifier)), normalised_value)
-				| transform([](const auto it) static constexpr noexcept(
-					std::is_nothrow_copy_constructible_v<Factor>) { return make_from_tuple<Basic<Factor>>(it); });
+				| Core::View::Functional::MakeFromTuple<Basic<Factor>>;
 		} else {
-			return std::forward<Element>(element) | Normalise(factor);
+			return std::forward<Element>(element) | Core::View::Arithmetic::Normalise(factor);
 		}
 	});
 

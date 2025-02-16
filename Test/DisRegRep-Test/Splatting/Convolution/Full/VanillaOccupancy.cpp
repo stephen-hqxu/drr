@@ -8,7 +8,7 @@ using DisRegRep::Splatting::Convolution::Full::VanillaOccupancy;
 
 namespace GndTth = DisRegRep::Test::Splatting::GroundTruth;
 
-SCENARIO("Use a brute-force 2D convolution to compute splatting coefficients from a regionfield", "[Splatting][VanillaFullOccupancy]") {
+SCENARIO("Use a brute-force 2D convolution to compute splatting coefficients from a regionfield", "[Splatting][Convolution][Full][VanillaOccupancy]") {
 
 	GIVEN("A vanilla full occupancy splatting") {
 		VanillaOccupancy splatting;

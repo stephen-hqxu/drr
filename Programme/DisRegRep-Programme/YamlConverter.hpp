@@ -6,8 +6,6 @@
 
 #include <utility>
 
-#include <cstddef>
-
 namespace YAML {
 
 template<glm::length_t L, typename T, glm::qualifier Q>
@@ -19,10 +17,11 @@ struct convert<glm::vec<L, T, Q>> {
 		if (!(node.IsSequence() && node.size() == L)) [[unlikely]] {
 			return false;
 		}
-		using std::index_sequence, std::make_index_sequence;
-		[&]<std::size_t... I>(index_sequence<I...>) {
+		using std::integer_sequence, std::make_integer_sequence;
+		using LengthType = typename ConvertType::length_type;
+		[&]<LengthType... I>(integer_sequence<LengthType, I...>) {
 			((vec[I] = node[I].template as<T>()), ...);
-		}(make_index_sequence<L> {});
+		}(make_integer_sequence<LengthType, L> {});
 		return true;
 	}
 

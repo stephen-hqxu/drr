@@ -100,7 +100,7 @@ SCENARIO("Regionfield is a matrix of region identifiers", "[Container][Regionfie
 					}
 
 					THEN("Data are transposed") {
-						auto rf_view_t = rf.span() | View::Matrix::ViewTransposed2d(rf.mapping().stride(1U)) | join;
+						auto rf_view_t = rf.span() | View::Matrix::ViewTransposed2d(rf.mapping().stride(0U)) | join;
 						CHECK_THAT(rf_t.range2d() | join, RangeEquals(rf_view_t));
 					}
 

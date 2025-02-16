@@ -11,6 +11,8 @@
 #include <DisRegRep/Splatting/Convolution/Full/Base.hpp>
 #include <DisRegRep/Splatting/Trait.hpp>
 
+#include <DisRegRep-Test/StringMaker.hpp>
+
 #include <catch2/generators/catch_generators_adapters.hpp>
 #include <catch2/generators/catch_generators_random.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -67,14 +69,12 @@ namespace Regionfield {
 
 constexpr auto Dimension = ::Regionfield::DimensionType(6U, 8U);
 constexpr auto Value = to_array<::Regionfield::ValueType>({
-	0, 0, 0, 0, 0, 0,
-	2, 3, 3, 3, 2, 2,
-	1, 0, 2, 1, 3, 3,
-	2, 2, 3, 0, 3, 1,
-	1, 2, 0, 3, 1, 1,
-	2, 3, 3, 2, 1, 2,
-	3, 3, 0, 0, 1, 3,
-	2, 0, 1, 2, 3, 2
+	0, 2, 1, 2, 1, 2, 3, 2,
+	0, 3, 0, 2, 2, 3, 3, 0,
+	0, 3, 2, 3, 0, 3, 0, 1,
+	0, 3, 1, 0, 3, 2, 0, 2,
+	0, 2, 3, 3, 1, 1, 1, 3,
+	0, 2, 3, 1, 1, 2, 3, 2
 });
 constexpr auto RegionCount = std::ranges::max(Value) + 1U;
 
@@ -103,9 +103,8 @@ using SplattingCoefficientMatrixType = array<array<T, Regionfield::RegionCount>,
 
 constexpr auto SplattingCoefficientMatrixDense = [] static consteval noexcept {
 	static constexpr SplattingCoefficientMatrixType<Type::RegionImportance> Importance {{
-		{ 3, 5, 8, 9 }, { 3, 5, 7, 10 },
-		{ 5, 6, 6, 8 }, { 5, 6, 5, 9 },
-		{ 5, 5, 7, 8 }, { 5, 6, 6, 8 }
+		{ 3, 5, 8, 9 }, { 5, 6, 6, 8 }, { 5, 5, 7, 8 },
+		{ 3, 5, 7, 10 }, { 5, 6, 5, 9 }, { 5, 6, 6, 8 }
 	}};
 	static constexpr Type::RegionMask NormFactor = Base::kernelNormalisationFactor(Base::diametre(Radius));
 
@@ -175,6 +174,7 @@ void GndTth::checkMinimumRequirement(BaseConvolution& splatting) {
 	}
 }
 
+//NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void GndTth::checkSplattingCoefficient(BaseFullConvolution& splatting) {
 	AND_GIVEN("An invoke specification that does not satisfy the minimum requirements") {
 		const auto size = GENERATE(take(3U, chunk(4U, random<BaseFullConvolution::KernelSizeType>(4U, 8U))));

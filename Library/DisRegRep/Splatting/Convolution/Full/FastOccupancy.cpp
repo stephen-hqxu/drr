@@ -43,21 +43,21 @@ public:
 	using ExtentType = DisRegRep::Container::SplattingCoefficient::Type::Dimension3Type;
 
 	typename ContainerTrait::KernelType Kernel;
-	typename ContainerTrait::ImportanceOutputType Horizontal;
-	typename ContainerTrait::MaskOutputType Vertical;
+	typename ContainerTrait::ImportanceOutputType Vertical;
+	typename ContainerTrait::MaskOutputType Horizontal;
 
-	//(region count, width, height)
+	//(width, height, region count)
 	void resize(const tuple<ExtentType, FastOccupancy::KernelSizeType> arg) {
 		auto [extent, padding] = arg;
-		this->Kernel.resize(extent.x);
-		this->Vertical.resize(extent);
-		extent.z += padding;
+		this->Kernel.resize(extent.z);
 		this->Horizontal.resize(extent);
+		extent.x += padding;
+		this->Vertical.resize(extent);
 	}
 
 	[[nodiscard]] FastOccupancy::SizeType sizeByte() const noexcept {
 		return apply([](const auto&... member) static noexcept { return (member.sizeByte() + ...); },
-			tie(this->Kernel, this->Horizontal, this->Vertical));
+			tie(this->Kernel, this->Vertical, this->Horizontal));
 	}
 
 };
@@ -115,32 +115,32 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(FastOccupancy) {
 		//Padding does not include the centre element (only the halo), so minus one from the diametre.
 		d_halo = d - 1U;
 
-	//Horizontal pass requires padding above and below the matrix.
-	auto& [kernel_memory, horizontal_memory, vertical_memory] = ImplementationHelper::allocate<ScratchMemory, ContainerTrait>(
-		memory, tuple(typename ScratchMemoryType::ExtentType(regionfield.RegionCount, extent), d_halo));
+	//Vertical pass requires padding to the left and right of the matrix.
+	auto& [kernel_memory, vertical_memory, horizontal_memory] = ImplementationHelper::allocate<ScratchMemory, ContainerTrait>(
+		memory, tuple(typename ScratchMemoryType::ExtentType(extent, regionfield.RegionCount), d_halo));
 
 	//Need to read the whole halo from regionfield.
-	//In horizontal scanline, this overlaps with the 1D kernel.
-	//In vertical scanline, this includes the padding.
+	//In vertical scanline, this overlaps with the 1D kernel.
+	//In horizontal scanline, this includes the padding.
 	conv1d(
 		regionfield.range2d() | Core::View::Matrix::SubRange2d(offset - this->Radius, extent + d_halo),
 		kernel_memory,
-		horizontal_memory.range().begin(),
+		vertical_memory.range().begin(),
 		d,
 		[](const auto& km) static constexpr noexcept { return km.span(); }
 	);
 
-	//Repeat the same process in the vertical pass.
+	//Repeat the same process in the horizontal pass.
 	conv1d(
-		horizontal_memory.rangeTransposed2d() | transform(bind_back(bit_or {}, Core::View::Functional::Dereference)),
+		vertical_memory.rangeTransposed2d() | transform(bind_back(bit_or {}, Core::View::Functional::Dereference)),
 		kernel_memory,
-		vertical_memory.range().begin(),
+		horizontal_memory.range().begin(),
 		d,
 		[norm_factor = Base::kernelNormalisationFactor(d)](
 			const auto& km) constexpr noexcept { return SpltKn::toMask(km, norm_factor); }
 	);
 
-	return vertical_memory;
+	return horizontal_memory;
 }
 
 DRR_SPLATTING_DEFINE_SIZE_BYTE(FastOccupancy)

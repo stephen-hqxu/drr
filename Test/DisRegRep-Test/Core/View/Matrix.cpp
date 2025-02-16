@@ -1,4 +1,5 @@
 #include <DisRegRep/Core/View/Matrix.hpp>
+#include <DisRegRep/Core/View/Functional.hpp>
 
 #include <DisRegRep-Test/StringMaker.hpp>
 
@@ -10,7 +11,6 @@
 #include <glm/vec2.hpp>
 
 #include <array>
-
 #include <string_view>
 
 #include <algorithm>
@@ -25,7 +25,7 @@ namespace Matrix = DisRegRep::Core::View::Matrix;
 using glm::u8vec2;
 
 using std::array;
-using std::ranges::transform,
+using std::ranges::copy,
 	std::views::cartesian_product, std::views::iota, std::views::enumerate;
 
 namespace {
@@ -34,11 +34,9 @@ namespace MeshGrid {
 
 constexpr std::uint_fast8_t Width = 4U, Height = 3U;
 constexpr auto Data = [] static consteval noexcept {
+	using DisRegRep::Core::View::Functional::MakeFromTuple;
 	array<u8vec2, 12U> mesh_grid {};
-	transform(cartesian_product(iota(0U, Height), iota(0U, Width)), mesh_grid.begin(), [](const auto it) static consteval noexcept {
-		const auto [y, x] = it;
-		return u8vec2(x, y);
-	});
+	copy(cartesian_product(iota(0U, Width), iota(0U, Height)) | MakeFromTuple<u8vec2>, mesh_grid.begin());
 	return mesh_grid;
 }();
 
@@ -71,13 +69,14 @@ TEMPLATE_TEST_CASE_SIG("View2d/ViewTransposed2d/SubRange2d: View a linear range 
 		WHEN("A " << ViewText << " view is formed") {
 			static constexpr auto Offset = u8vec2(2U, 1U), Extent = u8vec2(1U, 2U);
 
-			static constexpr auto MeshGrid2d = MeshGrid::Data | Matrix::View2d(MeshGrid::Width);
-			static constexpr auto MeshGrid2dT = MeshGrid::Data | Matrix::ViewTransposed2d(MeshGrid::Width);
+			static constexpr auto MeshGrid2d = MeshGrid::Data | Matrix::View2d(MeshGrid::Height);
+			static constexpr auto MeshGrid2dT = MeshGrid::Data | Matrix::ViewTransposed2d(MeshGrid::Height);
 			static constexpr auto SubMeshGrid2d = MeshGrid2d | Matrix::SubRange2d(Offset, Extent);
 
+			//NOLINTNEXTLINE(readability-function-cognitive-complexity)
 			static constexpr auto CheckIdx = [](const auto& rg, const u8vec2 offset = {}) static -> void {
-				for (const auto [y, outer] : rg | enumerate) [[likely]] {
-					for (const auto [x, inner] : outer | enumerate) [[likely]] {
+				for (const auto [x, outer] : rg | enumerate) [[likely]] {
+					for (const auto [y, inner] : outer | enumerate) [[likely]] {
 						u8vec2 coordinate;
 						if constexpr (Cat == Transposed) {
 							coordinate = u8vec2(y, x);

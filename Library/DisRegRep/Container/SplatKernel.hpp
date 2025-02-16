@@ -423,15 +423,13 @@ concept Is = std::disjunction_v<std::is_same<Kn, Dense>, std::is_same<Kn, Sparse
 /**
  * @brief Convert a splat kernel of region importance to mask by normalisation.
  *
- * @tparam Kn Splat kernel type.
- *
  * @param kernel Splat kernel to be normalised.
  * @param norm_factor Normalisation factor.
  *
  * @return A splat kernel of region mask.
  */
-template<Is Kn>
-[[nodiscard]] constexpr std::ranges::common_range auto toMask(const Kn& kernel, const Core::Type::RegionMask norm_factor) noexcept {
+[[nodiscard]] constexpr std::ranges::common_range auto toMask(
+	const Is auto& kernel, const Core::Type::RegionMask norm_factor) noexcept {
 	using std::views::common;
 	return kernel.span() | SparseMatrixElement::Normalise(norm_factor) | common;
 }

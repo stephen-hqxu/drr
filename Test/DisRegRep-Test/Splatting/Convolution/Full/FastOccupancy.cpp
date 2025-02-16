@@ -8,7 +8,7 @@ using DisRegRep::Splatting::Convolution::Full::FastOccupancy;
 
 namespace GndTth = DisRegRep::Test::Splatting::GroundTruth;
 
-SCENARIO("Use an optimised 2D convolution to compute splatting coefficients from a regionfield", "[Splatting][FastFullOccupancy]") {
+SCENARIO("Use an optimised 2D convolution to compute splatting coefficients from a regionfield", "[Splatting][Convolution][Full][FastOccupancy]") {
 
 	GIVEN("A fast full occupancy splatting") {
 		FastOccupancy splatting;

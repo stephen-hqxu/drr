@@ -4,6 +4,7 @@
 
 #include <DisRegRep/Container/SplatKernel.hpp>
 
+#include <DisRegRep/Core/View/Functional.hpp>
 #include <DisRegRep/Core/View/Matrix.hpp>
 
 #include <tuple>
@@ -11,14 +12,13 @@
 #include <algorithm>
 #include <ranges>
 
-#include <cstddef>
+#include <utility>
 
 using DisRegRep::Splatting::Convolution::Full::VanillaOccupancy;
 
 using std::tie, std::apply;
-using std::views::cartesian_product, std::views::iota, std::views::transform,
-	std::views::take, std::views::join;
-using std::index_sequence;
+using std::views::cartesian_product, std::views::iota, std::views::transform, std::views::take, std::views::join;
+using std::integer_sequence, std::make_integer_sequence;
 
 namespace {
 
@@ -32,9 +32,9 @@ public:
 	typename ContainerTrait::KernelType Kernel;
 	typename ContainerTrait::MaskOutputType Output;
 
-	//(region count, width, height)
+	//(width, height, region count)
 	void resize(const ExtentType extent) {
-		this->Kernel.resize(extent.x);
+		this->Kernel.resize(extent.z);
 		this->Output.resize(extent);
 	}
 
@@ -52,18 +52,20 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(VanillaOccupancy) {
 	using ScratchMemoryType = ScratchMemory<ContainerTrait>;
 	const auto [offset, extent] = info;
 	auto& [kernel_memory, output_memory] = ImplementationHelper::allocate<ScratchMemory, ContainerTrait>(
-		memory, typename ScratchMemoryType::ExtentType(regionfield.RegionCount, extent));
+		memory, typename ScratchMemoryType::ExtentType(extent, regionfield.RegionCount));
 
 	const KernelSizeType d = Convolution::Base::diametre(this->Radius);
 
-	const auto element_rg = [r = this->Radius, &offset, &extent]<std::size_t... I>(index_sequence<I...>) constexpr noexcept {
-		return cartesian_product(iota(offset[I] - r) | take(extent[I])...);
-	}(index_sequence<1U, 0U> {});
+	using LengthType = DimensionType::length_type;
+	const auto element_rg = [r = this->Radius, &offset, &extent]<LengthType... I>(
+								integer_sequence<LengthType, I...>) constexpr noexcept {
+		return cartesian_product(iota(offset[I] - r) | take(extent[I])...)
+			 | Core::View::Functional::MakeFromTuple<DimensionType>;
+	}(make_integer_sequence<LengthType, DimensionType::length()> {});
 	const auto kernel_rg = element_rg
 		| transform([d, rf_2d = regionfield.range2d()](const auto idx) constexpr noexcept {
-			const auto [y, x] = idx;
 			return rf_2d
-				| Core::View::Matrix::SubRange2d(DimensionType(x, y), DimensionType(d))
+				| Core::View::Matrix::SubRange2d(idx, DimensionType(d))
 				| join;
 		  });
 
