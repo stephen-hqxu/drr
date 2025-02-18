@@ -18,10 +18,6 @@ private:
 
 public:
 
-	constexpr FastOccupancy() noexcept = default;
-
-	constexpr ~FastOccupancy() override = default;
-
 	DRR_SPLATTING_SET_INFO("F+", true)
 
 	DRR_SPLATTING_DECLARE_SIZE_BYTE_IMPL;

@@ -74,7 +74,7 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(VanillaOccupancy) {
 		[&kernel_memory, norm_factor = Base::kernelNormalisationFactor(d)](auto kernel) noexcept {
 			kernel_memory.clear();
 			for_each(kernel, [&kernel_memory](const auto region_id) noexcept { kernel_memory.increment(region_id); });
-			return Container::SplatKernel::toMask(kernel_memory, norm_factor);
+			return DisRegRep::Container::SplatKernel::toMask(kernel_memory, norm_factor);
 		});
 
 	return output_memory;

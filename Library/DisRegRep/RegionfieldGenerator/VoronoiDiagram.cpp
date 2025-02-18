@@ -1,4 +1,5 @@
 #include <DisRegRep/RegionfieldGenerator/VoronoiDiagram.hpp>
+#include <DisRegRep/RegionfieldGenerator/ImplementationHelper.hpp>
 
 #include <DisRegRep/Container/Regionfield.hpp>
 
@@ -19,7 +20,6 @@
 #include <tuple>
 
 #include <algorithm>
-#include <execution>
 #include <iterator>
 #include <ranges>
 
@@ -33,16 +33,15 @@ using glm::u16vec2, glm::f32vec2;
 using std::array, std::span, std::vector;
 using std::apply;
 using std::ranges::min_element, std::ranges::distance, std::ranges::to,
-	std::execution::par_unseq,
 	std::views::iota, std::views::cartesian_product;
 using std::integer_sequence, std::make_integer_sequence;
 
-void VoronoiDiagram::operator()(Regionfield& regionfield) const {
+DRR_REGIONFIELD_GENERATOR_DEFINE_DELEGATING_FUNCTOR(VoronoiDiagram) {
 	DRR_ASSERT(this->CentroidCount > 0U);
 	const span rf_span = regionfield.span();
 	const Regionfield::ExtentType& rf_extent = regionfield.mapping().extents();
 
-	auto rng = Core::XXHash::RandomEngine(this->generateSecret());
+	auto rng = Core::XXHash::RandomEngine(Base::generateSecret(seed));
 	array<UniformDistributionType, 2U> dist;
 	std::ranges::transform(iota(0U, dist.size()), dist.begin(),
 		[&rf_extent](const auto ext) { return UniformDistributionType(0U, rf_extent.extent(ext) - 1U); });
@@ -63,7 +62,7 @@ void VoronoiDiagram::operator()(Regionfield& regionfield) const {
 		return cartesian_product(iota(Regionfield::IndexType {}, rf_extent.extent(I))...)
 			 | Core::View::Functional::MakeFromTuple<Regionfield::DimensionType>;
 	}(make_integer_sequence<RankType, Regionfield::ExtentType::rank()> {});
-	std::transform(par_unseq, idx_rg.cbegin(), idx_rg.cend(), rf_span.begin(),
+	std::transform(EpTrait::Unsequenced, idx_rg.cbegin(), idx_rg.cend(), rf_span.begin(),
 		[&region_centroid, &region_assignment](const auto idx) noexcept {
 			const auto argmin = distance(region_centroid.cbegin(),
 				min_element(region_centroid, {}, [current_coord = f32vec2(idx)](const f32vec2 centroid_coord) noexcept {
@@ -72,3 +71,5 @@ void VoronoiDiagram::operator()(Regionfield& regionfield) const {
 			return region_assignment[argmin];
 		});
 }
+
+DRR_REGIONFIELD_GENERATOR_DEFINE_FUNCTOR_ALL(VoronoiDiagram)

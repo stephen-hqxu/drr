@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Trait.hpp"
+#include "Container.hpp"
 
 #include <DisRegRep/Container/Regionfield.hpp>
 #include <DisRegRep/Container/SplattingCoefficient.hpp>
@@ -20,8 +20,8 @@
 
 //Declare `DisRegRep::Splatting::Base::operator()`.
 #define DRR_SPLATTING_DECLARE_FUNCTOR(QUAL, KERNEL, OUTPUT) \
-	DRR_SPLATTING_TRAIT_CONTAINER(KERNEL, OUTPUT)::MaskOutputType& QUAL operator()( \
-		const DRR_SPLATTING_TRAIT_CONTAINER(KERNEL, OUTPUT) container_trait, \
+	DRR_SPLATTING_CONTAINER_TRAIT(KERNEL, OUTPUT)::MaskOutputType& QUAL operator()( \
+		const DRR_SPLATTING_CONTAINER_TRAIT(KERNEL, OUTPUT) container_trait, \
 		const DisRegRep::Container::Regionfield& regionfield, \
 		std::any& memory, \
 		const DisRegRep::Splatting::Base::InvokeInfo& info \
@@ -37,7 +37,7 @@
 //Declare a template function that delegates the call of splatting functor to here.
 //This declaration should only be made private in the derived class.
 #define DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR(FUNC_QUAL, QUAL) \
-	template<DisRegRep::Splatting::Trait::IsContainer ContainerTrait> \
+	template<DisRegRep::Splatting::Container::IsTrait ContainerTrait> \
 	FUNC_QUAL ContainerTrait::MaskOutputType& QUAL invokeImpl( \
 		const DisRegRep::Container::Regionfield& regionfield, \
 		std::any& memory, \
@@ -66,8 +66,8 @@ public:
 
 	//The reason why we take the common of these two types is because we will be using this as 2D index to access these containers.
 	using DimensionType = std::common_type_t<
-		Container::Regionfield::DimensionType,
-		Container::SplattingCoefficient::Type::Dimension2Type
+		DisRegRep::Container::Regionfield::DimensionType,
+		DisRegRep::Container::SplattingCoefficient::Type::Dimension2Type
 	>;
 	using SizeType = std::size_t;
 
@@ -86,7 +86,7 @@ protected:
 	 * @param regionfield Regionfield used for splatting.
 	 * @param info @link InvokeInfo.
 	 */
-	virtual void validate(const Container::Regionfield&, const InvokeInfo&) const;
+	virtual void validate(const DisRegRep::Container::Regionfield&, const InvokeInfo&) const;
 
 public:
 

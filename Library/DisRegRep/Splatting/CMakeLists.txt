@@ -3,8 +3,8 @@ add_subdirectory(Convolution)
 drrTargetSource(
 HEADER
 	Base
+	Container
 	ImplementationHelper
-	Trait
 SOURCE
 	Base
 )

@@ -16,21 +16,21 @@
 #include <cstdint>
 
 //Get a fully qualified splatting container trait.
-#define DRR_SPLATTING_TRAIT_CONTAINER(KERNEL, OUTPUT) \
-	DisRegRep::Splatting::Trait::Container< \
-		DisRegRep::Splatting::Trait::ContainerImplementation::KERNEL, \
-		DisRegRep::Splatting::Trait::ContainerImplementation::OUTPUT \
+#define DRR_SPLATTING_CONTAINER_TRAIT(KERNEL, OUTPUT) \
+	DisRegRep::Splatting::Container::Trait< \
+		DisRegRep::Splatting::Container::Implementation::KERNEL, \
+		DisRegRep::Splatting::Container::Implementation::OUTPUT \
 	>
 
 /**
- * @brief Common traits of region feature splatting.
+ * @brief Container usage of region feature splatting.
  */
-namespace DisRegRep::Splatting::Trait {
+namespace DisRegRep::Splatting::Container {
 
 /**
  * @brief Identification for the data structure used to implement the container.
  */
-enum class ContainerImplementation : std::uint_fast8_t {
+enum class Implementation : std::uint_fast8_t {
 	Dense = 0x00U, /**< Use dense matrix to implement the container. */
 	Sparse = 0xFFU /**< Use sparse matrix to implement the container. */
 };
@@ -42,8 +42,8 @@ enum class ContainerImplementation : std::uint_fast8_t {
  *
  * @return String representation of `impl`.
  */
-[[nodiscard]] consteval std::string_view tag(const ContainerImplementation impl) noexcept {
-	using enum ContainerImplementation;
+[[nodiscard]] consteval std::string_view tag(const Implementation impl) noexcept {
+	using enum Implementation;
 	switch (impl) {
 	case Dense: return "D";
 	case Sparse: return "S";
@@ -57,17 +57,17 @@ enum class ContainerImplementation : std::uint_fast8_t {
  * @tparam Kernel Container implementation of the splatting kernel.
  * @tparam Output Container implementation of the computed coefficients.
  */
-template<ContainerImplementation Kernel, ContainerImplementation Output>
-struct Container {
+template<Implementation Kernel, Implementation Output>
+struct Trait {
 private:
 
-	template<ContainerImplementation Impl, typename Dense, typename Sparse>
-	using SwitchContainer = std::conditional_t<Impl == ContainerImplementation::Dense, Dense, Sparse>;
+	template<Implementation Impl, typename Dense, typename Sparse>
+	using SwitchContainer = std::conditional_t<Impl == Implementation::Dense, Dense, Sparse>;
 
 public:
 
-	static constexpr ContainerImplementation KernelContainerImplementation = Kernel,
-		OutputContainerImplementation = Output;
+	static constexpr Implementation KernelImplementation = Kernel,
+		OutputImplementation = Output;
 
 private:
 
@@ -79,24 +79,24 @@ private:
 			auto it = ch.begin();
 			((it = copy(tag(impl), it).out), ...);
 			return ch;
-		}, std::tuple(KernelContainerImplementation, OutputContainerImplementation));
+		}, std::tuple(KernelImplementation, OutputImplementation));
 
 public:
 
 	static constexpr auto Tag = std::string_view(TagCharacter); /**< Just a string representation of this container trait. */
 
 	using KernelType = SwitchContainer<
-		KernelContainerImplementation,
+		KernelImplementation,
 		DisRegRep::Container::SplatKernel::Dense,
 		DisRegRep::Container::SplatKernel::Sparse
 	>; /**< Container type of the splatting kernel. */
 	using ImportanceOutputType = SwitchContainer<
-		OutputContainerImplementation,
+		OutputImplementation,
 		DisRegRep::Container::SplattingCoefficient::DenseImportance,
 		DisRegRep::Container::SplattingCoefficient::SparseImportance
 	>; /**< Container type of the output that stores region importance. */
 	using MaskOutputType = SwitchContainer<
-		OutputContainerImplementation,
+		OutputImplementation,
 		DisRegRep::Container::SplattingCoefficient::DenseMask,
 		DisRegRep::Container::SplattingCoefficient::SparseMask
 	>; /**< Container type of the output that stores region mask. */
@@ -107,15 +107,15 @@ public:
  * `Tr` is a container trait.
  */
 template<typename Tr>
-concept IsContainer = std::is_same_v<Tr, Container<Tr::KernelContainerImplementation, Tr::OutputContainerImplementation>>;
+concept IsTrait = std::is_same_v<Tr, Trait<Tr::KernelImplementation, Tr::OutputImplementation>>;
 
 /**
  * @brief All valid container trait combinations.
  */
-using ContainerCombination = std::tuple<
-	DRR_SPLATTING_TRAIT_CONTAINER(Dense, Dense),
-	DRR_SPLATTING_TRAIT_CONTAINER(Dense, Sparse),
-	DRR_SPLATTING_TRAIT_CONTAINER(Sparse, Sparse)
+using Combination = std::tuple<
+	DRR_SPLATTING_CONTAINER_TRAIT(Dense, Dense),
+	DRR_SPLATTING_CONTAINER_TRAIT(Dense, Sparse),
+	DRR_SPLATTING_CONTAINER_TRAIT(Sparse, Sparse)
 >;
 
 }

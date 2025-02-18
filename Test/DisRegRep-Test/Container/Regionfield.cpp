@@ -2,6 +2,7 @@
 
 #include <DisRegRep/Core/View/Matrix.hpp>
 
+#include <DisRegRep/RegionfieldGenerator/ExecutionPolicy.hpp>
 #include <DisRegRep/RegionfieldGenerator/Uniform.hpp>
 
 #include <catch2/generators/catch_generators_adapters.hpp>
@@ -24,6 +25,7 @@
 #include <cstdint>
 
 namespace View = DisRegRep::Core::View;
+namespace RfGenExec = DisRegRep::RegionfieldGenerator::ExecutionPolicy;
 using DisRegRep::Container::Regionfield, DisRegRep::RegionfieldGenerator::Uniform;
 
 using Catch::Matchers::IsEmpty, Catch::Matchers::SizeIs,
@@ -72,13 +74,12 @@ SCENARIO("Regionfield is a matrix of region identifiers", "[Container][Regionfie
 		}
 
 		AND_GIVEN("A regionfield generator") {
-			Uniform generator;
-			generator.Seed = Catch::getSeed();
+			static constexpr Uniform Generator;
 
 			THEN("Regionfield can be filled with region identifiers") {
 				rf.resize(make_vec2(GENERATE(take(2U, chunk(2U, random<std::uint_least8_t>(5U, 20U)))).data()));
 				rf.RegionCount = GENERATE(take(2U, random<Regionfield::ValueType>(1U, 10U)));
-				generator(rf);
+				Generator(RfGenExec::Trait<RfGenExec::Threading::Multi> {}, rf, Catch::getSeed());
 
 				WHEN("Matrix is transposed") {
 					const auto rf_t = rf.transpose();

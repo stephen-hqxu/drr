@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ExecutionPolicy.hpp"
+
 #include <DisRegRep/Container/Regionfield.hpp>
 #include <DisRegRep/Core/XXHash.hpp>
 
@@ -7,6 +9,37 @@
 #include <string_view>
 
 #include <cstdint>
+
+//Declare `DisRegRep::RegionfieldGenerator::Base::operator()`.
+#define DRR_REGIONFIELD_GENERATOR_DECLARE_FUNCTOR(QUAL, THREADING) \
+	void QUAL operator()( \
+		const DRR_REGIONFIELD_GENERATOR_EXECUTION_POLICY_TRAIT(THREADING) ep_trait, \
+		DisRegRep::Container::Regionfield& regionfield, \
+		const DisRegRep::RegionfieldGenerator::Base::SeedType seed \
+	) const
+//Do `DRR_REGIONFIELD_GENERATOR_DECLARE_FUNCTOR` for every valid execution policy.
+#define DRR_REGIONFIELD_GENERATOR_DECLARE_FUNCTOR_ALL(PREFIX, SUFFIX) \
+	PREFIX DRR_REGIONFIELD_GENERATOR_DECLARE_FUNCTOR(, Single) SUFFIX; \
+	PREFIX DRR_REGIONFIELD_GENERATOR_DECLARE_FUNCTOR(, Multi) SUFFIX
+//Do `DRR_REGIONFIELD_GENERATOR_DECLARE_FUNCTOR_ALL` with the correct fixes for regionfield generator implementation.
+#define DRR_REGIONFIELD_GENERATOR_DECLARE_FUNCTOR_ALL_IMPL DRR_REGIONFIELD_GENERATOR_DECLARE_FUNCTOR_ALL(, override)
+
+//Declare a template function that delegates the call of the regionfield generator functor to here.
+//This declaration should only be made private in the derived class.
+#define DRR_REGIONFIELD_GENERATOR_DECLARE_DELEGATING_FUNCTOR(FUNC_QUAL, QUAL) \
+	template<DisRegRep::RegionfieldGenerator::ExecutionPolicy::IsTrait EpTrait> \
+	FUNC_QUAL void QUAL invokeImpl( \
+		DisRegRep::Container::Regionfield& regionfield, \
+		const DisRegRep::RegionfieldGenerator::Base::SeedType seed \
+	) const
+//Do `DRR_REGIONFIELD_GENERATOR_DECLARE_DELEGATING_FUNCTOR` with the correct qualifier for regionfield generator implementation.
+#define DRR_REGIONFIELD_GENERATOR_DECLARE_DELEGATING_FUNCTOR_IMPL DRR_REGIONFIELD_GENERATOR_DECLARE_DELEGATING_FUNCTOR(,)
+
+//Set the general information fields for a regionfield generator.
+#define DRR_REGIONFIELD_GENERATOR_SET_INFO(NAME) \
+	[[nodiscard]] constexpr std::string_view name() const noexcept override { \
+		return NAME; \
+	}
 
 namespace DisRegRep::RegionfieldGenerator {
 
@@ -26,9 +59,11 @@ protected:
 	/**
 	 * @brief Generate a secret sequence using the currently set seed.
 	 *
+	 * @param seed Generator seed.
+	 *
 	 * @return Secret sequence with current seed.
 	 */
-	[[nodiscard]] Core::XXHash::Secret generateSecret() const;
+	[[nodiscard]] static Core::XXHash::Secret generateSecret(SeedType seed);
 
 	/**
 	 * @brief Create a new distribution based on the region count specified in a regionfield.
@@ -40,8 +75,6 @@ protected:
 	[[nodiscard]] static UniformDistributionType createDistribution(const Container::Regionfield&);
 
 public:
-
-	SeedType Seed {}; /**< A seed used by random number generators. */
 
 	constexpr Base() noexcept = default;
 
@@ -65,9 +98,12 @@ public:
 	/**
 	 * @brief Generate regionfield.
 	 *
+	 * @param ep_trait Specify the execution policy trait. Multithread implementation defaults to call the singlethreaded version if
+	 * not explicitly implemented by the application.
 	 * @param[Out] regionfield A regionfield matrix where generated contents are stored.
+	 * @param[In] seed A seed used by random number generators.
 	 */
-	virtual void operator()(Container::Regionfield&) const = 0;
+	DRR_REGIONFIELD_GENERATOR_DECLARE_FUNCTOR_ALL(virtual, = 0);
 
 };
 

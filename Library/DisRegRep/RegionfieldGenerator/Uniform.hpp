@@ -2,27 +2,21 @@
 
 #include "Base.hpp"
 
-#include <DisRegRep/Container/Regionfield.hpp>
-
-#include <string_view>
-
 namespace DisRegRep::RegionfieldGenerator {
 
 /**
  * @brief Generate a regionfield where region identifiers are distributed uniformly random.
 */
 class Uniform final : public Base {
+private:
+
+	DRR_REGIONFIELD_GENERATOR_DECLARE_DELEGATING_FUNCTOR_IMPL;
+
 public:
 
-	constexpr Uniform() noexcept = default;
+	DRR_REGIONFIELD_GENERATOR_SET_INFO("Uniform")
 
-	constexpr ~Uniform() override = default;
-
-	[[nodiscard]] constexpr std::string_view name() const noexcept override {
-		return "Uniform";
-	}
-
-	void operator()(Container::Regionfield&) const override;
+	DRR_REGIONFIELD_GENERATOR_DECLARE_FUNCTOR_ALL_IMPL;
 
 };
 

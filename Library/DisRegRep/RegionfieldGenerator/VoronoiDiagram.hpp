@@ -2,10 +2,6 @@
 
 #include "Base.hpp"
 
-#include <DisRegRep/Container/Regionfield.hpp>
-
-#include <string_view>
-
 #include <cstdint>
 
 namespace DisRegRep::RegionfieldGenerator {
@@ -18,17 +14,17 @@ public:
 
 	using SizeType = std::uint_fast16_t;
 
+private:
+
+	DRR_REGIONFIELD_GENERATOR_DECLARE_DELEGATING_FUNCTOR_IMPL;
+
+public:
+
 	SizeType CentroidCount {}; /**< Number of centroids in the Voronoi Diagram. */
 
-	constexpr VoronoiDiagram() noexcept = default;
+	DRR_REGIONFIELD_GENERATOR_SET_INFO("Voronoi")
 
-	constexpr ~VoronoiDiagram() override = default;
-
-	[[nodiscard]] constexpr std::string_view name() const noexcept override {
-		return "Voronoi";
-	}
-
-	void operator()(Container::Regionfield&) const override;
+	DRR_REGIONFIELD_GENERATOR_DECLARE_FUNCTOR_ALL_IMPL;
 
 };
 

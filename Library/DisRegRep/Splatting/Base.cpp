@@ -9,7 +9,7 @@ using DisRegRep::Splatting::Base;
 
 using glm::all, glm::greaterThanEqual;
 
-void Base::validate(const Container::Regionfield& regionfield, const InvokeInfo& info) const {
+void Base::validate(const DisRegRep::Container::Regionfield& regionfield, const InvokeInfo& info) const {
 	const auto [offset, extent] = info;
 	const auto rf_extent = regionfield.extent();
 

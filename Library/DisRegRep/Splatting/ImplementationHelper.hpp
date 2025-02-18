@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Base.hpp"
-#include "Trait.hpp"
+#include "Container.hpp"
 
 #include <any>
 #include <variant>
@@ -35,7 +35,7 @@
 
 //Define a structure that holds scratch memory of splatting implementation.
 #define DRR_SPLATTING_DEFINE_SCRATCH_MEMORY \
-	template<DisRegRep::Splatting::Trait::IsContainer CtnTr> \
+	template<DisRegRep::Splatting::Container::IsTrait CtnTr> \
 	class ScratchMemory
 //Trait of containers that might be useful in a scratch memory.
 #define DRR_SPLATTING_SCRATCH_MEMORY_CONTAINER_TRAIT using ContainerTrait = CtnTr;
@@ -48,15 +48,15 @@ namespace DisRegRep::Splatting::ImplementationHelper {
 /**
  * All possible instantiations of `ScratchMemory` given container trait combinations.
  */
-template<template<Trait::IsContainer> typename ScratchMemory>
+template<template<Container::IsTrait> typename ScratchMemory>
 using ScratchMemoryCombination = decltype(std::apply(
 	[]<typename... Trait>(Trait...) -> std::default_initializable auto { return std::tuple<ScratchMemory<Trait>...> {}; },
-	Trait::ContainerCombination {}));
+	Container::Combination {}));
 
 /**
  * Internal, type-erased scratch memory type, which is basically a variant of every @link ScratchMemoryCombination.
  */
-template<template<Trait::IsContainer> typename ScratchMemory>
+template<template<Container::IsTrait> typename ScratchMemory>
 using ScratchMemoryInternal =
 	decltype(std::apply([]<typename... Mem>(const Mem&...) -> std::default_initializable auto { return std::variant<Mem...> {}; },
 		ScratchMemoryCombination<ScratchMemory> {}));
@@ -91,8 +91,8 @@ concept SizedScratchmemory = requires(const ScratchMemory scratch_memory) {
  * @return A valid scratch memory instance held by `memory`.
  */
 template<
-	template<Trait::IsContainer> typename ScratchMemory,
-	Trait::IsContainer Trait,
+	template<Container::IsTrait> typename ScratchMemory,
+	Container::IsTrait Trait,
 	typename ResizeArg,
 	ResizableScratchMemory<ResizeArg> TraitedScratchMemory = ScratchMemory<Trait>
 >
@@ -122,7 +122,7 @@ template<
  * 
  * @return Memory usage in bytes.
  */
-template<template<Trait::IsContainer> typename ScratchMemory>
+template<template<Container::IsTrait> typename ScratchMemory>
 requires(std::apply(
 	[]<typename... Mem>(const Mem&...) { return (SizedScratchmemory<Mem> && ...); }, ScratchMemoryCombination<ScratchMemory> {}))
 [[nodiscard]] Base::SizeType sizeByte(const std::any& memory) {

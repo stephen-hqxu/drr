@@ -14,10 +14,6 @@ private:
 
 public:
 
-	constexpr VanillaOccupancy() noexcept = default;
-
-	constexpr ~VanillaOccupancy() override = default;
-
 	DRR_SPLATTING_SET_INFO("F-", false)
 
 	DRR_SPLATTING_DECLARE_SIZE_BYTE_IMPL;

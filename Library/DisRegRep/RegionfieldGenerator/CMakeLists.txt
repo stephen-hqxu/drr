@@ -1,6 +1,8 @@
 drrTargetSource(
 HEADER
 	Base
+	ExecutionPolicy
+	ImplementationHelper
 	Uniform
 	VoronoiDiagram
 SOURCE

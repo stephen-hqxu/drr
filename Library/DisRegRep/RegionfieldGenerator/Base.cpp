@@ -14,8 +14,8 @@ constexpr auto DefaultSecret = XXHash::makeApplicationSecret("60 e6 5a 64 a2 20 
 
 }
 
-XXHash::Secret Base::generateSecret() const {
-	return XXHash::generateSecret(DefaultSecret, this->Seed);
+XXHash::Secret Base::generateSecret(const SeedType seed) {
+	return XXHash::generateSecret(DefaultSecret, seed);
 }
 
 Base::UniformDistributionType Base::createDistribution(const Container::Regionfield& regionfield) {
