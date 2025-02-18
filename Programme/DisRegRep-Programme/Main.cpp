@@ -25,7 +25,7 @@
 #include <cstdlib>
 
 namespace fs = std::filesystem;
-using std::chrono::system_clock;
+using std::chrono::system_clock, std::chrono::sys_seconds, std::chrono::duration_cast;
 using std::format, std::string;
 using std::cout, std::println;
 using std::exception;
@@ -113,7 +113,8 @@ int main(const int argc, const char* const* const argv) try {
 		runProfiler(arg_profile);
 
 		const auto end = system_clock::now();
-		println("The profiling engine exits normally at {:%c}, with a total runtime of {:%M min %S s}.", end, end - start);
+		println("The profiling engine exits normally at {:%c}, with a total runtime of {:%M min %S s}.",
+			end, duration_cast<sys_seconds::duration>(end - start));
 	}
 	return EXIT_SUCCESS;
 } catch (const exception& e) {

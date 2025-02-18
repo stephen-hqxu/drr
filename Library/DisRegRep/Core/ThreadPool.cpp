@@ -73,11 +73,9 @@ ThreadPool::SizeType ThreadPool::sizeTask() const {
 }
 
 void ThreadPool::setPriority(const ProcThrCtrl::Priority priority) {
-	for_each(this->Thread | View::Functional::AddressOf,
-		bind_front(static_cast<void (*)(ProcThrCtrl::Priority, jthread*)>(ProcThrCtrl::setPriority), priority));
+	for_each(this->Thread | View::Functional::AddressOf, bind_front(ProcThrCtrl::setPriority, priority));
 }
 
 void ThreadPool::setAffinityMask(const ProcThrCtrl::AffinityMask affinity_mask) {
-	for_each(this->Thread | View::Functional::AddressOf,
-		bind_front(static_cast<void (*)(ProcThrCtrl::AffinityMask, jthread*)>(ProcThrCtrl::setAffinityMask), affinity_mask));
+	for_each(this->Thread | View::Functional::AddressOf, bind_front(ProcThrCtrl::setAffinityMask, affinity_mask));
 }

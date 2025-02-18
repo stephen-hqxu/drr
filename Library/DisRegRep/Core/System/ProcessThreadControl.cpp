@@ -24,27 +24,31 @@ using std::jthread;
 
 namespace {
 
-[[nodiscard]] Internal_::HandleType getNativeHandle(jthread* const thread) noexcept {
+[[nodiscard]] Internal_::ThreadType getNativeThread(jthread* const thread) noexcept {
 	return thread ? thread->native_handle() : Internal_::getCurrentThread();
 }
 
+[[nodiscard]] Internal_::ProcessType getNativeProcess() noexcept {
+	return Internal_::getCurrentProcess();
+}
+
+}
+
+ProcThrCtrl::Priority ProcThrCtrl::getPriority(jthread* const thread) {
+	return Internal_::getNativeThreadPriority(getNativeThread(thread));
 }
 
 void ProcThrCtrl::setPriority(const Priority priority, jthread* const thread) {
 	DRR_ASSERT(priority >= PriorityPreset::Min && priority <= PriorityPreset::Max);
-	Internal_::setNativeThreadPriority(getNativeHandle(thread), priority);
+	Internal_::setNativeThreadPriority(getNativeThread(thread), priority);
 }
 
-void ProcThrCtrl::setPriority(jthread* const thread) {
-	Internal_::setNativeThreadPriority(getNativeHandle(thread));
+ProcThrCtrl::AffinityMask ProcThrCtrl::getAffinityMask(jthread* const thread) {
+	return Internal_::getNativeThreadAffinityMask(getNativeProcess(), getNativeThread(thread));
 }
 
 void ProcThrCtrl::setAffinityMask(const AffinityMask affinity_mask, jthread* const thread) {
 	DRR_ASSERT(affinity_mask.any());
 	DRR_ASSERT(jthread::hardware_concurrency() <= affinity_mask.size());
-	Internal_::setNativeThreadAffinityMask(getNativeHandle(thread), affinity_mask);
-}
-
-void ProcThrCtrl::setAffinityMask(jthread* const thread) {
-	Internal_::setNativeThreadAffinityMask(getNativeHandle(thread));
+	Internal_::setNativeThreadAffinityMask(getNativeProcess(), getNativeThread(thread), affinity_mask);
 }

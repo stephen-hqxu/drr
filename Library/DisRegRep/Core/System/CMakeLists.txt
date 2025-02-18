@@ -6,5 +6,6 @@ HEADER
 	ProcessThreadControlPosix
 	ProcessThreadControlWindows
 SOURCE
+	Error
 	ProcessThreadControl
 )

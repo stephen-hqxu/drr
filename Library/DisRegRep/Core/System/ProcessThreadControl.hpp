@@ -45,6 +45,17 @@ inline constexpr std::uint_fast8_t MaxSystemThread = 64U;
 using AffinityMask = std::bitset<MaxSystemThread>;
 
 /**
+ * @brief Get priority of a given thread.
+ *
+ * @param thread Thread whose priority is to be got. Default to the calling thread if not given.
+ *
+ * @return Priority of `thread`.
+ *
+ * @exception std::system_error For any exception thrown by system API.
+ */
+[[nodiscard]] Priority getPriority(std::jthread* = nullptr);
+
+/**
  * @brief Set priority of a given thread.
  *
  * @param priority New priority set to.
@@ -55,11 +66,15 @@ using AffinityMask = std::bitset<MaxSystemThread>;
 void setPriority(Priority, std::jthread* = nullptr);
 
 /**
- * @brief Reset the priority of a given thread to the platform's default.
+ * @brief Get affinity mask of a given thread.
  *
- * @param thread Thread whose priority is to be reset to default. Default to the calling thread if not given.
+ * @param thread Thread whose affinity mask is to be got. Default to the calling thread if not given.
+ *
+ * @return Affinity mask of `thread`.
+ *
+ * @exception std::system_error For any exception thrown by system API.
  */
-void setPriority(std::jthread* = nullptr);
+[[nodiscard]] AffinityMask getAffinityMask(std::jthread* = nullptr);
 
 /**
  * @brief Set affinity mask of a given thread.
@@ -70,12 +85,5 @@ void setPriority(std::jthread* = nullptr);
  * @exception std::system_error For any exception thrown by system API.
  */
 void setAffinityMask(AffinityMask, std::jthread* = nullptr);
-
-/**
- * @brief Reset affinity mask of a given thread to the platform's default.
- *
- * @param thread Thread whose affinity mask is to be reset to default. Default to the calling thread if not given.
- */
-void setAffinityMask(std::jthread* = nullptr);
 
 }

@@ -48,13 +48,13 @@ namespace Prof = DisRegRep::Programme::Profiler;
 namespace Drv = Prof::Driver;
 namespace View = DisRegRep::Core::View;
 
-namespace crn = std::chrono;
 namespace fs = std::filesystem;
 using std::array, std::to_array, std::span, std::vector;
 using std::string_view;
 using std::tuple, std::tie, std::apply;
 using std::ranges::to, std::ranges::copy,
 	std::views::transform, std::views::zip;
+using std::chrono::system_clock, std::chrono::sys_seconds, std::chrono::time_point_cast;
 using std::format,
 	std::index_sequence, std::make_index_sequence;
 using std::throw_with_nested,
@@ -195,13 +195,16 @@ void Drv::splatting(const SplattingInfo& info) {
 	} catch (const Core::Exception& e) {
 		throw_with_nested(fs::filesystem_error(e.what(), *result_dir, make_error_code(errc::not_a_directory)));
 	}
-	const fs::path output_dir = *result_dir / format("{:%Y-%m-%d_%H-%M}",
-		crn::zoned_time(crn::current_zone(), crn::time_point_cast<crn::minutes>(crn::system_clock::now())));
+	const fs::path output_dir = *result_dir / format("{:%Y-%m-%d_%H-%M-%S}",
+		time_point_cast<sys_seconds::duration>(system_clock::now()));
 	DRR_ASSERT(fs::create_directory(output_dir));
 
 	namespace ProcThrCtrl = Core::System::ProcessThreadControl;
 	[[maybe_unused]] const volatile class MainThreadScheduler {
 	private:
+
+		const ProcThrCtrl::Priority Priority = ProcThrCtrl::getPriority();
+		const ProcThrCtrl::AffinityMask AffinityMask = ProcThrCtrl::getAffinityMask();
 
 		bool AffinityMasked = false;
 
@@ -209,6 +212,7 @@ void Drv::splatting(const SplattingInfo& info) {
 
 		MainThreadScheduler(const ProcThrCtrl::AffinityMask splatting_thread_affinity_mask) {
 			ProcThrCtrl::setPriority(ProcThrCtrl::PriorityPreset::Min);
+			//Schedule the main thread to avoid from using the processors which will be used by the profiler.
 			if (const ProcThrCtrl::AffinityMask main_thread_affinity_mask = ~splatting_thread_affinity_mask;
 				main_thread_affinity_mask.any()) {
 				ProcThrCtrl::setAffinityMask(main_thread_affinity_mask);
@@ -216,10 +220,10 @@ void Drv::splatting(const SplattingInfo& info) {
 			}
 		}
 
-		~MainThreadScheduler() {
-			ProcThrCtrl::setPriority();
+		~MainThreadScheduler() noexcept(false) {
+			ProcThrCtrl::setPriority(this->Priority);
 			if (this->AffinityMasked) {
-				ProcThrCtrl::setAffinityMask();
+				ProcThrCtrl::setAffinityMask(this->AffinityMask);
 			}
 		}
 
