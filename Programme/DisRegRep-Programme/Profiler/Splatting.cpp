@@ -44,9 +44,11 @@
 #include <filesystem>
 #include <fstream>
 #include <ios>
+#include <ostream>
 #include <print>
 
 #include <exception>
+#include <source_location>
 #include <system_error>
 
 #include <concepts>
@@ -69,21 +71,23 @@ using std::array, std::to_array, std::vector,
 	std::any,
 	std::tuple, std::apply, std::tuple_cat;
 using std::ranges::copy, std::ranges::for_each, std::ranges::fold_left_first,
-	std::invoke, std::bind_back, std::mem_fn,
+	std::invoke, std::bind_back,
 	std::ostreambuf_iterator, std::back_inserter, std::make_const_iterator,
 	std::views::single, std::views::repeat, std::views::transform, std::views::cartesian_product,
-	std::views::join_with, std::views::zip, std::views::chunk;
+	std::views::join_with, std::views::zip, std::views::chunk, std::views::enumerate;
 using std::ranges::range_value_t, std::ranges::range_reference_t, std::ranges::range_const_reference_t,
 	std::ranges::input_range, std::ranges::view;
 using std::future, std::mutex, std::unique_lock;
 using std::chrono::duration,
 	std::format, std::format_to, std::format_to_n,
 	std::unique_ptr, std::make_unique;
-using std::ofstream, std::ios_base,
+using std::ostream, std::fstream, std::ofstream, std::ios_base,
 	std::println;
-using std::throw_with_nested, std::errc, std::make_error_code;
+using std::exception, std::exception_ptr, std::current_exception, std::rethrow_exception, std::throw_with_nested,
+	std::source_location,
+	std::errc, std::make_error_code;
 using std::numeric_limits;
-using std::integral, std::floating_point, std::convertible_to, std::copy_constructible,
+using std::integral, std::convertible_to, std::copy_constructible,
 	std::is_same_v, std::is_convertible_v,
 	std::conjunction_v, std::is_invocable,
 	std::common_type_t, std::remove_pointer_t, std::remove_cvref_t;
@@ -311,7 +315,6 @@ private:
 		template<typename PfIf>
 		requires IS_PROFILE_INFO(PfIf)
 		void write(const nb::Bench& bench, const PfIf& profile_info) const {
-			const nb::Config& config = bench.config();
 			const vector<nb::Result>& bench_result_array = bench.results();
 			const ExtraResultArray& extra_result_array = *profile_info.ExtraResultArray_;
 			assert(bench_result_array.size() == extra_result_array.size());
@@ -321,16 +324,18 @@ private:
 			copy(Header | join_with(Delimiter), ostreambuf_iterator(result));
 			println(result);
 
-			const auto cast_time = [target_time_unit = config.mTimeUnit](
-									   const floating_point auto tick) constexpr noexcept -> NanoBenchDefaultDuration::rep {
-				return NanoBenchDefaultDuration(tick) / target_time_unit;
-			};
 			for (const auto& [bench_result, extra_result] : zip(bench_result_array, extra_result_array.view())) [[likely]] {
+				const nb::Config& config = bench_result.config();
 				const auto [memory_usage] = extra_result;
 
+				const auto cast_time = [target_time_unit = config.mTimeUnit](
+										   const auto tick) constexpr noexcept -> NanoBenchDefaultDuration::rep {
+					return NanoBenchDefaultDuration(tick) / target_time_unit;
+				};
+
 				using enum nb::Result::Measure;
-				println(result, "{:.0f},{:.2f},{:.0f}",
-					bench_result.sum(iterations),
+				println(result, "{},{:.2f},{:.0f}",
+					config.mBenchmarkName,
 					cast_time(bench_result.median(elapsed)),
 					memory_usage * (1.0F * DefaultMemoryUnit::den / DefaultMemoryUnit::num)
 				);
@@ -341,7 +346,7 @@ private:
 	class ResultContent {
 	private:
 
-		static constexpr IdentifierType IdentifierStart = 84140904U;
+		static constexpr IdentifierType IdentifierStart = 10000000U;
 
 		static constexpr string_view Filename = "Content.csv";
 		static constexpr auto Header = to_array<string_view>({
@@ -403,7 +408,7 @@ private:
 			}) | join_with(Delimiter);
 
 			const auto lock = unique_lock(this->Mutex);
-			auto content = ofstream(this->Location, ios_base::ate);
+			auto content = fstream(this->Location, ios_base::in | ios_base::out | ios_base::ate);
 			DRR_ASSERT(content);
 			copy(row, ostreambuf_iterator(content));
 			println(content);
@@ -515,9 +520,28 @@ public:
 		this->ResultContent_.update(container_trait, bench, profile_info);
 	}
 
-	void synchronise() {
-		for_each(this->Future, mem_fn(&decltype(this->Future)::value_type::get));
+	void synchronise(ostream* const progress_log) {
+		exception_ptr e_ptr;
+		//WORKAROUND: A missing specialisation for indirect-value-t exposition-only alias in MSVC STL
+		//	causes capturing prvalue with non-copyable inner type to fail.
+		for_each(this->Future | enumerate, [progress_log, &e_ptr, total_job = this->Future.size()](auto&& i_fut) {
+			auto& [i, fut] = i_fut;
+			try {
+				fut.get();
+				if (progress_log) {
+					println(*progress_log, "{}: {}/{}", source_location::current().function_name(), i, total_job);
+				}
+			} catch (...) {
+				if (!e_ptr) [[unlikely]] {
+					e_ptr = current_exception();
+				}
+			}
+		});
 		this->Future.clear();
+
+		if (e_ptr) [[unlikely]] {
+			rethrow_exception(e_ptr);
+		}
 	}
 
 };
@@ -527,8 +551,8 @@ Splatting::Splatting(fs::path result_dir, const ThreadPoolCreateInfo& thread_poo
 
 Splatting::~Splatting() = default;
 
-void Splatting::synchronise() const {
-	this->Impl_->synchronise();
+void Splatting::synchronise(ostream* const progress_log) const {
+	this->Impl_->synchronise(progress_log);
 }
 
 void Splatting::sweepRadius(
@@ -638,6 +662,7 @@ void Splatting::sweepCentroidCount(const span<const Base* const> splat, const sp
 			const auto current_centroid_count : centroid_count) [[likely]] {
 			rf->resize(splat.minimumRegionfieldDimension(invoke_info));
 			rf->RegionCount = region_count;
+			voronoi_rf_gen.CentroidCount = current_centroid_count;
 			voronoi_rf_gen(*rf);
 
 			bench.run(toString(current_centroid_count).data(), [&invoke_info, container_trait, rf, &splat, &memory] {

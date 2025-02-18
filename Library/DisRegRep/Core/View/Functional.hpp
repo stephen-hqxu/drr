@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RangeAdaptorClosure.hpp"
+#include "Trait.hpp"
 
 #include <tuple>
 
@@ -23,8 +24,7 @@ struct Cast {
 
 	template<std::ranges::viewable_range R>
 	requires std::ranges::input_range<R> && std::is_convertible_v<std::ranges::range_reference_t<R>, To>
-	[[nodiscard]] static constexpr std::ranges::view auto operator()(R&& r)
-		noexcept(std::is_nothrow_constructible_v<std::views::all_t<R>, R>) {
+	[[nodiscard]] static constexpr std::ranges::view auto operator()(R&& r) noexcept(Trait::IsNothrowViewable<R>) {
 		using std::views::transform;
 		return std::forward<R>(r)
 			 | transform([]<typename Value>(Value&& value) static constexpr noexcept(
@@ -55,8 +55,7 @@ public:
 
 	template<std::ranges::viewable_range R>
 	requires std::ranges::input_range<R> && RangeArgument<R>::Constructible
-	[[nodiscard]] static constexpr std::ranges::view auto operator()(R&& r)
-		noexcept(std::is_nothrow_constructible_v<std::views::all_t<R>, R>) {
+	[[nodiscard]] static constexpr std::ranges::view auto operator()(R&& r) noexcept(Trait::IsNothrowViewable<R>) {
 		using std::views::transform, std::make_from_tuple;
 		return std::forward<R>(r)
 			 | transform([]<typename Tuple>(Tuple&& tuple) static constexpr noexcept(
@@ -78,7 +77,7 @@ public:
  */
 inline constexpr auto AddressOf = RangeAdaptorClosure([]<std::ranges::viewable_range R>
 	requires std::ranges::input_range<R> && std::is_lvalue_reference_v<std::ranges::range_reference_t<R>>
-	(R&& r) static constexpr noexcept(std::is_nothrow_constructible_v<std::views::all_t<R>, R>) -> std::ranges::view auto {
+	(R&& r) static constexpr noexcept(Trait::IsNothrowViewable<R>) -> std::ranges::view auto {
 		using std::views::transform, std::addressof;
 		return std::forward<R>(r) | transform([](auto& obj) static constexpr noexcept { return addressof(obj); });
 	});
@@ -95,7 +94,7 @@ inline constexpr auto AddressOf = RangeAdaptorClosure([]<std::ranges::viewable_r
 inline constexpr auto Dereference =
 	RangeAdaptorClosure([]<std::ranges::viewable_range R, typename Value = std::ranges::range_value_t<R>>
 		requires std::ranges::input_range<R> && requires(Value value) { *value; }
-		(R&& r) static constexpr noexcept(std::is_nothrow_constructible_v<std::views::all_t<R>, R>) -> std::ranges::view auto {
+		(R && r) static constexpr noexcept(Trait::IsNothrowViewable<R>) -> std::ranges::view auto {
 			using std::views::transform;
 			return std::forward<R>(r)
 				 | transform([]<typename V>(V&& v) static noexcept(

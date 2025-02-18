@@ -18,6 +18,7 @@
 #include <memory>
 
 #include <filesystem>
+#include <ostream>
 
 #include <cstdint>
 
@@ -129,8 +130,13 @@ public:
 	/**
 	 * @brief Block the current thread until all profiler threads finish. All object lifetime requirements are lifted once this call
 	 * returns.
+	 *
+	 * @param progress_log An optional stream to receive real-time progress tracking on the splatting profiler.
+	 *
+	 * @exception std::exception The first exception during the execution of all currently active profiler works, after all profiler
+	 * threads finish. The remaining exceptions (if there is more than one) are discarded.
 	 */
-	void synchronise() const;
+	void synchronise(std::ostream* = nullptr) const;
 
 	/**
 	 * @brief Profile the impact of runtime by varying radius on a convolution-based splatting. Profiler will be executed by the order

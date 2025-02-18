@@ -7,4 +7,5 @@ HEADER
 	IrregularTransform
 	Matrix
 	RangeAdaptorClosure
+	Trait
 )

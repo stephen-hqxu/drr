@@ -2,6 +2,7 @@
 
 #include "CacheLatest.hpp"
 #include "RangeAdaptorClosure.hpp"
+#include "Trait.hpp"
 
 #include <iterator>
 #include <ranges>
@@ -27,8 +28,7 @@ namespace DisRegRep::Core::View {
 inline constexpr auto IrregularTransform = RangeAdaptorClosure([]<std::ranges::viewable_range R, RangeApplicator F>
 	requires std::ranges::input_range<R> && std::indirectly_unary_invocable<F, std::ranges::iterator_t<R>>
 	(R&& r, F f) static constexpr noexcept(
-		std::is_nothrow_constructible_v<std::views::all_t<R>, R> && std::is_nothrow_move_constructible_v<F>)
-		-> std::ranges::view auto {
+		Trait::IsNothrowViewable<R> && std::is_nothrow_move_constructible_v<F>) -> std::ranges::view auto {
 		//This cache views force the range to be an input range, and each element in the preceding range will be dereferenced exactly
 		//	once, thus eliminating the possibility of calling the irregular function more than once per iteration.
 		return std::forward<R>(r) | std::ranges::views::transform(std::move(f)) | CacheLatest;

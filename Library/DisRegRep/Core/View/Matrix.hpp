@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RangeAdaptorClosure.hpp"
+#include "Trait.hpp"
 
 #include <glm/vec2.hpp>
 
@@ -29,8 +30,7 @@ namespace DisRegRep::Core::View::Matrix {
 inline constexpr auto View2d =
 	RangeAdaptorClosure([]<std::ranges::viewable_range R, std::integral Stride = std::ranges::range_difference_t<R>>
 		requires std::ranges::forward_range<R>
-		(R&& r, const Stride stride) static constexpr noexcept(
-			std::is_nothrow_constructible_v<std::views::all_t<R>, R>) -> std::ranges::view auto {
+		(R&& r, const Stride stride) static constexpr noexcept(Trait::IsNothrowViewable<R>) -> std::ranges::view auto {
 			using std::views::chunk;
 			return std::forward<R>(r) | chunk(stride);
 		});
@@ -49,8 +49,7 @@ inline constexpr auto View2d =
 inline constexpr auto ViewTransposed2d =
 	RangeAdaptorClosure([]<std::ranges::viewable_range R, std::integral Stride = std::ranges::range_difference_t<R>>
 		requires std::ranges::forward_range<R>
-		(R&& r, const Stride stride) static constexpr noexcept(
-			std::is_nothrow_constructible_v<std::views::all_t<R>, R>) -> std::ranges::view auto {
+		(R&& r, const Stride stride) static constexpr noexcept(Trait::IsNothrowViewable<R>) -> std::ranges::view auto {
 			using std::views::all, std::views::iota, std::views::transform, std::views::drop;
 			return iota(Stride {}, stride) | transform([r = std::forward<R>(r) | all, stride](const auto offset) constexpr noexcept {
 				return r | drop(offset) | std::views::stride(stride);
@@ -74,25 +73,21 @@ inline constexpr auto ViewTransposed2d =
 inline constexpr auto SubRange2d = RangeAdaptorClosure([]<
 	std::ranges::viewable_range OuterR,
 	std::ranges::viewable_range InnerR = std::ranges::range_reference_t<OuterR>,
-	std::integral Size = std::common_type_t<std::ranges::range_difference_t<OuterR>, std::ranges::range_difference_t<InnerR>>
-> requires std::ranges::input_range<OuterR> (
-	OuterR&& outer_r,
-	const glm::vec<2U, Size> offset,
-	const glm::vec<2U, Size> extent
-) static constexpr noexcept(
-	std::is_nothrow_constructible_v<std::views::all_t<OuterR>, OuterR>
-) -> std::ranges::view auto {
-	using std::views::drop, std::views::take, std::views::transform;
-	return std::forward<OuterR>(outer_r)
-		| drop(offset.x)
-		| take(extent.x)
-		| transform([offset_y = offset.y, extent_y = extent.y]<typename R>(R&& inner_r) constexpr noexcept(
-			std::is_nothrow_constructible_v<std::views::all_t<R>, R>
-		) {
-			return std::forward<R>(inner_r)
-				| drop(offset_y)
-				| take(extent_y);
-		});
-});
+	std::integral Size = std::common_type_t<std::ranges::range_difference_t<OuterR>,
+	std::ranges::range_difference_t<InnerR>>
+> requires std::ranges::input_range<OuterR>
+	(OuterR&& outer_r, const glm::vec<2U, Size> offset, const glm::vec<2U, Size> extent) static constexpr noexcept(
+		Trait::IsNothrowViewable<OuterR>) -> std::ranges::view auto {
+		using std::views::drop, std::views::take, std::views::transform;
+		return std::forward<OuterR>(outer_r)
+			| drop(offset.x)
+			| take(extent.x)
+			| transform([offset_y = offset.y, extent_y = extent.y]<typename R>(R&& inner_r) constexpr noexcept(
+				Trait::IsNothrowViewable<R>) {
+				return std::forward<R>(inner_r)
+					| drop(offset_y)
+					| take(extent_y);
+				});
+	});
 
 }

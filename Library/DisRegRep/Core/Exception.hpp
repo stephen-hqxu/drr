@@ -3,6 +3,7 @@
 #include <format>
 #include <string_view>
 
+#include <exception>
 #include <source_location>
 #include <stdexcept>
 #include <stacktrace>
@@ -37,6 +38,13 @@ public:
 	);
 
 	~Exception() override = default;
+
+	/**
+	 * @brief Print all exception messages from a potentially nested exception.
+	 *
+	 * @param e The exception object; may be a @link std::nested_exception.
+	 */
+	static void print(const std::exception&) noexcept;
 
 };
 

@@ -2,6 +2,7 @@
 
 #include "Functional.hpp"
 #include "RangeAdaptorClosure.hpp"
+#include "Trait.hpp"
 
 #include <glm/fwd.hpp>
 
@@ -31,8 +32,7 @@ namespace DisRegRep::Core::View::Arithmetic {
  */
 inline constexpr auto Normalise = RangeAdaptorClosure([]<std::ranges::viewable_range R, std::floating_point Factor>
 	requires std::ranges::input_range<R> && std::is_convertible_v<std::ranges::range_reference_t<R>, Factor>
-	(R&& r, const Factor factor) static constexpr noexcept(
-		std::is_nothrow_constructible_v<std::views::all_t<R>, R>) -> std::ranges::view auto {
+	(R&& r, const Factor factor) static constexpr noexcept(Trait::IsNothrowViewable<R>) -> std::ranges::view auto {
 		using std::views::transform, std::bind_front, std::multiplies;
 		return std::forward<R>(r) | transform(bind_front(multiplies {}, Factor { 1 } / factor));
 	});

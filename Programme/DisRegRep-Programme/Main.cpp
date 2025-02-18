@@ -1,6 +1,7 @@
 #include <DisRegRep-Programme/Profiler/Driver.hpp>
 #include <DisRegRep-Programme/Profiler/Splatting.hpp>
 
+#include <DisRegRep/Core/Exception.hpp>
 #include <DisRegRep/Core/ThreadPool.hpp>
 #include <DisRegRep/Info.hpp>
 
@@ -8,6 +9,8 @@
 #include <CLI/Validators.hpp>
 
 #include <yaml-cpp/yaml.h>
+
+#include <chrono>
 
 #include <format>
 #include <string>
@@ -22,9 +25,10 @@
 #include <cstdlib>
 
 namespace fs = std::filesystem;
+using std::chrono::system_clock;
 using std::format, std::string;
-using std::cerr, std::println;
-using std::exception, std::rethrow_if_nested;
+using std::cout, std::println;
+using std::exception;
 
 namespace {
 
@@ -44,7 +48,7 @@ struct Profile {
 			->check(CLI::ExistingFile);
 		cmd.add_option("--output,-o", this->ResultDirectory, "A directory intended for the storage of profiling results. It should be noted that a new directory is created in this directory, in which all relevant outputs are located.")
 			->required()
-			->type_name("DIR")
+			->type_name("OUT")
 			->check(CLI::ExistingDirectory);
 		cmd.add_option("-t", this->ThreadCount, "The quantity of threads that will be utilised for the execution of each profiler job in a concurrent manner.")
 			->type_name("THREAD")
@@ -74,13 +78,14 @@ void runProfiler(const Argument::Profile& arg_profile) {
 	namespace Prof = DisRegRep::Programme::Profiler;
 	const Prof::Splatting::ThreadPoolCreateInfo tp_info {
 		.Size = thread_count,
-		.AffinityMask = config["thread_affinity_mask"].as<std::uint64_t>()
+		.AffinityMask = config["thread affinity mask"].as<std::uint64_t>()
 	};
 	const auto parameter_set = config["parameter set"].as<Prof::Driver::SplattingInfo::ParameterSetType>();
 	Prof::Driver::splatting({
 		.ResultDirectory = &result_dir,
 		.ThreadPoolCreateInfo = &tp_info,
 		.Seed = config["seed"].as<Prof::Splatting::SeedType>(),
+		.ProgressLog = &cout,
 		.ParameterSet = &parameter_set
 	});
 }
@@ -102,19 +107,16 @@ int main(const int argc, const char* const* const argv) try {
 	CLI11_PARSE(parser, argc, argv);
 
 	if (cmd_profile) {
+		const auto start = system_clock::now();
+		println("The {} profiling engine was initiated at {:%c}.", Info::FullName, start);
+
 		runProfiler(arg_profile);
+
+		const auto end = system_clock::now();
+		println("The profiling engine exits normally at {:%c}, with a total runtime of {:%M min %S s}.", end, end - start);
 	}
 	return EXIT_SUCCESS;
 } catch (const exception& e) {
-	//NOLINTBEGIN(misc-no-recursion)
-	[](this const auto self, const exception& nested_e, const std::uint_fast8_t level) -> void {
-		println(cerr, "Exception Level: {}\nMessage:\n{}\n{:#<80}", level, nested_e.what(), "#");
-		try {
-			rethrow_if_nested(nested_e);
-		} catch (const exception& next_e) {
-			self(next_e, level + 1U);
-		}
-	}(e, 0U);
-	//NOLINTEND(misc-no-recursion)
+	DisRegRep::Core::Exception::print(e);
 	return EXIT_FAILURE;
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RangeAdaptorClosure.hpp"
+#include "Trait.hpp"
 
 #include <optional>
 
@@ -245,7 +246,7 @@ std::views::cache_latest
 #else
 RangeAdaptorClosure([]<std::ranges::viewable_range R>
 	requires std::ranges::input_range<R>
-	(R&& r) static constexpr noexcept(std::is_nothrow_constructible_v<std::views::all_t<R>, R>) -> std::ranges::view auto {
+	(R&& r) static constexpr noexcept(Trait::IsNothrowViewable<R>) -> std::ranges::view auto {
 		return CacheLatestView(std::forward<R>(r));
 	});
 #endif

@@ -7,6 +7,7 @@
 #include <tuple>
 
 #include <filesystem>
+#include <ostream>
 
 #include <type_traits>
 
@@ -79,6 +80,7 @@ struct SplattingInfo {
 	const std::filesystem::path* ResultDirectory; /**< A new directory is created in this directory where all profiler outputs are stored. */
 	const Splatting::ThreadPoolCreateInfo* ThreadPoolCreateInfo; /**< Please read this documentation carefully regarding how to tune the profiler. */
 	Splatting::SeedType Seed;
+	std::ostream* ProgressLog; /**< @link Splatting::synchronise. */
 
 	const ParameterSetType* ParameterSet;
 

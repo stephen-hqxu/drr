@@ -114,7 +114,7 @@ constexpr void seedGenerator(tuple<RfGen...>& generator, const Prof::Splatting::
 }
 
 void Drv::splatting(const SplattingInfo& info) {
-	const auto [result_dir, thread_pool_create_info, seed, parameter_set] = info;
+	const auto [result_dir, thread_pool_create_info, seed, progress_log, parameter_set] = info;
 	const auto& [default_profile, stress_profile] = *parameter_set;
 	const auto& [default_fixed, default_variable] = default_profile;
 	const auto& [stress_fixed, stress_variable] = stress_profile;
@@ -200,14 +200,14 @@ void Drv::splatting(const SplattingInfo& info) {
 	DRR_ASSERT(fs::create_directory(output_dir));
 
 	namespace ProcThrCtrl = Core::System::ProcessThreadControl;
-	[[maybe_unused]] const volatile class MainThreadSchedulerType {
+	[[maybe_unused]] const volatile class MainThreadScheduler {
 	private:
 
 		bool AffinityMasked = false;
 
 	public:
 
-		MainThreadSchedulerType(const ProcThrCtrl::AffinityMask splatting_thread_affinity_mask) {
+		MainThreadScheduler(const ProcThrCtrl::AffinityMask splatting_thread_affinity_mask) {
 			ProcThrCtrl::setPriority(ProcThrCtrl::PriorityPreset::Min);
 			if (const ProcThrCtrl::AffinityMask main_thread_affinity_mask = ~splatting_thread_affinity_mask;
 				main_thread_affinity_mask.any()) {
@@ -216,7 +216,7 @@ void Drv::splatting(const SplattingInfo& info) {
 			}
 		}
 
-		~MainThreadSchedulerType() noexcept(false) {
+		~MainThreadScheduler() {
 			ProcThrCtrl::setPriority();
 			if (this->AffinityMasked) {
 				ProcThrCtrl::setAffinityMask();
@@ -249,7 +249,7 @@ void Drv::splatting(const SplattingInfo& info) {
 		.Seed = seed,
 		.RegionCount = default_fixed.RegionCount
 	});
-	profiler.synchronise();
+	profiler.synchronise(progress_log);
 }
 
 bool YAML::convert<Drv::SplattingInfo::ParameterSetType>::decode(const Node& node, ConvertType& parameter_set) {

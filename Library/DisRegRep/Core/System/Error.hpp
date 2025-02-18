@@ -8,6 +8,8 @@
 #include <errhandlingapi.h>
 #endif
 
+#include <format>
+
 #include <exception>
 #include <system_error>
 
@@ -19,7 +21,9 @@
 		try { \
 			DRR_ASSERT(EXPR); \
 		} catch (...) { \
-			std::throw_with_nested(std::system_error(GetLastError(), std::system_category())); \
+			const DWORD last_error = GetLastError(); \
+			std::throw_with_nested(std::system_error(last_error, std::system_category(), \
+				std::format("Windows Error Code {}", last_error))); \
 		} \
 	} while (false)
 
