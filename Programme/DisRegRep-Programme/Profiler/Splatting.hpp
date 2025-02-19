@@ -31,15 +31,11 @@ namespace DisRegRep::Programme::Profiler {
 class Splatting {
 public:
 
-	using Base = DisRegRep::Splatting::Base;
-	using BaseConvolution = DisRegRep::Splatting::Convolution::Base;
-	using DimensionType = Base::DimensionType;
-	using KernelSizeType = BaseConvolution::KernelSizeType;
-
 	using RegionCountType = Container::Regionfield::ValueType;
-
 	using SeedType = RegionfieldGenerator::Base::SeedType;
 	using CentroidCountType = RegionfieldGenerator::VoronoiDiagram::SizeType;
+	using DimensionType = DisRegRep::Splatting::Base::DimensionType;
+	using KernelSizeType = DisRegRep::Splatting::Convolution::Base::KernelSizeType;
 
 	using SizeType = std::uint_fast8_t;
 
@@ -67,7 +63,9 @@ public:
 	struct CommonSweepInfo {
 
 		std::string_view Tag; /**< A custom tag that contains application-dependent info for identifying a result. */
-		DimensionType Extent; /**< @link Base::InvokeInfo::Extent. */
+
+		const RegionfieldGenerator::Base::GenerateInfo* RegionfieldGenerateInfo; /**< @link RegionfieldGenerator::Base::GenerateInfo. */
+		DimensionType Extent; /**< @link DisRegRep::Splatting::Base::InvokeInfo::Extent. */
 
 	};
 
@@ -95,7 +93,6 @@ public:
 	struct CentroidCountSweepInfo {
 
 		const CommonSweepInfo* CommonSweepInfo_;
-		SeedType Seed; /**< @link RegionfieldGenerator::Base::Seed. */
 		RegionCountType RegionCount; /**< @link Container::Regionfield::RegionCount. */
 
 	};
@@ -148,7 +145,7 @@ public:
 	 * @param splat_size Number of *splat* instances in `splat_conv`.
 	 * @param info @link RadiusSweepInfo.
 	 */
-	void sweepRadius(std::span<const BaseConvolution* const>, SizeType, const RadiusSweepInfo&) const;
+	void sweepRadius(std::span<const DisRegRep::Splatting::Convolution::Base* const>, SizeType, const RadiusSweepInfo&) const;
 
 	/**
 	 * @brief Profile the impact of runtime by varying the number of regions on a regionfield, though it is not guaranteed that all
@@ -160,7 +157,8 @@ public:
 	 * @param region_count Region count to be run in order.
 	 * @param info @link RegionCountSweepInfo.
 	 */
-	void sweepRegionCount(std::span<const Base* const>, std::span<const RegionCountType>, const RegionCountSweepInfo&) const;
+	void sweepRegionCount(
+		std::span<const DisRegRep::Splatting::Base* const>, std::span<const RegionCountType>, const RegionCountSweepInfo&) const;
 
 	/**
 	 * @brief Profile the impact of runtime by varying the number of regions presented on a regionfield. Similar to @link
@@ -171,7 +169,8 @@ public:
 	 * @param centroid_count Centroid count @link RegionfieldGenerator::VoronoiDiagram::CentroidCount to be run in order.
 	 * @param info @link CentroidCountSweepInfo.
 	 */
-	void sweepCentroidCount(std::span<const Base* const>, std::span<const CentroidCountType>, const CentroidCountSweepInfo&) const;
+	void sweepCentroidCount(
+		std::span<const DisRegRep::Splatting::Base* const>, std::span<const CentroidCountType>, const CentroidCountSweepInfo&) const;
 
 };
 

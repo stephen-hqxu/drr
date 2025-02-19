@@ -132,8 +132,6 @@ public:
 		requires std::is_constructible_v<ProxyElementViewType, R>
 		constexpr ValueProxy(R&& r) noexcept(std::is_nothrow_constructible_v<ProxyElementViewType, R>) : Span(std::forward<R>(r)) { }
 
-		constexpr ~ValueProxy() = default;
-
 		/**
 		 * @brief Get the view of values.
 		 *
@@ -321,8 +319,6 @@ public:
 		 */
 		constexpr ValueProxy(ProxyPairwiseOffsetType pairwise_offset, ProxyElementContainerReference sparse_matrix) noexcept :
 			PairwiseOffset(std::move(pairwise_offset)), ElementContainer(std::addressof(sparse_matrix)) { }
-
-		constexpr ~ValueProxy() = default;
 
 		/**
 		 * @brief Get the view of values.

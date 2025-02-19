@@ -40,6 +40,7 @@ DRR_REGIONFIELD_GENERATOR_DEFINE_DELEGATING_FUNCTOR(VoronoiDiagram) {
 	DRR_ASSERT(this->CentroidCount > 0U);
 	const span rf_span = regionfield.span();
 	const Regionfield::ExtentType& rf_extent = regionfield.mapping().extents();
+	const auto [seed] = info;
 
 	auto rng = Core::XXHash::RandomEngine(Base::generateSecret(seed));
 	array<UniformDistributionType, 2U> dist;

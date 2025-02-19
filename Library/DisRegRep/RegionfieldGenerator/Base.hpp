@@ -15,7 +15,7 @@
 	void QUAL operator()( \
 		const DRR_REGIONFIELD_GENERATOR_EXECUTION_POLICY_TRAIT(THREADING) ep_trait, \
 		DisRegRep::Container::Regionfield& regionfield, \
-		const DisRegRep::RegionfieldGenerator::Base::SeedType seed \
+		const DisRegRep::RegionfieldGenerator::Base::GenerateInfo& info \
 	) const
 //Do `DRR_REGIONFIELD_GENERATOR_DECLARE_FUNCTOR` for every valid execution policy.
 #define DRR_REGIONFIELD_GENERATOR_DECLARE_FUNCTOR_ALL(PREFIX, SUFFIX) \
@@ -30,7 +30,7 @@
 	template<DisRegRep::RegionfieldGenerator::ExecutionPolicy::IsTrait EpTrait> \
 	FUNC_QUAL void QUAL invokeImpl( \
 		DisRegRep::Container::Regionfield& regionfield, \
-		const DisRegRep::RegionfieldGenerator::Base::SeedType seed \
+		const DisRegRep::RegionfieldGenerator::Base::GenerateInfo& info \
 	) const
 //Do `DRR_REGIONFIELD_GENERATOR_DECLARE_DELEGATING_FUNCTOR` with the correct qualifier for regionfield generator implementation.
 #define DRR_REGIONFIELD_GENERATOR_DECLARE_DELEGATING_FUNCTOR_IMPL DRR_REGIONFIELD_GENERATOR_DECLARE_DELEGATING_FUNCTOR(,)
@@ -50,6 +50,12 @@ class Base {
 public:
 
 	using SeedType = std::uint_fast32_t;
+
+	struct GenerateInfo {
+
+		SeedType Seed; /**< A seed used by random number generators. */
+
+	};
 
 protected:
 
@@ -101,7 +107,7 @@ public:
 	 * @param ep_trait Specify the execution policy trait. Multithread implementation defaults to call the singlethreaded version if
 	 * not explicitly implemented by the application.
 	 * @param[Out] regionfield A regionfield matrix where generated contents are stored.
-	 * @param[In] seed A seed used by random number generators.
+	 * @param[In] info @link GenerateInfo.
 	 */
 	DRR_REGIONFIELD_GENERATOR_DECLARE_FUNCTOR_ALL(virtual, = 0);
 

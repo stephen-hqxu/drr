@@ -9,10 +9,12 @@
 #include <DisRegRep/Core/ThreadPool.hpp>
 
 #include <DisRegRep/RegionfieldGenerator/Base.hpp>
+#include <DisRegRep/RegionfieldGenerator/ExecutionPolicy.hpp>
 #include <DisRegRep/RegionfieldGenerator/VoronoiDiagram.hpp>
 
+#include <DisRegRep/Splatting/Convolution/Base.hpp>
 #include <DisRegRep/Splatting/Base.hpp>
-#include <DisRegRep/Splatting/Trait.hpp>
+#include <DisRegRep/Splatting/Container.hpp>
 
 #include <glm/common.hpp>
 
@@ -60,8 +62,8 @@
 #include <cstdint>
 
 using DisRegRep::Programme::Profiler::Splatting;
+namespace RfGen = DisRegRep::RegionfieldGenerator;
 namespace Splt = DisRegRep::Splatting;
-using Splt::Trait::ContainerCombination;
 
 namespace nb = ankerl::nanobench;
 
@@ -89,7 +91,7 @@ using std::exception, std::exception_ptr, std::current_exception, std::rethrow_e
 using std::numeric_limits;
 using std::integral, std::convertible_to, std::copy_constructible,
 	std::is_same_v, std::is_convertible_v,
-	std::conjunction_v, std::is_invocable,
+	std::conjunction_v, std::is_invocable, std::is_invocable_v,
 	std::common_type_t, std::remove_pointer_t, std::remove_cvref_t;
 
 namespace {
@@ -102,7 +104,7 @@ concept ProfilerInputRange = input_range<Rg> && view<remove_cvref_t<Rg>>;
 
 template<typename RfGenRg>
 concept RegionfieldGeneratorRange = ProfilerInputRange<RfGenRg>
-	&& is_convertible_v<range_const_reference_t<RfGenRg>, const DisRegRep::RegionfieldGenerator::Base* const>;
+	&& is_convertible_v<range_const_reference_t<RfGenRg>, const RfGen::Base* const>;
 
 template<typename RfRg>
 concept RegionfieldRange = ProfilerInputRange<RfRg>
@@ -137,9 +139,11 @@ template<SplattingRange SplattingBase>
 
 template<SplattingRange SplattingBase>
 [[nodiscard]] Splt::Base::DimensionType maximinOffset(SplattingBase&& splatting_base) noexcept {
-	return *fold_left_first(std::forward<SplattingBase>(splatting_base)
-								| transform([](const auto* const splat) static noexcept { return splat->minimumOffset(); }),
-		VectorMax);
+	return *fold_left_first(
+		std::forward<SplattingBase>(splatting_base)
+			| transform([](const auto* const splat) static noexcept { return splat->minimumOffset(); }),
+		VectorMax
+	);
 }
 
 [[nodiscard]] nb::Bench createBenchmark() {
@@ -261,7 +265,7 @@ public:
 		//Uniquely identity the current profile job.
 		IdentifierType Identifier;
 
-		const RegionfieldGenerator::Base* RegionfieldGenerator_;
+		const RfGen::Base* RegionfieldGenerator_;
 		//Any nullptr regionfield from the submit info element is replaced with one from thread cache.
 		RegionfieldPointer Regionfield;
 		SplattingRangeType Splatting_;
@@ -390,7 +394,7 @@ private:
 
 		//Add a new index to the content.
 		//It is safe to update the content with different a profile info from multiple threads.
-		template<Splt::Trait::IsContainer CtnTr, typename PfIf>
+		template<Splt::Container::IsTrait CtnTr, typename PfIf>
 		requires IS_PROFILE_INFO(PfIf)
 		void update(CtnTr, const nb::Bench& bench, const PfIf& profile_info) const {
 			const auto [id, rf_gen, _1, splat, _2, tag] = profile_info;
@@ -452,6 +456,22 @@ public:
 
 	~Impl() = default;
 
+	//Generate a regionfield with automate execution policy selection.
+	template<typename... Arg>
+	requires is_invocable_v<const RfGen::Base, DRR_REGIONFIELD_GENERATOR_EXECUTION_POLICY_TRAIT(Default), Arg...>
+	void generateRegionfield(const RfGen::Base& rf_gen, Arg&&... arg) const {
+		if (const auto generate = bind_back(std::cref(rf_gen), std::ref(std::forward<Arg>(arg))...);
+			this->ThreadPool.sizeThread() == 1U) {
+			//It is fine to generate regionfield in parallel if there is only one profiler thread,
+			//	since it will be waiting for generation anyway, and by theory it should not cause resource contention.
+			generate(DRR_REGIONFIELD_GENERATOR_EXECUTION_POLICY_TRAIT(Multi) {});
+		} else {
+			//If profiler is run in parallel, then we have to force single-thread execution
+			//	to ensure generator does not contend with profiler threads.
+			generate(DRR_REGIONFIELD_GENERATOR_EXECUTION_POLICY_TRAIT(Single) {});
+		}
+	}
+
 	//Submit an asynchronous profile job.
 	template<copy_constructible Job, typename SmIf, typename... CtnTrComb>
 	requires conjunction_v<is_invocable<
@@ -470,9 +490,9 @@ public:
 		const auto& [rf_gen, rf, splat, tag] = submit_info;
 		const auto run_job = [this, job = std::move(job), tag = string(tag)](
 			const Core::ThreadPool::ThreadInfo& thread_info,
-			const Splt::Trait::IsContainer auto container_trait,
+			const Splt::Container::IsTrait auto container_trait,
 			const IdentifierType identifier,
-			const RegionfieldGenerator::Base* const run_rf_gen,
+			const RfGen::Base* const run_rf_gen,
 			typename SmIf::RegionfieldType run_rf,
 			const typename SmIf::SplattingRangeInnerType run_splat
 		) -> void {
@@ -504,6 +524,8 @@ public:
 					[&result_content, &run_job, &info_rg_tuple](const auto... container_trait) {
 						return tuple(apply(
 							[&result_content, &run_job, container_trait](const auto&... run_rg) {
+								//The result content ID assignment is unspecified
+								//	because evaluation order of arguments in the outer tuple constructor is unspecified.
 								return bind_back(run_job, container_trait, result_content.next(), run_rg...);
 							}, info_rg_tuple)...);
 					}, container_trait_combination);
@@ -514,8 +536,7 @@ public:
 	//Make sure all pointers stored in `profile_info` are valid, if any pointer passed to submit info was invalid.
 	template<typename PfIf>
 	requires IS_PROFILE_INFO(PfIf)
-	void writeResult(
-		const Splt::Trait::IsContainer auto container_trait, const nb::Bench& bench, const PfIf& profile_info) const {
+	void writeResult(const Splt::Container::IsTrait auto container_trait, const nb::Bench& bench, const PfIf& profile_info) const {
 		this->Result_.write(bench, profile_info);
 		this->ResultContent_.update(container_trait, bench, profile_info);
 	}
@@ -556,20 +577,20 @@ void Splatting::synchronise(ostream* const progress_log) const {
 }
 
 void Splatting::sweepRadius(
-	const span<const BaseConvolution* const> splat_conv, const SizeType splat_size, const RadiusSweepInfo& info) const {
+	const span<const Splt::Convolution::Base* const> splat_conv, const SizeType splat_size, const RadiusSweepInfo& info) const {
 	const auto& [common_info, input] = info;
-	const auto& [tag, extent] = *common_info;
+	const auto& [tag, rf_gen_info, extent] = *common_info;
 
-	for (const BaseConvolution::DimensionType maximin_regionfield_extent = maximinRegionfieldDimension(splat_conv, extent);
+	for (const auto maximin_regionfield_extent = maximinRegionfieldDimension(splat_conv, extent);
 		const auto [rf_gen, rf] : apply(zip, input)) [[likely]] {
 		rf->resize(maximin_regionfield_extent);
-		(*rf_gen)(*rf);
+		this->Impl_->generateRegionfield(*rf_gen, *rf, *rf_gen_info);
 	}
 
 	const auto& [rf_gen, rf] = input;
 	this->Impl_->submit([
 		&impl = *this->Impl_,
-		invoke_info = BaseConvolution::InvokeInfo {
+		invoke_info = Splt::Convolution::Base::InvokeInfo {
 			.Offset = maximinOffset(splat_conv),
 			.Extent = extent
 		}
@@ -592,24 +613,25 @@ void Splatting::sweepRadius(
 		.Regionfield = rf | transform([](const auto* const rf_ptr) static constexpr noexcept { return rf_ptr; }),
 		.Splatting_ = splat_conv | chunk(splat_size),
 		.Tag = tag
-	}, ContainerCombination {});
+	}, Splt::Container::Combination {});
 }
 
-void Splatting::sweepRegionCount(
-	const span<const Base* const> splat, const span<const RegionCountType> region_count, const RegionCountSweepInfo& info) const {
+void Splatting::sweepRegionCount(const span<const Splt::Base* const> splat, const span<const RegionCountType> region_count,
+	const RegionCountSweepInfo& info) const {
 	const auto [common_info, input] = info;
-	const auto& [tag, extent] = *common_info;
+	const auto& [tag, rf_gen_info, extent] = *common_info;
 
 	this->Impl_->submit([
 		&impl = *this->Impl_,
 		region_count,
-		invoke_info = Base::InvokeInfo {
+		rf_gen_info,
+		invoke_info = Splt::Base::InvokeInfo {
 			.Offset = maximinOffset(splat),
 			.Extent = extent
 		}
 	](const auto container_trait, const auto&& profile_info) {
 		const auto& [_1, rf_gen, rf, splat_outer, extra_result, _2] = profile_info;
-		const Base& splat = *splat_outer.front();
+		const Splt::Base& splat = *splat_outer.front();
 
 		nb::Bench bench = createBenchmark();
 		bench.title("GlobalRegionCount");
@@ -618,7 +640,7 @@ void Splatting::sweepRegionCount(
 			const auto current_region_count : region_count) [[likely]] {
 			rf->resize(splat.minimumRegionfieldDimension(invoke_info));
 			rf->RegionCount = current_region_count;
-			(*rf_gen)(*rf);
+			impl.generateRegionfield(*rf_gen, *rf, *rf_gen_info);
 
 			bench.run(toString(current_region_count).data(), [&invoke_info, container_trait, rf, &splat, &memory] {
 				nb::doNotOptimizeAway(splat(container_trait, *rf, memory, invoke_info));
@@ -631,29 +653,28 @@ void Splatting::sweepRegionCount(
 		.Regionfield = Impl::UseBuiltInRegionfield,
 		.Splatting_ = ToSplatting2dRange(splat),
 		.Tag = tag
-	}, ContainerCombination {});
+	}, Splt::Container::Combination {});
 }
 
-void Splatting::sweepCentroidCount(const span<const Base* const> splat, const span<const CentroidCountType> centroid_count,
+void Splatting::sweepCentroidCount(const span<const Splt::Base* const> splat, const span<const CentroidCountType> centroid_count,
 	const CentroidCountSweepInfo& info) const {
-	const auto [common_info, seed, region_count] = info;
-	const auto& [tag, extent] = *common_info;
+	const auto [common_info, region_count] = info;
+	const auto& [tag, rf_gen_info, extent] = *common_info;
 
 	this->Impl_->submit([
 		&impl = *this->Impl_,
 		centroid_count,
-		invoke_info = Base::InvokeInfo {
+		region_count,
+		rf_gen_info,
+		invoke_info = Splt::Base::InvokeInfo {
 			.Offset = maximinOffset(splat),
 			.Extent = extent,
-		},
-		seed,
-		region_count
+		}
 	](const auto container_trait, auto profile_info) {
 		const auto& [_1, _2, rf, splat_outer, extra_result, _3] = profile_info;
-		const Base& splat = *splat_outer.front();
+		const Splt::Base& splat = *splat_outer.front();
 
-		RegionfieldGenerator::VoronoiDiagram voronoi_rf_gen;
-		voronoi_rf_gen.Seed = seed;
+		RfGen::VoronoiDiagram voronoi_rf_gen;
 
 		nb::Bench bench = createBenchmark();
 		bench.title("LocalRegionCount");
@@ -663,7 +684,7 @@ void Splatting::sweepCentroidCount(const span<const Base* const> splat, const sp
 			rf->resize(splat.minimumRegionfieldDimension(invoke_info));
 			rf->RegionCount = region_count;
 			voronoi_rf_gen.CentroidCount = current_centroid_count;
-			voronoi_rf_gen(*rf);
+			impl.generateRegionfield(voronoi_rf_gen, *rf, *rf_gen_info);
 
 			bench.run(toString(current_centroid_count).data(), [&invoke_info, container_trait, rf, &splat, &memory] {
 				nb::doNotOptimizeAway(splat(container_trait, *rf, memory, invoke_info));
@@ -673,9 +694,9 @@ void Splatting::sweepCentroidCount(const span<const Base* const> splat, const sp
 		profile_info.RegionfieldGenerator_ = &voronoi_rf_gen;
 		impl.writeResult(container_trait, bench, profile_info);
 	}, Impl::SubmitInfo {
-		.RegionfieldGenerator_ = single(static_cast<const RegionfieldGenerator::Base*>(nullptr)),
+		.RegionfieldGenerator_ = single(static_cast<const RfGen::Base*>(nullptr)),
 		.Regionfield = Impl::UseBuiltInRegionfield,
 		.Splatting_ = ToSplatting2dRange(splat),
 		.Tag = tag
-	}, ContainerCombination {});
+	}, Splt::Container::Combination {});
 }

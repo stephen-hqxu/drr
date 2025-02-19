@@ -15,6 +15,8 @@
 
 #include <DisRegRep/Splatting/Convolution/Full/FastOccupancy.hpp>
 #include <DisRegRep/Splatting/Convolution/Full/VanillaOccupancy.hpp>
+#include <DisRegRep/Splatting/Convolution/Base.hpp>
+#include <DisRegRep/Splatting/Base.hpp>
 
 #include <yaml-cpp/yaml.h>
 
@@ -44,27 +46,30 @@
 
 #include <cstddef>
 
-namespace Prof = DisRegRep::Programme::Profiler;
-namespace Drv = Prof::Driver;
+namespace Drv = DisRegRep::Programme::Profiler::Driver;
 namespace View = DisRegRep::Core::View;
+namespace Splt = DisRegRep::Splatting;
 
 namespace fs = std::filesystem;
 using std::array, std::to_array, std::span, std::vector;
 using std::string_view;
 using std::tuple, std::tie, std::apply;
 using std::ranges::to, std::ranges::copy,
-	std::views::transform, std::views::zip;
+	std::views::transform, std::views::zip, std::views::repeat;
 using std::chrono::system_clock, std::chrono::sys_seconds, std::chrono::time_point_cast;
 using std::format,
 	std::index_sequence, std::make_index_sequence;
 using std::throw_with_nested,
 	std::make_error_code, std::errc;
 using std::derived_from,
-	std::type_identity, std::add_const_t, std::add_pointer_t;
+	std::type_identity, std::add_const_t, std::add_pointer_t, std::integral_constant;
 
 namespace {
 
-template<derived_from<Prof::Splatting::BaseConvolution> Conv>
+template<std::size_t Value>
+using IndexConstant = integral_constant<std::size_t, Value>;
+
+template<derived_from<Splt::Convolution::Base> Conv>
 [[nodiscard]] constexpr auto getRadiusSweepSplatting(const auto& variable_radius) {
 	return apply(View::Arithmetic::LinSpace, variable_radius) | transform([](const auto radius) static constexpr noexcept {
 		Conv convolution_splatting;
@@ -74,7 +79,7 @@ template<derived_from<Prof::Splatting::BaseConvolution> Conv>
 }
 
 template<typename... Conv>
-requires(derived_from<Conv, Prof::Splatting::BaseConvolution> && ...)
+requires(derived_from<Conv, Splt::Convolution::Base> && ...)
 [[nodiscard]] constexpr auto getAllRadiusSweepSplatting(const auto& variable_radius) {
 	return apply([&variable_radius]<typename... CurrentConv>(type_identity<CurrentConv>...) constexpr {
 		return tuple(getRadiusSweepSplatting<CurrentConv>(variable_radius)...);
@@ -82,10 +87,10 @@ requires(derived_from<Conv, Prof::Splatting::BaseConvolution> && ...)
 }
 
 template<typename... Conv>
-requires(derived_from<Conv, Prof::Splatting::BaseConvolution> && ...)
+requires(derived_from<Conv, Splt::Convolution::Base> && ...)
 [[nodiscard]] constexpr auto viewConvolution(const tuple<vector<Conv>...>& convolution) {
 	return apply([](const auto&... conv) static constexpr {
-		vector<const Prof::Splatting::BaseConvolution*> conv_view;
+		vector<const Splt::Convolution::Base*> conv_view;
 		conv_view.reserve((conv.size() + ...));
 		(conv_view.append_range(conv | View::Functional::AddressOf), ...);
 		return conv_view;
@@ -105,12 +110,6 @@ template<typename T, std::size_t S>
 	return apply([](auto&... elem) static constexpr noexcept { return array { std::addressof(elem)... }; }, a);
 }
 
-template<typename... RfGen>
-requires(derived_from<RfGen, DisRegRep::RegionfieldGenerator::Base> && ...)
-constexpr void seedGenerator(tuple<RfGen...>& generator, const Prof::Splatting::SeedType seed) noexcept {
-	apply([seed](auto&... current_generator) constexpr noexcept { ((current_generator.Seed = seed), ...); }, generator);
-}
-
 }
 
 void Drv::splatting(const SplattingInfo& info) {
@@ -122,8 +121,8 @@ void Drv::splatting(const SplattingInfo& info) {
 	using Container::Regionfield,
 		RegionfieldGenerator::Uniform,
 		RegionfieldGenerator::VoronoiDiagram,
-		DisRegRep::Splatting::Convolution::Full::FastOccupancy,
-		DisRegRep::Splatting::Convolution::Full::VanillaOccupancy;
+		Splt::Convolution::Full::FastOccupancy,
+		Splt::Convolution::Full::VanillaOccupancy;
 
 	const tuple default_variable_radius = [&default_variable] {
 		const auto& [variable_radius, _1, _2] = default_variable;
@@ -142,51 +141,49 @@ void Drv::splatting(const SplattingInfo& info) {
 	}();
 	const vector stress_variable_radius_ptr = viewConvolution(stress_variable_radius);
 
-	const tuple default_rf_gen = [seed, centroid_count = default_fixed.CentroidCount] constexpr noexcept {
+	const tuple default_rf_gen = [centroid_count = default_fixed.CentroidCount] constexpr noexcept {
 		tuple<Uniform, VoronoiDiagram> rf_gen;
-		seedGenerator(rf_gen, seed);
 		std::get<VoronoiDiagram>(rf_gen).CentroidCount = centroid_count;
 		return rf_gen;
 	}();
 	const array default_rf_gen_ptr = viewTuple<RegionfieldGenerator::Base>(default_rf_gen);
 	const auto [_, default_voronoi_rf_gen_ptr] = default_rf_gen_ptr;
-	const tuple stress_rf_gen = [seed] constexpr noexcept {
-		tuple<Uniform> rf_gen;
-		seedGenerator(rf_gen, seed);
-		return rf_gen;
-	}();
+	static constexpr tuple<Uniform> stress_rf_gen;
 	const array stress_rf_gen_ptr = viewTuple<RegionfieldGenerator::Base>(stress_rf_gen);
 
-	array rf = [
-		region_count = apply(
-			[](const auto&... fixed) static constexpr noexcept { return array { fixed.RegionCount... }; },
-			tie(default_fixed, stress_fixed)
-		)
-	] constexpr {
-		array<Regionfield, region_count.size()> rf;
-		[&]<std::size_t... I>(index_sequence<I...>) constexpr {
-			((rf[I].RegionCount = region_count[I]), ...);
-		}(make_index_sequence<rf.size()> {});
-		return rf;
-	}();
-	const auto [default_rf_ptr, stress_rf_ptr] = viewArray(rf);
+	static constexpr auto make_regionfield = []<std::size_t Repetition>(
+												 IndexConstant<Repetition>, const auto& fixed) static constexpr -> auto {
+		return [region_count = fixed.RegionCount]<std::size_t... I>(index_sequence<I...>) constexpr {
+			array<Regionfield, Repetition> rf;
+			((rf[I].RegionCount = region_count), ...);
+			return rf;
+		}(make_index_sequence<Repetition> {});
+	};
+	array default_rf = make_regionfield(IndexConstant<2U> {}, default_fixed);
+	array stress_rf = make_regionfield(IndexConstant<1U> {}, stress_fixed);
+	const array default_rf_ptr = viewArray(default_rf);
+	const array stress_rf_ptr = viewArray(stress_rf);
 
 	const tuple default_fixed_radius = [radius = default_fixed.Radius] constexpr noexcept {
 		tuple<VanillaOccupancy, FastOccupancy> splatting;
 		apply([radius](auto&... current_splatting) constexpr noexcept { ((current_splatting.Radius = radius), ...); }, splatting);
 		return splatting;
 	}();
-	const array default_fixed_radius_ptr = viewTuple<Splatting::Base>(default_fixed_radius);
+	const array default_fixed_radius_ptr = viewTuple<Splt::Base>(default_fixed_radius);
 
+	const RegionfieldGenerator::Base::GenerateInfo rf_gen_info {
+		.Seed = seed
+	};
 	const auto [default_common_info, stress_common_info] = [
 		extent = apply(
 			[](const auto&... fixed) static constexpr noexcept { return array { fixed.Extent... }; },
 			tie(default_fixed, stress_fixed)
 		),
+		rf_gen_info = repeat(&rf_gen_info),
 		tag = to_array<string_view>({ "Default", "Stress" })
 	] constexpr {
 		array<Splatting::CommonSweepInfo, extent.size()> common_info;
-		copy(zip(tag, extent) | View::Functional::MakeFromTuple<Splatting::CommonSweepInfo>, common_info.begin());
+		copy(zip(tag, rf_gen_info, extent) | View::Functional::MakeFromTuple<Splatting::CommonSweepInfo>, common_info.begin());
 		return common_info;
 	}();
 
@@ -232,17 +229,17 @@ void Drv::splatting(const SplattingInfo& info) {
 	const auto profiler = Splatting(output_dir, *thread_pool_create_info);
 	profiler.sweepRadius(default_variable_radius_ptr, std::get<2U>(default_variable.Radius), {
 		.CommonSweepInfo_ = &default_common_info,
-		.Input = tuple(
+		.Input = {
 			default_rf_gen_ptr,
-			span(&default_rf_ptr, 1U)
-		)
+			default_rf_ptr
+		}
 	});
 	profiler.sweepRadius(stress_variable_radius_ptr, std::get<2U>(stress_variable.Radius), {
 		.CommonSweepInfo_ = &stress_common_info,
-		.Input = tuple(
+		.Input = {
 			stress_rf_gen_ptr,
-			span(&stress_rf_ptr, 1U)
-		)
+			stress_rf_ptr
+		}
 	});
 	profiler.sweepRegionCount(default_fixed_radius_ptr, default_variable_region_count, {
 		.CommonSweepInfo_ = &default_common_info,
@@ -250,7 +247,6 @@ void Drv::splatting(const SplattingInfo& info) {
 	});
 	profiler.sweepCentroidCount(default_fixed_radius_ptr, default_variable_centroid_count, {
 		.CommonSweepInfo_ = &default_common_info,
-		.Seed = seed,
 		.RegionCount = default_fixed.RegionCount
 	});
 	profiler.synchronise(progress_log);

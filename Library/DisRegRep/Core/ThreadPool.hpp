@@ -102,8 +102,6 @@ private:
 		 */
 		explicit ApplicationTask(TaskType&& task) : Task(std::move(task)) { }
 
-		~ApplicationTask() override = default;
-
 		void operator()(ThreadInfoArgumentType thread_info) override {
 			using std::invoke, std::is_same_v, std::current_exception;
 			try {

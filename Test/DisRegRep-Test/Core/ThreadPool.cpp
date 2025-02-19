@@ -65,8 +65,6 @@ protected:
 		destroyer_thread_pool.setPriority(DefaultPriority);
 	}
 
-	~TestThreadPool() = default;
-
 	template<
 		input_range FutureRg,
 		input_range Reference,

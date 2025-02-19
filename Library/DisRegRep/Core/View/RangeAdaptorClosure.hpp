@@ -43,16 +43,6 @@ public:
 	explicit constexpr RangeAdaptorClosure(F f) noexcept(std::is_nothrow_move_constructible_v<FunctionType>) :
 		Function(std::move(f)) { }
 
-	RangeAdaptorClosure(const RangeAdaptorClosure&) noexcept(std::is_nothrow_copy_constructible_v<FunctionType>) = default;
-
-	RangeAdaptorClosure(RangeAdaptorClosure&&) noexcept(std::is_nothrow_move_constructible_v<FunctionType>) = default;
-
-	RangeAdaptorClosure& operator=(const RangeAdaptorClosure&) noexcept(std::is_nothrow_copy_assignable_v<FunctionType>) = default;
-
-	RangeAdaptorClosure& operator=(RangeAdaptorClosure&&) noexcept(std::is_nothrow_move_assignable_v<FunctionType>) = default;
-
-	constexpr ~RangeAdaptorClosure() = default;
-
 	/**
 	 * @brief Invoke RAC with a range.
 	 *
