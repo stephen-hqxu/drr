@@ -8,5 +8,6 @@ HEADER
 	IrregularTransform
 	Matrix
 	RangeAdaptorClosure
+	ToInput
 	Trait
 )

@@ -18,14 +18,14 @@
 #include <version>
 
 #if __cpp_lib_ranges_cache_latest >= 2024'11L
-#define DRR_CORE_VIEW_HAS_STD_CACHE_LATEST
+#define DRR_CORE_VIEW_HAS_STD_RANGES_CACHE_LATEST
 #endif
 
 namespace DisRegRep::Core::View {
 
-#ifndef DRR_CORE_VIEW_HAS_STD_CACHE_LATEST
+#ifndef DRR_CORE_VIEW_HAS_STD_RANGES_CACHE_LATEST
 /**
- * @brief Reference implementation of C++26 std::views::cache_latest.
+ * @brief Reference implementation of C++26 std::ranges::cache_latest_view.
  *
  * @ref https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3138r5.html
  *
@@ -62,7 +62,7 @@ private:
 	class Iterator {
 	public:
 
-		friend class CacheLatestView;
+		friend CacheLatestView;
 
 		using value_type = Value;
 		using difference_type = Difference;
@@ -74,7 +74,7 @@ private:
 		ViewIterator Current;
 
 		explicit constexpr Iterator(CacheLatestView& parent)
-			noexcept(std::is_nothrow_invocable_v<decltype(std::ranges::begin), ViewType>) :
+			noexcept(std::is_nothrow_invocable_v<decltype(std::ranges::begin), ViewType&>) :
 			Parent(std::addressof(parent)), Current(std::ranges::begin(parent.Base)) { }
 
 	public:
@@ -87,7 +87,7 @@ private:
 			return std::move(this->Current);
 		}
 
-		[[nodiscard]] constexpr Reference& operator*() const {
+		[[nodiscard]] constexpr Reference& operator*() const noexcept(std::is_nothrow_constructible_v<CacheValueType, Reference>) {
 			using std::addressof,
 				std::remove_reference_t, std::add_lvalue_reference_t;
 			if constexpr (auto& cache = this->Parent->Cache;
@@ -104,13 +104,13 @@ private:
 			}
 		}
 
-		constexpr Iterator& operator++() {
+		constexpr Iterator& operator++() noexcept(noexcept(++this->Current)) {
 			this->Parent->Cache.reset();
 			++this->Current;
 			return *this;
 		}
 
-		constexpr void operator++(int) {
+		constexpr void operator++(int) noexcept(noexcept(++*this)) {
 			++*this;
 		}
 
@@ -133,12 +133,12 @@ private:
 	class Sentinel {
 	private:
 
-		friend class CacheLatestView;
+		friend CacheLatestView;
 
 		ViewSentinel End;
 
 		explicit constexpr Sentinel(CacheLatestView& parent)
-			noexcept(std::is_nothrow_invocable_v<decltype(std::ranges::end), ViewType>) :
+			noexcept(std::is_nothrow_invocable_v<decltype(std::ranges::end), ViewType&>) :
 			End(std::ranges::end(parent.Base)) { }
 
 	public:
@@ -149,17 +149,17 @@ private:
 			return this->End;
 		}
 
-		[[nodiscard]] friend constexpr bool operator==(const Iterator& x, const Sentinel& y) {
+		[[nodiscard]] friend constexpr bool operator==(const Iterator& x, const Sentinel& y) noexcept(noexcept(x.Current == y.End)) {
 			return x.Current == y.End;
 		}
 
-		[[nodiscard]] friend constexpr Difference operator-(const Iterator& x, const Sentinel& y)
+		[[nodiscard]] friend constexpr Difference operator-(const Iterator& x, const Sentinel& y) noexcept(noexcept(x.Current - y.End))
 		requires std::sized_sentinel_for<ViewSentinel, ViewIterator>
 		{
 			return x.Current - y.End;
 		}
 
-		[[nodiscard]] friend constexpr Difference operator-(const Sentinel& x, const Iterator& y)
+		[[nodiscard]] friend constexpr Difference operator-(const Sentinel& x, const Iterator& y) noexcept(noexcept(x.End - y.Current))
 		requires std::sized_sentinel_for<ViewSentinel, ViewIterator>
 		{
 			return x.End - y.Current;
@@ -186,21 +186,21 @@ public:
 		return std::move(this->Base);
 	}
 
-	[[nodiscard]] constexpr auto begin() {
+	[[nodiscard]] constexpr auto begin() noexcept(std::is_nothrow_constructible_v<Iterator, CacheLatestView&>) {
 		return Iterator(*this);
 	}
 
-	[[nodiscard]] constexpr auto end() {
+	[[nodiscard]] constexpr auto end() noexcept(std::is_nothrow_constructible_v<Sentinel, CacheLatestView&>) {
 		return Sentinel(*this);
 	}
 
-	[[nodiscard]] constexpr auto size()
+	[[nodiscard]] constexpr auto size() noexcept(std::is_nothrow_invocable_v<decltype(std::ranges::size), ViewType&>)
 	requires std::ranges::sized_range<ViewType>
 	{
 		return std::ranges::size(this->Base);
 	}
 
-	[[nodiscard]] constexpr auto size() const
+	[[nodiscard]] constexpr auto size() const noexcept(std::is_nothrow_invocable_v<decltype(std::ranges::size), const ViewType&>)
 	requires std::ranges::sized_range<const ViewType>
 	{
 		return std::ranges::size(this->Base);
@@ -210,18 +210,21 @@ public:
 
 template<typename R>
 CacheLatestView(R&&) -> CacheLatestView<std::views::all_t<R>>;
-#endif//DRR_CORE_VIEW_HAS_STD_CACHE_LATEST
+#endif//DRR_CORE_VIEW_HAS_STD_RANGES_CACHE_LATEST
 
 /**
  * @brief CacheLatestView range adaptor.
  */
 inline constexpr auto CacheLatest =
-#ifdef DRR_CORE_VIEW_HAS_STD_CACHE_LATEST
-std::views::cache_latest
+#ifdef DRR_CORE_VIEW_HAS_STD_RANGES_CACHE_LATEST
+std::views::cache_latest;
 #else
 RangeAdaptorClosure([]<std::ranges::viewable_range R>
 	requires std::ranges::input_range<R>
-	(R&& r) static constexpr noexcept(Trait::IsNothrowViewable<R>) -> std::ranges::view auto {
+	(R&& r) static constexpr noexcept(
+		Trait::IsNothrowViewable<R>
+		&& std::is_nothrow_constructible_v<CacheLatestView<std::views::all_t<R>>, R>
+	) -> std::ranges::view auto {
 		return CacheLatestView(std::forward<R>(r));
 	});
 #endif
