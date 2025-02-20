@@ -2,6 +2,7 @@ drrTargetSource(
 HEADER
 	Arithmetic
 	CacheLatest
+	CommonExpositionOnly
 	Functional
 	Generate
 	IrregularTransform

@@ -87,7 +87,7 @@ inline constexpr auto SubRange2d = RangeAdaptorClosure([]<
 				return std::forward<R>(inner_r)
 					| drop(offset_y)
 					| take(extent_y);
-				});
+			});
 	});
 
 }

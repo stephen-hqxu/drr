@@ -418,7 +418,7 @@ public:
  * `Kn` is one of the valid splat kernel.
  */
 template<typename Kn>
-concept Is = std::disjunction_v<std::is_same<Kn, Dense>, std::is_same<Kn, Sparse>>;
+concept Is = std::is_same_v<Kn, Dense> || std::is_same_v<Kn, Sparse>;
 
 /**
  * @brief Convert a splat kernel of region importance to mask by normalisation.

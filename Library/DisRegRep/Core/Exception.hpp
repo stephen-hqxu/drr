@@ -37,8 +37,6 @@ public:
 		const std::stacktrace& = std::stacktrace::current()
 	);
 
-	~Exception() override = default;
-
 	/**
 	 * @brief Print all exception messages from a potentially nested exception.
 	 *

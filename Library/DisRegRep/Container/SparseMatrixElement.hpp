@@ -4,6 +4,7 @@
 #include <DisRegRep/Core/View/Functional.hpp>
 #include <DisRegRep/Core/View/IrregularTransform.hpp>
 #include <DisRegRep/Core/View/RangeAdaptorClosure.hpp>
+#include <DisRegRep/Core/View/Trait.hpp>
 
 #include <DisRegRep/Core/Type.hpp>
 
@@ -124,8 +125,7 @@ inline constexpr auto ToSparse =
 	Core::View::RangeAdaptorClosure([]<std::ranges::viewable_range Dense, typename Value = std::ranges::range_value_t<Dense>>
 		requires std::ranges::input_range<Dense> && std::equality_comparable<Value>
 		(Dense&& dense, const Value ignore_value = {}) static constexpr noexcept(
-			std::is_nothrow_constructible_v<std::views::all_t<Dense>, Dense> && std::is_nothrow_copy_constructible_v<Value>)
-			-> std::ranges::view auto {
+			Core::View::Trait::IsNothrowViewable<Dense> && std::is_nothrow_copy_constructible_v<Value>) -> std::ranges::view auto {
 			using std::views::enumerate, std::views::filter, std::views::transform;
 			return std::forward<Dense>(dense)
 				| enumerate
@@ -152,7 +152,7 @@ inline constexpr auto Normalise = Core::View::RangeAdaptorClosure(
 	requires(std::ranges::input_range<Element>
 				&& ((Is<Value> && std::is_convertible_v<typename Value::ValueType, Factor>) || std::is_convertible_v<Value, Factor>))
 	(Element&& element, const Factor factor) static constexpr noexcept(
-		std::is_nothrow_constructible_v<std::views::all_t<Element>, Element>) -> std::ranges::view auto {
+		Core::View::Trait::IsNothrowViewable<Element>) -> std::ranges::view auto {
 		using std::views::zip, std::views::transform, std::mem_fn;
 		if constexpr (Is<Value>) {
 			const auto normalised_value = element

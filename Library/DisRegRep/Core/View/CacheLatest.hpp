@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CommonExpositionOnly.hpp"
 #include "RangeAdaptorClosure.hpp"
 #include "Trait.hpp"
 
@@ -16,8 +17,13 @@
 
 #include <version>
 
+#if __cpp_lib_ranges_cache_latest >= 2024'11L
+#define DRR_CORE_VIEW_HAS_STD_CACHE_LATEST
+#endif
+
 namespace DisRegRep::Core::View {
 
+#ifndef DRR_CORE_VIEW_HAS_STD_CACHE_LATEST
 /**
  * @brief Reference implementation of C++26 std::views::cache_latest.
  *
@@ -50,7 +56,7 @@ private:
 		Reference
 	>;
 
-	ViewType Base = V();
+	ViewType Base;
 	std::optional<CacheValueType> Cache;
 
 	class Iterator {
@@ -87,7 +93,7 @@ private:
 			if constexpr (auto& cache = this->Parent->Cache;
 				IsReferenceReference) {
 				if (!cache) {
-					cache = addressof(static_cast<add_lvalue_reference_t<remove_reference_t<Reference>>>(*this->Current));
+					cache = addressof(CommonExpositionOnly::asLValue(*this->Current));
 				}
 				return **cache;
 			} else {
@@ -108,6 +114,7 @@ private:
 			++*this;
 		}
 
+		//NOLINTBEGIN(readability-identifier-naming)
 		[[nodiscard]] friend constexpr RValueReference iter_move(const Iterator& it)
 			noexcept(noexcept(std::ranges::iter_move(it.Current))) {
 			return std::ranges::iter_move(it.Current);
@@ -119,6 +126,7 @@ private:
 		{
 			std::ranges::iter_swap(x.Current, y.Current);
 		}
+		//NOLINTEND(readability-identifier-naming)
 
 	};
 
@@ -127,7 +135,7 @@ private:
 
 		friend class CacheLatestView;
 
-		ViewSentinel End = ViewSentinel();
+		ViewSentinel End;
 
 		explicit constexpr Sentinel(CacheLatestView& parent)
 			noexcept(std::is_nothrow_invocable_v<decltype(std::ranges::end), ViewType>) :
@@ -202,12 +210,13 @@ public:
 
 template<typename R>
 CacheLatestView(R&&) -> CacheLatestView<std::views::all_t<R>>;
+#endif//DRR_CORE_VIEW_HAS_STD_CACHE_LATEST
 
 /**
  * @brief CacheLatestView range adaptor.
  */
 inline constexpr auto CacheLatest =
-#if __cpp_lib_ranges_cache_latest == 2024'11L
+#ifdef DRR_CORE_VIEW_HAS_STD_CACHE_LATEST
 std::views::cache_latest
 #else
 RangeAdaptorClosure([]<std::ranges::viewable_range R>
