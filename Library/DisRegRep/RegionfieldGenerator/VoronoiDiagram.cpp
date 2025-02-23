@@ -37,14 +37,16 @@ using std::ranges::min_element, std::ranges::distance, std::ranges::to,
 using std::integer_sequence, std::make_integer_sequence;
 
 DRR_REGIONFIELD_GENERATOR_DEFINE_DELEGATING_FUNCTOR(VoronoiDiagram) {
+	using RankType = Regionfield::ExtentType::rank_type;
 	DRR_ASSERT(this->CentroidCount > 0U);
+
 	const span rf_span = regionfield.span();
 	const Regionfield::ExtentType& rf_extent = regionfield.mapping().extents();
 	const auto [seed] = info;
 
 	auto rng = Core::XXHash::RandomEngine(Base::generateSecret(seed));
 	array<UniformDistributionType, 2U> dist;
-	std::ranges::transform(iota(0U, dist.size()), dist.begin(),
+	std::ranges::transform(iota(RankType {}, static_cast<RankType>(dist.size())), dist.begin(),
 		[&rf_extent](const auto ext) { return UniformDistributionType(0U, rf_extent.extent(ext) - 1U); });
 
 	const auto region_centroid =
@@ -58,7 +60,6 @@ DRR_REGIONFIELD_GENERATOR_DEFINE_DELEGATING_FUNCTOR(VoronoiDiagram) {
 	//Find the nearest centroid for every point in the regionfield.
 	//This is a pretty Naive algorithm, in practice it is better to use a quad tree or KD tree to find K-NN;
 	//	omitted here for simplicity.
-	using RankType = Regionfield::ExtentType::rank_type;
 	const auto idx_rg = [&rf_extent]<RankType... I>(integer_sequence<RankType, I...>) constexpr noexcept {
 		return cartesian_product(iota(Regionfield::IndexType {}, rf_extent.extent(I))...)
 			 | Core::View::Functional::MakeFromTuple<Regionfield::DimensionType>;

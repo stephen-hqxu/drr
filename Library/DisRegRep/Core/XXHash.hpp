@@ -1,5 +1,6 @@
 #pragma once
 
+#include "View/Trait.hpp"
 #include "Exception.hpp"
 
 #include <array>
@@ -124,7 +125,7 @@ requires(sizeof...(Obj) > 0U && std::conjunction_v<std::is_trivially_copyable<Ob
  * @tparam Sec Secret type.
  * @tparam Obj Object types.
  */
-template<typename Sec, typename... Obj>
+template<std::ranges::view Sec, typename... Obj>
 requires std::is_constructible_v<SecretView, Sec> && std::conjunction_v<std::is_trivially_copyable<Obj>...>
 class RandomEngine {
 public:
@@ -156,19 +157,11 @@ public:
 	 * @param secret Secret sequence to control the engine. The ownership is correctly deduced based on its value category.
 	 * @param object Objects to be hashed.
 	 */
-	template<
-		std::ranges::viewable_range AnotherSec,
-		typename... AnotherObj,
-		typename AllAnotherSec = std::views::all_t<AnotherSec>
-	>
-	requires(std::is_constructible_v<SecretType, AllAnotherSec> && sizeof...(AnotherObj) == ObjectSize
-				&& std::conjunction_v<std::is_constructible<Obj, AnotherObj>...>)
-	RandomEngine(AnotherSec&& secret, AnotherObj&&... object) noexcept(std::conjunction_v<
-		std::is_nothrow_constructible<SecretType, AllAnotherSec>,
-		std::is_nothrow_constructible<Obj, AnotherObj>...
-	>) :
-		Secret_(std::forward<AnotherSec>(secret) | std::views::all),
-		Object(CounterType {}, std::forward<AnotherObj>(object)...) { }
+	template<std::ranges::viewable_range AnotherSec, typename... AnotherObj>
+	requires(sizeof...(AnotherObj) == ObjectSize && std::conjunction_v<std::is_constructible<Obj, AnotherObj>...>)
+	RandomEngine(AnotherSec&& secret, AnotherObj&&... object)
+		noexcept(View::Trait::IsNothrowViewable<AnotherSec> && std::conjunction_v<std::is_nothrow_constructible<Obj, AnotherObj>...>) :
+		Secret_(std::forward<AnotherSec>(secret) | std::views::all), Object(CounterType {}, std::forward<AnotherObj>(object)...) { }
 
 	[[nodiscard]] ResultType operator()() noexcept {
 		//Static extent makes span explicitly constructed.
@@ -202,6 +195,6 @@ public:
 
 //Takes ownership of `Sec` whenever necessary.
 template<typename Sec, typename... Obj>
-RandomEngine(Sec&&, Obj...) -> RandomEngine<std::views::all_t<Sec&&>, Obj...>;
+RandomEngine(Sec&&, Obj...) -> RandomEngine<std::views::all_t<Sec>, Obj...>;
 
 }

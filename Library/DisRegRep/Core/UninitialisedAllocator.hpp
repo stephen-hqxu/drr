@@ -37,11 +37,11 @@ public:
 
 	template<typename U>
 	requires std::is_trivially_default_constructible_v<U>
-	constexpr void construct(U*) const noexcept { }
+	static constexpr void construct(U*) noexcept { }
 
 	template<typename U>
 	requires std::is_trivially_destructible_v<U>
-	constexpr void destroy(U*) const noexcept { }
+	static constexpr void destroy(U*) noexcept { }
 
 };
 

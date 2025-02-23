@@ -158,8 +158,7 @@ inline constexpr auto Normalise = Core::View::RangeAdaptorClosure(
 			const auto normalised_value = element
 				| transform(mem_fn(&Value::Value))
 				| Core::View::Arithmetic::Normalise(factor);
-			return zip(element
-				| transform(mem_fn(&Value::Identifier)), normalised_value)
+			return zip(element | transform(mem_fn(&Value::Identifier)), normalised_value)
 				| Core::View::Functional::MakeFromTuple<Basic<Factor>>;
 		} else {
 			return std::forward<Element>(element) | Core::View::Arithmetic::Normalise(factor);

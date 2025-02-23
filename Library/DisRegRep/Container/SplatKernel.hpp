@@ -8,7 +8,6 @@
 #include <vector>
 
 #include <algorithm>
-#include <execution>
 #include <functional>
 #include <ranges>
 
@@ -32,14 +31,13 @@ namespace DisRegRep::Container::SplatKernel {
  * `Importance` is a range of importance.
  */
 template<typename Importance>
-concept DenseImportanceRange = Core::Type::RegionImportanceRange<Importance> && std::ranges::forward_range<Importance>;
+concept DenseImportanceRange = Core::Type::RegionImportanceRange<Importance> && std::ranges::input_range<Importance>;
 
 /**
  * `Importance` is a range of sparse importance matrix element.
  */
 template<typename Importance>
-concept SparseImportanceRange = SparseMatrixElement::ImportanceRange<Importance> && std::ranges::forward_range<Importance>
-							 && std::ranges::common_range<Importance>;
+concept SparseImportanceRange = SparseMatrixElement::ImportanceRange<Importance> && std::ranges::input_range<Importance>;
 
 namespace Internal_ {
 
@@ -66,15 +64,13 @@ template<
 	KernelModifier<Kernel, Importance> Modifier
 >
 void modify(Kernel& kernel, Importance&& importance, Modifier modifier) {
-	using std::ranges::cbegin, std::ranges::cend,
-		std::for_each, std::execution::unseq,
+	using std::ranges::for_each,
 		std::invoke,
 		std::is_nothrow_invocable_v, std::add_lvalue_reference_t, std::ranges::range_const_reference_t;
-	for_each(unseq, cbegin(importance), cend(importance),
-		[&kernel, &modifier](const auto& element) noexcept(
-			is_nothrow_invocable_v<Modifier, add_lvalue_reference_t<Kernel>, range_const_reference_t<Importance>>) {
-			invoke(modifier, kernel, element);
-		});
+	for_each(std::forward<Importance>(importance), [&kernel, &modifier](const auto& element) noexcept(
+		is_nothrow_invocable_v<Modifier, add_lvalue_reference_t<Kernel>, range_const_reference_t<Importance>>) {
+		invoke(modifier, kernel, element);
+	});
 }
 
 }
@@ -106,14 +102,14 @@ private:
 	//Modify all regions by some amount.
 	template<Internal_::DenseKernelBinaryOperator Op, DenseImportanceRange Importance>
 	void modify(Op op, Importance&& importance) {
-		if constexpr (std::is_same_v<Op, std::minus<>>) {
+		using std::ranges::forward_range, std::ranges::viewable_range;
+		if constexpr (std::is_same_v<Op, std::minus<>> && forward_range<Importance> && viewable_range<Importance>) {
 			using std::ranges::all_of, std::views::zip_transform,
 				std::ranges::greater_equal, std::identity;
 			assert(all_of(zip_transform(greater_equal {}, this->Importance_, importance), identity {}));
 		}
-		using std::transform, std::execution::unseq, std::ranges::cbegin;
-		transform(unseq, this->Importance_.cbegin(), this->Importance_.cend(), cbegin(std::forward<Importance>(importance)),
-			this->Importance_.begin(), std::move(op));
+		using std::ranges::transform;
+		transform(this->Importance_, std::forward<Importance>(importance), this->Importance_.begin(), std::move(op));
 	}
 
 	//Modify some regions by some amount.
@@ -428,10 +424,8 @@ concept Is = std::is_same_v<Kn, Dense> || std::is_same_v<Kn, Sparse>;
  *
  * @return A splat kernel of region mask.
  */
-[[nodiscard]] constexpr std::ranges::common_range auto toMask(
-	const Is auto& kernel, const Core::Type::RegionMask norm_factor) noexcept {
-	using std::views::common;
-	return kernel.span() | SparseMatrixElement::Normalise(norm_factor) | common;
+[[nodiscard]] constexpr std::ranges::view auto toMask(const Is auto& kernel, const Core::Type::RegionMask norm_factor) noexcept {
+	return kernel.span() | SparseMatrixElement::Normalise(norm_factor);
 }
 
 }

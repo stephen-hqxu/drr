@@ -17,7 +17,7 @@
 using DisRegRep::Splatting::Convolution::Full::VanillaOccupancy;
 
 using std::tie, std::apply;
-using std::views::cartesian_product, std::views::iota, std::views::transform, std::views::take, std::views::join;
+using std::views::cartesian_product, std::views::iota, std::views::transform, std::views::join;
 using std::integer_sequence, std::make_integer_sequence;
 
 namespace {
@@ -59,18 +59,21 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(VanillaOccupancy) {
 	using LengthType = DimensionType::length_type;
 	const auto element_rg = [r = this->Radius, &offset, &extent]<LengthType... I>(
 								integer_sequence<LengthType, I...>) constexpr noexcept {
-		return cartesian_product(iota(offset[I] - r) | take(extent[I])...)
-			 | Core::View::Functional::MakeFromTuple<DimensionType>;
+		//It is much more clean to use std::views::take, but I want to keep iota_view sized to allow better compiler optimisation.
+		return cartesian_product([&, r] constexpr noexcept {
+			const DimensionType::value_type start = offset[I] - r;
+			return iota(start, start + extent[I]);
+		}()...) | Core::View::Functional::MakeFromTuple<DimensionType>;
 	}(make_integer_sequence<LengthType, DimensionType::length()> {});
 	const auto kernel_rg = element_rg
-		| transform([d, rf_2d = regionfield.range2d()](const auto idx) constexpr noexcept {
-			return rf_2d
+		| transform([d, &regionfield](const auto idx) constexpr noexcept {
+			return regionfield.range2dInput()
 				| Core::View::Matrix::SubRange2d(idx, DimensionType(d))
 				| join;
 		  });
 
 	using std::ranges::transform, std::ranges::for_each;
-	transform(kernel_rg, output_memory.range().begin(),
+	transform(kernel_rg, output_memory.rangeInput().begin(),
 		[&kernel_memory, norm_factor = Base::kernelNormalisationFactor(d)](auto kernel) noexcept {
 			kernel_memory.clear();
 			for_each(kernel, [&kernel_memory](const auto region_id) noexcept { kernel_memory.increment(region_id); });

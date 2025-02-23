@@ -31,7 +31,7 @@ using Catch::Matchers::RangeEquals;
 using std::vector,
 	std::optional, std::tuple;
 using std::views::transform, std::views::single,
-	std::ranges::input_range, std::ranges::sized_range, std::ranges::range_value_t;
+	std::ranges::input_range, std::ranges::sized_range, std::ranges::viewable_range, std::ranges::range_value_t;
 using std::future,
 	std::counting_semaphore;
 using std::is_same_v;
@@ -70,9 +70,9 @@ protected:
 		input_range Reference,
 		typename Future = range_value_t<FutureRg>,
 		typename ReferenceValue = range_value_t<Reference>
-	>
-	requires sized_range<FutureRg> && is_same_v<Future, future<decltype(std::declval<Future>().get())>>
-		  && is_same_v<ReferenceValue, TaskValue>
+	> requires sized_range<FutureRg> && viewable_range<FutureRg>
+		&& is_same_v<Future, future<decltype(std::declval<Future>().get())>>
+		&& is_same_v<ReferenceValue, TaskValue>
 	void checkTask(FutureRg&& future_rg, Reference&& reference) const {
 		using std::ranges::size;
 		this->Semaphore_.release(size(future_rg));
@@ -100,7 +100,7 @@ protected:
 	}
 
 	template<input_range Task, typename Value = range_value_t<Task>>
-	requires sized_range<Task> && is_same_v<Value, TaskValue>
+	requires sized_range<Task> && viewable_range<Task> && is_same_v<Value, TaskValue>
 	[[nodiscard]] auto enqueue(Task&& task) const {
 		using std::ranges::size;
 

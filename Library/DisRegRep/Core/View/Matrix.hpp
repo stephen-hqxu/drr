@@ -29,11 +29,11 @@ namespace DisRegRep::Core::View::Matrix {
  */
 inline constexpr auto View2d =
 	RangeAdaptorClosure([]<std::ranges::viewable_range R, std::integral Stride = std::ranges::range_difference_t<R>>
-		requires std::ranges::forward_range<R>
-		(R&& r, const Stride stride) static constexpr noexcept(Trait::IsNothrowViewable<R>) -> std::ranges::view auto {
-			using std::views::chunk;
-			return std::forward<R>(r) | chunk(stride);
-		});
+		requires std::ranges::input_range<R>
+		(R&& r, const Stride stride) static constexpr noexcept(
+			Trait::IsNothrowViewable<R>) -> std::ranges::view auto {
+				return std::forward<R>(r) | std::views::chunk(stride);
+			});
 
 /**
  * @brief View a range as a transposed 2D range.
@@ -73,8 +73,7 @@ inline constexpr auto ViewTransposed2d =
 inline constexpr auto SubRange2d = RangeAdaptorClosure([]<
 	std::ranges::viewable_range OuterR,
 	std::ranges::viewable_range InnerR = std::ranges::range_reference_t<OuterR>,
-	std::integral Size = std::common_type_t<std::ranges::range_difference_t<OuterR>,
-	std::ranges::range_difference_t<InnerR>>
+	std::integral Size = std::common_type_t<std::ranges::range_difference_t<OuterR>, std::ranges::range_difference_t<InnerR>>
 > requires std::ranges::input_range<OuterR>
 	(OuterR&& outer_r, const glm::vec<2U, Size> offset, const glm::vec<2U, Size> extent) static constexpr noexcept(
 		Trait::IsNothrowViewable<OuterR>) -> std::ranges::view auto {

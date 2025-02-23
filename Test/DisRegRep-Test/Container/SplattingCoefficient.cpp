@@ -4,13 +4,16 @@
 
 #include <DisRegRep/Core/View/Functional.hpp>
 #include <DisRegRep/Core/View/Matrix.hpp>
+#include <DisRegRep/Core/View/ToInput.hpp>
 #include <DisRegRep/Core/Type.hpp>
+
+#include <DisRegRep-Test/StringMaker.hpp>
 
 #include <catch2/generators/catch_generators_adapters.hpp>
 #include <catch2/generators/catch_generators_random.hpp>
 
 #include <catch2/matchers/catch_matchers_container_properties.hpp>
-#include <catch2/matchers/catch_matchers_quantifiers.hpp>
+#include <catch2/matchers/catch_matchers_range_equals.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 #include <catch2/catch_template_test_macros.hpp>
@@ -24,6 +27,8 @@
 #include <functional>
 #include <ranges>
 
+#include <utility>
+
 #include <concepts>
 #include <type_traits>
 
@@ -35,14 +40,14 @@ namespace View = DisRegRep::Core::View;
 namespace Type = DisRegRep::Core::Type;
 
 using Catch::Matchers::SizeIs, Catch::Matchers::IsEmpty,
-	Catch::Matchers::AllTrue, Catch::Matchers::ContainsSubstring;
+	Catch::Matchers::RangeEquals, Catch::Matchers::ContainsSubstring;
 
 using glm::make_vec3, glm::value_ptr;
 
 using std::span;
 using std::ranges::fold_left_first, std::ranges::copy, std::ranges::equal,
-	std::bind_front, std::bind_back, std::multiplies, std::bit_or,
-	std::views::zip_transform, std::views::transform;
+	std::bind_back, std::multiplies, std::bit_or,
+	std::views::transform;
 using std::unsigned_integral, std::is_unsigned_v;
 
 namespace {
@@ -61,6 +66,7 @@ TEMPLATE_PRODUCT_TEST_CASE("Splatting coefficient matrix allocates memory in two
 	using MatrixType = TestType;
 	using IndexType = typename MatrixType::IndexType;
 	using Dimension3Type = typename MatrixType::Dimension3Type;
+	static constexpr auto Dimension3Length = Dimension3Type::length();
 
 	static constexpr bool IsDense = SpltCoef::IsDense<MatrixType>;
 
@@ -94,7 +100,8 @@ TEMPLATE_PRODUCT_TEST_CASE("Splatting coefficient matrix allocates memory in two
 
 			THEN("Matrix memory is allocated with the correct size") {
 				if constexpr (IsDense) {
-					REQUIRE_THAT(matrix, SizeIs(*fold_left_first(span(value_ptr(dim), Dimension3Type::length()), multiplies {})));
+					REQUIRE_THAT(matrix, SizeIs(*fold_left_first(
+						span<const IndexType, Dimension3Length>(value_ptr(dim), Dimension3Length), multiplies {})));
 					REQUIRE_THAT(matrix, !IsEmpty());
 				} else {
 					REQUIRE_THAT(matrix, IsEmpty());
@@ -116,32 +123,42 @@ TEMPLATE_PRODUCT_TEST_CASE("Matrix that stores region splatting coefficients", "
 	static constexpr bool IsSparse = SpltCoef::IsSparse<MatrixType>;
 
 	GIVEN("A region splatting coefficient matrix and some coefficients") {
-		const auto dim = make_vec3(generateDimension<IndexType>().data());
+		const auto dim_vec = generateDimension<IndexType>();
+		const auto dim = make_vec3(dim_vec.data());
 		MatrixType matrix;
 		matrix.resize(dim);
 
-		//I am not going to test sparse input on sparse matrix, since sparse SCM internally views dense input as sparse anyway.
-		const auto coefficient = GENERATE_REF(take(1U, chunk(matrix.size(), map(
-			[](const auto coef) static noexcept {
-				if constexpr (is_unsigned_v<ValueType>) {
-					return static_cast<ValueType>(std::round(std::abs(coef)) * 7800U);
-				} else {
-					return coef;
-				}
-			}, random(-10.0F, 10.0F)))));
+		const auto get_input = [
+			dim_z = dim.z,
+			coefficient = GENERATE_REF(
+				take(1U,
+					chunk(*fold_left_first(dim_vec, multiplies {}),
+						map([](const auto coef) static noexcept {
+							if constexpr (is_unsigned_v<ValueType>) {
+								return static_cast<ValueType>(std::round(std::abs(coef)) * 7800U);
+							} else {
+								return coef;
+							}
+						}, random(-10.0F, 10.0F))
+					)
+				)
+			)
+		] constexpr noexcept -> auto {
+			if constexpr (auto input = coefficient | View::ToInput | View::Matrix::View2d(dim_z);
+				IsSparse) {
+				return std::move(input) | transform(bind_back(bit_or {}, SpMatElem::ToSparse));
+			} else {
+				return input;
+			}
+		};
 
 		WHEN("Matrix is filled in with the coefficients") {
-			const auto input = coefficient | View::Matrix::View2d(dim.z);
-			const auto output = matrix.range();
-			copy(input, output.begin());
+			copy(get_input(), matrix.rangeInput().begin());
 
 			THEN("Coefficients in the matrix equal the input coefficients") {
-				const auto equal_2d = bind_front(zip_transform, equal, output | View::Functional::Dereference);
-				if constexpr (IsSparse) {
-					CHECK_THAT(equal_2d(input | transform(bind_back(bit_or {}, SpMatElem::ToSparse))), AllTrue());
-				} else {
-					CHECK_THAT(equal_2d(input), AllTrue());
-				}
+				auto proxy_elem = matrix.rangeInput() | View::Functional::Dereference;
+				auto input = get_input();
+				CHECK_THAT(proxy_elem, RangeEquals(input, equal));
 			}
 
 		}

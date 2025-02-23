@@ -1,6 +1,7 @@
 #pragma once
 
 #include <DisRegRep/Core/View/Matrix.hpp>
+#include <DisRegRep/Core/View/ToInput.hpp>
 #include <DisRegRep/Core/Type.hpp>
 #include <DisRegRep/Core/UninitialisedAllocator.hpp>
 
@@ -11,6 +12,8 @@
 #include <vector>
 
 #include <ranges>
+
+#include <utility>
 
 #include <cstdint>
 
@@ -38,6 +41,12 @@ private:
 
 	MappingType Mapping;
 	std::vector<ValueType, Core::UninitialisedAllocator<ValueType>> Data;
+
+	template<std::ranges::viewable_range R>
+	requires std::ranges::input_range<R>
+	[[nodiscard]] constexpr std::ranges::view auto view2d(R&& r) const noexcept {
+		return std::forward<R>(r) | Core::View::Matrix::View2d(this->Mapping.stride(0U));
+	}
 
 public:
 
@@ -137,12 +146,20 @@ public:
 
 	/**
 	 * @brief Form a 2D view on the regionfield matrix.
-	 * 
+	 *
 	 * @return The 2D range of the regionfield.
 	 */
 	template<typename Self>
 	[[nodiscard]] constexpr std::ranges::view auto range2d(this Self& self) noexcept {
-		return self.Data | Core::View::Matrix::View2d(self.Mapping.stride(0U));
+		return self.view2d(self.Data);
+	}
+
+	/**
+	 * @brief @link range2d but as a @link std::ranges::input_range.
+	 */
+	template<typename Self>
+	[[nodiscard]] constexpr std::ranges::view auto range2dInput(this Self& self) noexcept {
+		return self.view2d(self.Data | Core::View::ToInput);
 	}
 
 };

@@ -56,9 +56,9 @@ using std::any,
 using std::ranges::copy, std::ranges::all_of,
 	std::bind_front, std::bind_back, std::identity,
 	std::indirect_binary_predicate,
-	std::views::transform, std::views::join, std::views::zip_transform, std::views::all,
-	std::ranges::viewable_range,
-	std::ranges::range_const_reference_t, std::ranges::const_iterator_t;
+	std::views::transform, std::views::join, std::views::zip_transform,
+	std::ranges::input_range, std::ranges::viewable_range,
+	std::ranges::range_value_t, std::ranges::range_const_reference_t, std::ranges::const_iterator_t;
 using std::floating_point;
 
 namespace {
@@ -126,15 +126,15 @@ bool compare(const floating_point auto source, const floating_point auto target)
 
 template<
 	SpltCoef::Is Matrix,
-	viewable_range Ref,
+	input_range Ref,
 	indirect_binary_predicate<
-		const_iterator_t<typename Matrix::template ValueProxy<true>::ProxyElementViewType>,
+		typename range_value_t<decltype(std::declval<const Matrix&>().rangeInput())>::ProxyElementViewIterator,
 		const_iterator_t<range_const_reference_t<Ref>>
 	> Comp
->
+> requires viewable_range<range_const_reference_t<Ref>>
 void compare(const Matrix& matrix, const Ref& reference, Comp comp) {
-	CHECK_THAT(matrix.range() | View::Functional::Dereference,
-		RangeEquals(reference | all,
+	CHECK_THAT(matrix.rangeInput() | View::Functional::Dereference,
+		RangeEquals(reference,
 			[&comp](const auto source, const auto target) { return all_of(zip_transform(comp, source, target), identity {}); }));
 }
 

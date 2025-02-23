@@ -85,7 +85,7 @@ using std::chrono::duration,
 	std::unique_ptr, std::make_unique;
 using std::ostream, std::fstream, std::ofstream, std::ios_base,
 	std::println;
-using std::exception, std::exception_ptr, std::current_exception, std::rethrow_exception, std::throw_with_nested,
+using std::exception_ptr, std::current_exception, std::rethrow_exception, std::throw_with_nested,
 	std::source_location,
 	std::errc, std::make_error_code;
 using std::numeric_limits;

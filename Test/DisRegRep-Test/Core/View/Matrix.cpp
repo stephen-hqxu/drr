@@ -36,7 +36,10 @@ constexpr std::uint_fast8_t Width = 4U, Height = 3U;
 constexpr auto Data = [] static consteval noexcept {
 	using DisRegRep::Core::View::Functional::MakeFromTuple;
 	array<u8vec2, 12U> mesh_grid {};
-	copy(cartesian_product(iota(0U, Width), iota(0U, Height)) | MakeFromTuple<u8vec2>, mesh_grid.begin());
+	copy(cartesian_product(
+		iota(std::uint_fast8_t {}, Width),
+		iota(std::uint_fast8_t {}, Height)
+	) | MakeFromTuple<u8vec2>, mesh_grid.begin());
 	return mesh_grid;
 }();
 

@@ -71,6 +71,17 @@ private:
 		requires Const && std::convertible_to<ViewIterator, BaseIterator>
 			: Current(std::move(it.Current)) { }
 
+		Iterator(const Iterator&) = delete;
+
+		Iterator(Iterator&&) noexcept(std::is_nothrow_move_constructible_v<BaseIterator>) = default;
+
+		Iterator& operator=(const Iterator&) = delete;
+
+		Iterator& operator=(Iterator&&) noexcept(std::is_nothrow_move_assignable_v<BaseIterator>) = default;
+
+		~Iterator() = default;
+
+
 		[[nodiscard]] constexpr BaseIterator base() && noexcept(std::is_nothrow_move_constructible_v<BaseIterator>) {
 			return std::move(this->Current);
 		}
@@ -191,12 +202,10 @@ inline constexpr auto ToInput =
 #ifdef DRR_CORE_VIEW_HAS_STD_RANGES_TO_INPUT
 std::views::to_input;
 #else
-RangeAdaptorClosure([]<std::ranges::viewable_range R>
-	requires std::ranges::input_range<R>
-	(R&& r) static constexpr noexcept(
-		Trait::IsNothrowViewable<R>
-		&& std::is_nothrow_constructible_v<ToInputView<std::views::all_t<R>>, R>
-	) -> std::ranges::view auto {
+RangeAdaptorClosure([]<std::ranges::viewable_range R>(R&& r) static constexpr noexcept(
+						noexcept(ToInputView(std::forward<R>(r)))) -> std::ranges::view auto
+	requires requires { ToInputView(std::forward<R>(r)); }
+	{
 		return ToInputView(std::forward<R>(r));
 	});
 #endif

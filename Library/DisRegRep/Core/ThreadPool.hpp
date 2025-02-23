@@ -233,7 +233,8 @@ public:
 	 * @param out_it Iterator to receive tuples of futures for each task enqueued in order, or flattened futures (without tuple) if all
 	 * task functions return the same type.
 	 */
-	template<std::ranges::input_range TaskRange, typename TaskTrait = ApplicationTaskTrait<std::ranges::range_value_t<TaskRange>>>
+	template<std::ranges::viewable_range TaskRange, typename TaskTrait = ApplicationTaskTrait<std::ranges::range_value_t<TaskRange>>>
+	requires std::ranges::input_range<TaskRange>
 	void enqueue(TaskRange&& task_range, const std::output_iterator<typename TaskTrait::Future> auto out_it) {
 		using std::vector, std::array, std::to_array,
 			std::tuple, std::apply,

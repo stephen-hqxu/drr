@@ -34,7 +34,7 @@ struct StringMaker<DisRegRep::Container::SparseMatrixElement::Basic<V>> {
 
 	static std::string convert(const MakeType& mat_elem) {
 		const auto [region_id, value] = mat_elem;
-		return std::format("{{Identifier: {}, Value: {:.2f}}}", region_id, value);
+		return std::format("{{Identifier={}, Value={:.2f}}}", region_id, value);
 	}
 
 };

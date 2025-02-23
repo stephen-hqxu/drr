@@ -3,6 +3,8 @@
 #include "SparseMatrixElement.hpp"
 
 #include <DisRegRep/Core/View/Matrix.hpp>
+#include <DisRegRep/Core/View/ToInput.hpp>
+#include <DisRegRep/Core/View/Trait.hpp>
 #include <DisRegRep/Core/Type.hpp>
 #include <DisRegRep/Core/UninitialisedAllocator.hpp>
 
@@ -15,7 +17,6 @@
 #include <vector>
 
 #include <algorithm>
-#include <execution>
 #include <iterator>
 #include <ranges>
 
@@ -104,33 +105,39 @@ public:
 	 * @brief A proxy that acts like a lvalue reference to values along the Z axis of the dense matrix.
 	 *
 	 * @param Const True if the values are constant.
+	 * @param ElemView Region axis view.
 	 */
-	template<bool Const>
+	template<bool Const, std::ranges::view ElemView>
+	requires std::is_same_v<std::ranges::range_value_t<ElemView>, ElementType>
 	class ValueProxy {
 	public:
 
 		static constexpr bool IsConstant = Const;
 
-		using ProxyElementType = std::conditional_t<IsConstant, ConstElement, ElementType>;
-		using ProxyElementViewType = std::span<ProxyElementType>;
-		using ProxyElementIterator = typename ProxyElementViewType::iterator;
+		using ProxyElementViewType = ElemView;
+		using ProxyElementViewIterator = std::conditional_t<IsConstant,
+			std::ranges::const_iterator_t<ProxyElementViewType>,
+			std::ranges::iterator_t<ProxyElementViewType>
+		>;
 
 	private:
 
-		ProxyElementViewType Span;
+		ProxyElementViewType Element;
 
 	public:
 
 		/**
 		 * @brief Initialise a value proxy.
 		 *
+		 * @tparam DeducingConst Constness of this value proxy for use by CTAD.
 		 * @tparam R Type of range of values.
 		 *
 		 * @param r A range of values.
 		 */
-		template<typename R>
-		requires std::is_constructible_v<ProxyElementViewType, R>
-		constexpr ValueProxy(R&& r) noexcept(std::is_nothrow_constructible_v<ProxyElementViewType, R>) : Span(std::forward<R>(r)) { }
+		template<bool DeducingConst, std::ranges::viewable_range R>
+		//Clang will  ^^^^^^^^^^^^^ crash if the class argument is captured directly here; need to write a deduction guide.
+		constexpr ValueProxy(std::bool_constant<DeducingConst>, R&& r) noexcept(Core::View::Trait::IsNothrowViewable<R>) :
+			Element(std::forward<R>(r) | std::views::all) { }
 
 		/**
 		 * @brief Get the view of values.
@@ -138,7 +145,7 @@ public:
 		 * @return A view of values.
 		 */
 		[[nodiscard]] constexpr ProxyElementViewType operator*() const noexcept {
-			return this->Span;
+			return this->Element;
 		}
 
 		/**
@@ -150,18 +157,34 @@ public:
 		 *
 		 * @return Self.
 		 */
-		template<std::ranges::forward_range Value>
-		requires std::ranges::common_range<Value>
-			  && std::indirectly_copyable<std::ranges::const_iterator_t<Value>, ProxyElementIterator>
-				 const ValueProxy& operator=(Value&& value) const
-				 requires(!IsConstant)
+		template<std::ranges::input_range Value>
+		requires std::indirectly_copyable<std::ranges::const_iterator_t<Value>, ProxyElementViewIterator>
+		const ValueProxy& operator=(Value&& value) const
+		requires(!IsConstant)
 		{
-			using std::copy, std::execution::unseq, std::ranges::cbegin, std::ranges::cend;
-			copy(unseq, cbegin(value), cend(value), this->Span.begin());
+			std::ranges::copy(std::forward<Value>(value), std::ranges::begin(this->Element));
 			return *this;
 		}
 
 	};
+	template<bool Const, typename R>
+	ValueProxy(std::bool_constant<Const>, R&&) -> ValueProxy<Const, std::views::all_t<R>>;
+
+private:
+
+	template<typename Self, std::ranges::input_range R>
+	requires std::ranges::viewable_range<R>
+	[[nodiscard]] constexpr auto view(this Self& self, R&& r) noexcept {
+		using std::views::transform, std::bool_constant;
+
+		return std::forward<R>(r)
+			| Core::View::Matrix::View2d(self.Mapping.stride(1U))
+			| transform([](auto region_val) static constexpr noexcept {
+				return ValueProxy(bool_constant<std::is_const_v<Self>> {}, std::move(region_val));
+			});
+	}
+
+public:
 
 	constexpr BasicDense() = default;
 
@@ -219,17 +242,20 @@ public:
 
 	/**
 	 * @brief Get a range to the dense matrix.
-	 * 
+	 *
 	 * @return A range to the dense matrix.
 	 */
 	template<typename Self>
 	[[nodiscard]] constexpr std::ranges::view auto range(this Self& self) noexcept {
-		using std::views::transform;
-		using ProxyType = ValueProxy<std::is_const_v<Self>>;
+		return self.view(self.DenseMatrix);
+	}
 
-		return self.DenseMatrix
-			 | Core::View::Matrix::View2d(self.Mapping.stride(1U))
-			 | transform([](auto region_val) static constexpr noexcept { return ProxyType(std::move(region_val)); });
+	/**
+	 * @brief @link range but as a @link std::ranges::input_range.
+	 */
+	template<typename Self>
+	[[nodiscard]] constexpr std::ranges::view auto rangeInput(this Self& self) noexcept {
+		return self.view(self.DenseMatrix | Core::View::ToInput);
 	}
 
 	/**
@@ -295,6 +321,7 @@ public:
 
 		using ProxyElementType = std::conditional_t<IsConstant, ConstElement, ElementType>;
 		using ProxyElementViewType = std::span<ProxyElementType>;
+		using ProxyElementViewIterator = typename ProxyElementViewType::iterator;
 
 		using ProxyElementContainerType = std::conditional_t<IsConstant, ConstElementContainerType, ElementContainerType>;
 		using ProxyElementContainerPointer = std::add_pointer_t<ProxyElementContainerType>;
@@ -360,7 +387,8 @@ public:
 		 * @return Self.
 		 */
 		template<std::ranges::input_range Value>
-		requires std::is_convertible_v<std::ranges::range_value_t<Value>, ValueType>
+		requires std::ranges::viewable_range<Value>
+			  && std::is_convertible_v<std::ranges::range_value_t<Value>, ValueType>
 		constexpr const ValueProxy& operator=(Value&& value) const
 		requires(!IsConstant)
 		{
@@ -369,6 +397,24 @@ public:
 		}
 
 	};
+
+private:
+
+	template<typename Self, std::ranges::forward_range R>
+	requires std::ranges::viewable_range<R>
+	[[nodiscard]] constexpr auto view(this Self& self, R&& r) noexcept {
+		using std::views::pairwise, std::views::transform;
+		using ProxyType = ValueProxy<std::is_const_v<Self>>;
+
+		//Not using pairwise_transform since I need to pass the original tuple to the proxy.
+		return std::forward<R>(r)
+			| pairwise
+			| transform([&elem = self.SparseMatrix](auto pairwise_offset) constexpr noexcept {
+				return ProxyType(std::move(pairwise_offset), elem);
+			});
+	}
+
+public:
 
 	constexpr BasicSparse() noexcept = default;
 
@@ -445,20 +491,20 @@ public:
 
 	/**
 	 * @brief Get a range to the sparse matrix.
-	 * 
+	 *
 	 * @return A range to the sparse matrix.
 	 */
 	template<typename Self>
 	[[nodiscard]] constexpr std::ranges::view auto range(this Self& self) noexcept {
-		using std::views::pairwise, std::views::transform;
-		using ProxyType = ValueProxy<std::is_const_v<Self>>;
+		return self.view(self.Offset);
+	}
 
-		//Not using pairwise_transform since I need to pass the original tuple to the proxy.
-		return self.Offset
-			| pairwise
-			| transform([&elem = self.SparseMatrix](auto pairwise_offset) constexpr noexcept {
-				return ProxyType(std::move(pairwise_offset), elem);
-			});
+	/**
+	 * @brief Same as @link range because sparse view requires a @link std::ranges::forward_range.
+	 */
+	template<typename Self>
+	[[nodiscard]] constexpr std::ranges::view auto rangeInput(this Self& self) noexcept {
+		return self.range();
 	}
 
 	/**

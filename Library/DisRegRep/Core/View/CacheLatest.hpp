@@ -79,6 +79,16 @@ private:
 
 	public:
 
+		Iterator(const Iterator&) = delete;
+
+		Iterator(Iterator&&) noexcept(std::is_nothrow_move_constructible_v<ViewIterator>) = default;
+
+		Iterator& operator=(const Iterator&) = delete;
+
+		Iterator& operator=(Iterator&&) noexcept(std::is_nothrow_move_assignable_v<ViewIterator>) = default;
+
+		~Iterator() = default;
+
 		[[nodiscard]] constexpr const ViewIterator& base() const & noexcept {
 			return this->Current;
 		}
@@ -176,7 +186,7 @@ public:
 	explicit constexpr CacheLatestView(ViewType base) noexcept(std::is_nothrow_move_constructible_v<ViewType>) :
 		Base(std::move(base)) { }
 
-	[[nodiscard]] constexpr ViewType base() const & noexcept(std::is_nothrow_copy_constructible_v<ViewType>)
+	[[nodiscard]] constexpr ViewType base() const& noexcept(std::is_nothrow_copy_constructible_v<ViewType>)
 	requires std::copy_constructible<ViewType>
 	{
 		return this->Base;
@@ -219,12 +229,10 @@ inline constexpr auto CacheLatest =
 #ifdef DRR_CORE_VIEW_HAS_STD_RANGES_CACHE_LATEST
 std::views::cache_latest;
 #else
-RangeAdaptorClosure([]<std::ranges::viewable_range R>
-	requires std::ranges::input_range<R>
-	(R&& r) static constexpr noexcept(
-		Trait::IsNothrowViewable<R>
-		&& std::is_nothrow_constructible_v<CacheLatestView<std::views::all_t<R>>, R>
-	) -> std::ranges::view auto {
+RangeAdaptorClosure([]<std::ranges::viewable_range R>(R&& r) static constexpr noexcept(
+						noexcept(CacheLatestView(std::forward<R>(r)))) -> std::ranges::view auto
+	requires requires { CacheLatestView(std::forward<R>(r)); }
+	{
 		return CacheLatestView(std::forward<R>(r));
 	});
 #endif
