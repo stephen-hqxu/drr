@@ -74,16 +74,18 @@ struct Profile {
 void runProfiler(const Argument::Profile& arg_profile) {
 	const auto& [config_file, result_dir, thread_count] = arg_profile;
 	const YAML::Node config = YAML::LoadFile(config_file);
+	const YAML::Node& affinity_mask = config["thread affinity mask"];
 
 	namespace Prof = DisRegRep::Programme::Profiler;
 	const Prof::Splatting::ThreadPoolCreateInfo tp_info {
 		.Size = thread_count,
-		.AffinityMask = config["thread affinity mask"].as<std::uint64_t>()
+		.AffinityMask = affinity_mask["profiler"].as<std::uint64_t>()
 	};
 	const auto parameter_set = config["parameter set"].as<Prof::Driver::SplattingInfo::ParameterSetType>();
 	Prof::Driver::splatting({
 		.ResultDirectory = &result_dir,
 		.ThreadPoolCreateInfo = &tp_info,
+		.BackgroundThreadAffinityMask = affinity_mask["background"].as<std::uint64_t>(),
 		.Seed = config["seed"].as<Prof::Splatting::SeedType>(),
 		.ProgressLog = &cout,
 		.ParameterSet = &parameter_set

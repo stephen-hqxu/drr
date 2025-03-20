@@ -53,7 +53,7 @@ enum class View2dCategory : std::uint_fast8_t {
 
 }
 
-TEMPLATE_TEST_CASE_SIG("View2d/ViewTransposed2d/SubRange2d: View a linear range as a 2D matrix, or transposed, or as a sub-matrix", "[Core][View][Matrix]",
+TEMPLATE_TEST_CASE_SIG("NewAxis and Slice2d: View a linear range as a 2D matrix, or transposed, or as a sub-matrix", "[Core][View][Matrix]",
 	((View2dCategory Cat), Cat), View2dCategory::Normal, View2dCategory::Transposed, View2dCategory::SubView) {
 	using enum View2dCategory;
 
@@ -72,9 +72,9 @@ TEMPLATE_TEST_CASE_SIG("View2d/ViewTransposed2d/SubRange2d: View a linear range 
 		WHEN("A " << ViewText << " view is formed") {
 			static constexpr auto Offset = u8vec2(2U, 1U), Extent = u8vec2(1U, 2U);
 
-			static constexpr auto MeshGrid2d = MeshGrid::Data | Matrix::View2d(MeshGrid::Height);
-			static constexpr auto MeshGrid2dT = MeshGrid::Data | Matrix::ViewTransposed2d(MeshGrid::Height);
-			static constexpr auto SubMeshGrid2d = MeshGrid2d | Matrix::SubRange2d(Offset, Extent);
+			static constexpr auto MeshGrid2d = MeshGrid::Data | Matrix::NewAxisLeft(MeshGrid::Height);
+			static constexpr auto MeshGrid2dT = MeshGrid::Data | Matrix::NewAxisRight(MeshGrid::Height);
+			static constexpr auto SubMeshGrid2d = MeshGrid2d | Matrix::Slice2d(Offset, Extent);
 
 			//NOLINTNEXTLINE(readability-function-cognitive-complexity)
 			static constexpr auto CheckIdx = [](const auto& rg, const u8vec2 offset = {}) static -> void {

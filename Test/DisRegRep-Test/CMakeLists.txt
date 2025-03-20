@@ -1,4 +1,4 @@
-find_package(Catch2 3 CONFIG REQUIRED)
+find_package(Catch2 3.3 CONFIG REQUIRED)
 include(Catch)
 
 add_executable(${DRR_CURRENT_TARGET})

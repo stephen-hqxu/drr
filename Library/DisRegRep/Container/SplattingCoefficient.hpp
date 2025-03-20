@@ -3,7 +3,6 @@
 #include "SparseMatrixElement.hpp"
 
 #include <DisRegRep/Core/View/Matrix.hpp>
-#include <DisRegRep/Core/View/ToInput.hpp>
 #include <DisRegRep/Core/View/Trait.hpp>
 #include <DisRegRep/Core/Type.hpp>
 #include <DisRegRep/Core/UninitialisedAllocator.hpp>
@@ -144,8 +143,12 @@ public:
 		 *
 		 * @return A view of values.
 		 */
-		[[nodiscard]] constexpr ProxyElementViewType operator*() const noexcept {
+		[[nodiscard]] constexpr const ProxyElementViewType& operator*() const & noexcept {
 			return this->Element;
+		}
+		[[nodiscard]] constexpr ProxyElementViewType operator*() && noexcept(
+			std::is_nothrow_move_constructible_v<ProxyElementViewType>) {
+			return std::move(this->Element);
 		}
 
 		/**
@@ -178,7 +181,7 @@ private:
 		using std::views::transform, std::bool_constant;
 
 		return std::forward<R>(r)
-			| Core::View::Matrix::View2d(self.Mapping.stride(1U))
+			| Core::View::Matrix::NewAxisLeft(self.Mapping.stride(1U))
 			| transform([](auto region_val) static constexpr noexcept {
 				return ValueProxy(bool_constant<std::is_const_v<Self>> {}, std::move(region_val));
 			});
@@ -233,7 +236,7 @@ public:
 	[[nodiscard]] SizeType sizeByte() const noexcept;
 
 	/**
-	 * @brief Resize the current dense matrix. All existing contents become undefined and the internal state of the matrix is reset,
+	 * @brief Resize the current dense matrix. All existing contents become undefined, and the internal state of the matrix is reset,
 	 * thus suitable for commencing new computations.
 	 *
 	 * @param dim Provide width, height and region count of the dense matrix.
@@ -251,20 +254,12 @@ public:
 	}
 
 	/**
-	 * @brief @link range but as a @link std::ranges::input_range.
-	 */
-	template<typename Self>
-	[[nodiscard]] constexpr std::ranges::view auto rangeInput(this Self& self) noexcept {
-		return self.view(self.DenseMatrix | Core::View::ToInput);
-	}
-
-	/**
 	 * @brief Get a transposed 2D range to the dense matrix.
 	 *
 	 * @return A transposed 2D range to the dense matrix.
 	 */
 	[[nodiscard]] constexpr std::ranges::view auto rangeTransposed2d() const noexcept {
-		return this->range() | Core::View::Matrix::ViewTransposed2d(this->Mapping.extents().extent(1U));
+		return this->range() | Core::View::Matrix::NewAxisRight(this->Mapping.extents().extent(1U));
 	}
 
 };
@@ -481,7 +476,7 @@ public:
 	[[nodiscard]] SizeType sizeByte() const noexcept;
 
 	/**
-	 * @brief Resize the current sparse matrix. All existing contents become undefined and the internal state of the matrix is reset,
+	 * @brief Resize the current sparse matrix. All existing contents become undefined, and the internal state of the matrix is reset,
 	 * thus suitable for commencing new computations.
 	 *
 	 * @param dim Provide width and height of the sparse matrix. The region count is sparsely populated, but should still be provided
@@ -500,20 +495,12 @@ public:
 	}
 
 	/**
-	 * @brief Same as @link range because sparse view requires a @link std::ranges::forward_range.
-	 */
-	template<typename Self>
-	[[nodiscard]] constexpr std::ranges::view auto rangeInput(this Self& self) noexcept {
-		return self.range();
-	}
-
-	/**
 	 * @brief Get a transposed 2D range to the sparse matrix.
 	 *
 	 * @return A transposed 2D range to the sparse matrix.
 	 */
 	[[nodiscard]] constexpr std::ranges::view auto rangeTransposed2d() const noexcept {
-		return this->range() | Core::View::Matrix::ViewTransposed2d(this->OffsetMapping.stride(0U));
+		return this->range() | Core::View::Matrix::NewAxisRight(this->OffsetMapping.stride(0U));
 	}
 
 };

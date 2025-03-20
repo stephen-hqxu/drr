@@ -28,8 +28,8 @@ using std::ranges::for_each,
 	std::bind_back, std::bit_or, std::invoke,
 	std::views::take, std::views::drop, std::views::zip, std::views::transform;
 
-using std::input_or_output_iterator, std::indirectly_writable;
-using std::ranges::input_range, std::ranges::forward_range, std::ranges::view,
+using std::output_iterator;
+using std::ranges::forward_range, std::ranges::view,
 	std::ranges::range_difference_t, std::ranges::range_value_t, std::ranges::range_const_reference_t;
 using std::invocable, std::invoke_result_t;
 
@@ -65,26 +65,23 @@ public:
 template<
 	forward_range ScanlineRange,
 	SpltKn::Is KernelMemory,
-	input_or_output_iterator Out,
 	typename KernelMemoryProj,
-	input_range Scanline = range_value_t<ScanlineRange>
+	forward_range Scanline = range_value_t<ScanlineRange>
 >
 requires view<Scanline>
 void conv1d(
 	ScanlineRange&& scanline_rg,
 	KernelMemory& kernel_memory,
-	Out out,
+	output_iterator<invoke_result_t<KernelMemoryProj, const KernelMemory&>> auto out,
 	const range_difference_t<Scanline> d,
 	KernelMemoryProj kernel_memory_proj
-) requires indirectly_writable<Out, invoke_result_t<KernelMemoryProj, const KernelMemory&>>
-{
+) {
 	for (const auto scanline : std::forward<ScanlineRange>(scanline_rg)) [[likely]] {
 		kernel_memory.clear();
 
 		//Compute the initial kernel in this scanline.
 		for_each(scanline | take(d), [&kernel_memory](const auto element) noexcept { kernel_memory.increment(element); });
-		*out = invoke(kernel_memory_proj, std::as_const(kernel_memory));
-		++out;
+		*out++ = invoke(kernel_memory_proj, std::as_const(kernel_memory));
 
 		//Kernel sliding.
 		using std::ranges::transform;
@@ -130,9 +127,9 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(FastOccupancy) {
 	//In vertical scanline, this overlaps with the 1D kernel.
 	//In horizontal scanline, this includes the padding.
 	conv1d(
-		regionfield.range2d() | Core::View::Matrix::SubRange2d(offset - this->Radius, extent + d_halo),
+		regionfield.range2d() | Core::View::Matrix::Slice2d(offset - this->Radius, extent + d_halo),
 		kernel_memory,
-		vertical_memory.rangeInput().begin(),
+		vertical_memory.range().begin(),
 		d,
 		[](const auto& km) static constexpr noexcept { return km.span(); }
 	);
@@ -141,7 +138,7 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(FastOccupancy) {
 	conv1d(
 		vertical_memory.rangeTransposed2d() | transform(bind_back(bit_or {}, Core::View::Functional::Dereference)),
 		kernel_memory,
-		horizontal_memory.rangeInput().begin(),
+		horizontal_memory.range().begin(),
 		d,
 		[norm_factor = Base::kernelNormalisationFactor(d)](
 			const auto& km) constexpr noexcept { return SpltKn::toMask(km, norm_factor); }

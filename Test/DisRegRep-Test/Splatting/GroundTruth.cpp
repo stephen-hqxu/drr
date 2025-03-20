@@ -128,12 +128,12 @@ template<
 	SpltCoef::Is Matrix,
 	input_range Ref,
 	indirect_binary_predicate<
-		typename range_value_t<decltype(std::declval<const Matrix&>().rangeInput())>::ProxyElementViewIterator,
+		typename range_value_t<decltype(std::declval<const Matrix&>().range())>::ProxyElementViewIterator,
 		const_iterator_t<range_const_reference_t<Ref>>
 	> Comp
 > requires viewable_range<range_const_reference_t<Ref>>
 void compare(const Matrix& matrix, const Ref& reference, Comp comp) {
-	CHECK_THAT(matrix.rangeInput() | View::Functional::Dereference,
+	CHECK_THAT(matrix.range() | View::Functional::Dereference,
 		RangeEquals(reference,
 			[&comp](const auto source, const auto target) { return all_of(zip_transform(comp, source, target), identity {}); }));
 }

@@ -28,16 +28,16 @@ Regionfield Regionfield::transpose() const {
 	//	it gives better cache locality when iterating through the matrix in other places.
 	//It is possible to do an in-place transposition (by swapping upper and lower diagonal), but only with a square matrix.
 	//It is also possible to use an in-place permute algorithm,
-	//	but performance is generally poor on large matrix (even though it saves us memory) as not being parallelisable.
+	//	but performance is generally poor on large matrices (even though it saves us memory) as not being parallelisable.
 	Regionfield transposed;
 	transposed.RegionCount = this->RegionCount;
 	transposed.resize(Core::MdSpan::toVector(Core::MdSpan::flip(this->Mapping.extents())));
 
-	//Cannot use join on parallel algorithm because it is not a forward range.
+	//Cannot use join on a parallel algorithm because it is not a forward range.
 	//Mainly because of the xvalue return on the 2D range adaptor, such that inner range is not a reference type.
 	const auto zip_data = zip(
-		this->Data | Core::View::Matrix::View2d(this->Mapping.stride(0U)),
-		transposed.Data | Core::View::Matrix::ViewTransposed2d(transposed.Mapping.stride(0U))
+		this->Data | Core::View::Matrix::NewAxisLeft(this->Mapping.stride(0U)),
+		transposed.Data | Core::View::Matrix::NewAxisRight(transposed.Mapping.stride(0U))
 	);
 	for_each(par_unseq, zip_data.cbegin(), zip_data.cend(), [](const auto it) static constexpr noexcept {
 		const auto& [input, output] = it;

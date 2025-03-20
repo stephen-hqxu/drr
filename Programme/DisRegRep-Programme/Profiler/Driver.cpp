@@ -113,7 +113,7 @@ template<typename T, std::size_t S>
 }
 
 void Drv::splatting(const SplattingInfo& info) {
-	const auto [result_dir, thread_pool_create_info, seed, progress_log, parameter_set] = info;
+	const auto [result_dir, thread_pool_create_info, bg_thread_affinity_mask, seed, progress_log, parameter_set] = info;
 	const auto& [default_profile, stress_profile] = *parameter_set;
 	const auto& [default_fixed, default_variable] = default_profile;
 	const auto& [stress_fixed, stress_variable] = stress_profile;
@@ -203,28 +203,19 @@ void Drv::splatting(const SplattingInfo& info) {
 		const ProcThrCtrl::Priority Priority = ProcThrCtrl::getPriority();
 		const ProcThrCtrl::AffinityMask AffinityMask = ProcThrCtrl::getAffinityMask();
 
-		bool AffinityMasked = false;
-
 	public:
 
-		MainThreadScheduler(const ProcThrCtrl::AffinityMask splatting_thread_affinity_mask) {
+		MainThreadScheduler(const ProcThrCtrl::AffinityMask affinity_mask) {
 			ProcThrCtrl::setPriority(ProcThrCtrl::PriorityPreset::Min);
-			//Schedule the main thread to avoid from using the processors which will be used by the profiler.
-			if (const ProcThrCtrl::AffinityMask main_thread_affinity_mask = ~splatting_thread_affinity_mask;
-				main_thread_affinity_mask.any()) {
-				ProcThrCtrl::setAffinityMask(main_thread_affinity_mask);
-				this->AffinityMasked = true;
-			}
+			ProcThrCtrl::setAffinityMask(affinity_mask);
 		}
 
 		~MainThreadScheduler() noexcept(false) {
 			ProcThrCtrl::setPriority(this->Priority);
-			if (this->AffinityMasked) {
-				ProcThrCtrl::setAffinityMask(this->AffinityMask);
-			}
+			ProcThrCtrl::setAffinityMask(this->AffinityMask);
 		}
 
-	} main_thread_scheduler = thread_pool_create_info->AffinityMask;
+	} main_thread_scheduler = bg_thread_affinity_mask;
 
 	const auto profiler = Splatting(output_dir, *thread_pool_create_info);
 	profiler.sweepRadius(default_variable_radius_ptr, std::get<2U>(default_variable.Radius), {

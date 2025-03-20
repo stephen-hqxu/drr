@@ -2,6 +2,8 @@
 
 #include "Splatting.hpp"
 
+#include <DisRegRep/Core/System/ProcessThreadControl.hpp>
+
 #include <yaml-cpp/yaml.h>
 
 #include <tuple>
@@ -78,7 +80,14 @@ struct SplattingInfo {
 	};
 
 	const std::filesystem::path* ResultDirectory; /**< A new directory is created in this directory where all profiler outputs are stored. */
+
 	const Splatting::ThreadPoolCreateInfo* ThreadPoolCreateInfo; /**< Please read this documentation carefully regarding how to tune the profiler. */
+	/**
+	 * @brief Affinity mask of threads unrelated to any profiling workflow. It is recommended to follow the guideline to ensure it is
+	 * mutually exclusive to the profiler thread affinity mask.
+	 */
+	Core::System::ProcessThreadControl::AffinityMask BackgroundThreadAffinityMask;
+
 	Splatting::SeedType Seed;
 	std::ostream* ProgressLog; /**< @link Splatting::synchronise. */
 

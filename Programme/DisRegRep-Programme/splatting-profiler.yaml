@@ -3,7 +3,9 @@
 seed: 932619861
 # Programme/DisRegRep-Programme/Profiler/Splatting.hpp > ThreadPoolCreateInfo
 # The affinity mask under consideration constitutes an exemplar of a system endowed with an 8-core CPU and a SMT ratio of 1:2 (i.e. 8 cores/16 threads). It is noteworthy that this system is devoid of any energy-efficient cores, whilst the SMT threads are grouped in adjacent configurations. It is imperative to ascertain the CPU topology of one's system to determine the optimal affinity mask.
-thread affinity mask: 0xAAAA
+thread affinity mask:
+    profiler: 0x2AAA
+    background: 0xC000
 # Programme/DisRegRep-Programme/Profiler/Driver.hpp > SplattingInfo::ParameterSet
 parameter set:
     default:

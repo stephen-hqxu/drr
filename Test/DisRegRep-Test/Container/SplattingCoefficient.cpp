@@ -4,7 +4,6 @@
 
 #include <DisRegRep/Core/View/Functional.hpp>
 #include <DisRegRep/Core/View/Matrix.hpp>
-#include <DisRegRep/Core/View/ToInput.hpp>
 #include <DisRegRep/Core/Type.hpp>
 
 #include <DisRegRep-Test/StringMaker.hpp>
@@ -114,8 +113,7 @@ TEMPLATE_PRODUCT_TEST_CASE("Splatting coefficient matrix allocates memory in two
 
 }
 
-TEMPLATE_PRODUCT_TEST_CASE("Matrix that stores region splatting coefficients", "[Container][SplattingCoefficient]",
-	MATRIX_TYPE_PRODUCT_LIST) {
+TEMPLATE_PRODUCT_TEST_CASE("Matrix that stores region splatting coefficients can automatically convert data to the target format", "[Container][SplattingCoefficient]", MATRIX_TYPE_PRODUCT_LIST) {
 	using MatrixType = TestType;
 	using IndexType = typename MatrixType::IndexType;
 	using ValueType = typename MatrixType::ValueType;
@@ -128,37 +126,34 @@ TEMPLATE_PRODUCT_TEST_CASE("Matrix that stores region splatting coefficients", "
 		MatrixType matrix;
 		matrix.resize(dim);
 
-		const auto get_input = [
-			dim_z = dim.z,
-			coefficient = GENERATE_REF(
-				take(1U,
-					chunk(*fold_left_first(dim_vec, multiplies {}),
-						map([](const auto coef) static noexcept {
-							if constexpr (is_unsigned_v<ValueType>) {
-								return static_cast<ValueType>(std::round(std::abs(coef)) * 7800U);
-							} else {
-								return coef;
-							}
-						}, random(-10.0F, 10.0F))
-					)
+		const auto coefficient = GENERATE_REF(
+			take(1U,
+				chunk(*fold_left_first(dim_vec, multiplies {}),
+					map([](const auto coef) static noexcept {
+						if constexpr (is_unsigned_v<ValueType>) {
+							return static_cast<ValueType>(std::round(std::abs(coef)) * 7800U);
+						} else {
+							return coef;
+						}
+					}, random(-10.0F, 10.0F))
 				)
 			)
-		] constexpr noexcept -> auto {
-			if constexpr (auto input = coefficient | View::ToInput | View::Matrix::View2d(dim_z);
-				IsSparse) {
-				return std::move(input) | transform(bind_back(bit_or {}, SpMatElem::ToSparse));
-			} else {
-				return input;
-			}
-		};
+		);
 
 		WHEN("Matrix is filled in with the coefficients") {
-			copy(get_input(), matrix.rangeInput().begin());
+			const auto input = coefficient | View::Matrix::NewAxisLeft(dim.z);
+			const auto output = matrix.range();
+			copy(input, output.begin());
 
 			THEN("Coefficients in the matrix equal the input coefficients") {
-				auto proxy_elem = matrix.rangeInput() | View::Functional::Dereference;
-				auto input = get_input();
-				CHECK_THAT(proxy_elem, RangeEquals(input, equal));
+				auto&& converted_input = [&input] constexpr noexcept -> decltype(auto) {
+					if constexpr (IsSparse) {
+						return input | transform(bind_back(bit_or {}, SpMatElem::ToSparse));
+					} else {
+						return input;
+					}
+				}();
+				CHECK_THAT(output | View::Functional::Dereference, RangeEquals(converted_input, equal));
 			}
 
 		}

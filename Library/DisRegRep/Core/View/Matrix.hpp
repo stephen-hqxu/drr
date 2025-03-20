@@ -13,40 +13,42 @@
 #include <type_traits>
 
 /**
- * @brief View a linear range as a multi-dimension matrix with support for basic linear algebraic operations.
+ * @brief Manipulate a range as a multi-dimension matrix with support for basic linear algebraic operations.
  */
 namespace DisRegRep::Core::View::Matrix {
 
 /**
- * @brief View a range as a 2D range.
+ * @brief Add an axis to the left of a range, such that the new left axis has a stride greater than that of the original axis.
  *
  * @tparam R Range type.
  *
- * @param r Input range to be viewed as 2D.
- * @param stride Stride of the second axis. The first axis is assumed to have a stride of one in `r`.
+ * @param r A new axis is added to the left of this range.
+ * @param stride Stride of the new axis. The original axis is assumed to have a stride of one in `r`.
  *
- * @return 2D view of `r`.
+ * @return `r` with a new axis added to the left.
  */
-inline constexpr auto View2d =
-	RangeAdaptorClosure([]<std::ranges::viewable_range R, std::integral Stride = std::ranges::range_difference_t<R>>
-		requires std::ranges::input_range<R>
-		(R&& r, const Stride stride) static constexpr noexcept(
-			Trait::IsNothrowViewable<R>) -> std::ranges::view auto {
-				return std::forward<R>(r) | std::views::chunk(stride);
-			});
+inline constexpr auto NewAxisLeft = RangeAdaptorClosure([]<typename R, typename Stride>
+	requires std::is_invocable_v<decltype(std::views::chunk), R, Stride>
+	(R&& r, const Stride stride) static constexpr noexcept(std::is_nothrow_invocable_v<decltype(std::views::chunk), R, Stride>)
+		-> std::ranges::view auto {
+			return std::forward<R>(r) | std::views::chunk(stride);
+		});
 
 /**
- * @brief View a range as a transposed 2D range.
+ * @brief Add an axis to the right of a range, such that the new right axis has a stride less than that of the original axis.
+ *
+ * @note This may bring performance degradation as it essentially creates a view to a transposed matrix, which will damage cache
+ * locality.
  *
  * @tparam R Range type.
  * @tparam Stride Stride type.
  *
- * @param r Input range to be viewed as transposed 2D.
+ * @param r A new axis is added to the right of this range.
  * @param stride Stride of the second axis. The first axis is assumed to have a stride of one in `r`.
  *
- * @return Transposed 2D view of `r`.
+ * @return `r` with a new axis added to the right.
  */
-inline constexpr auto ViewTransposed2d =
+inline constexpr auto NewAxisRight =
 	RangeAdaptorClosure([]<std::ranges::viewable_range R, std::integral Stride = std::ranges::range_difference_t<R>>
 		requires std::ranges::forward_range<R>
 		(R&& r, const Stride stride) static constexpr noexcept(Trait::IsNothrowViewable<R>) -> std::ranges::view auto {
@@ -57,20 +59,21 @@ inline constexpr auto ViewTransposed2d =
 		});
 
 /**
- * @brief View a sub-range of a 2D range. It is assumed that the inner range represents the Y axis that has a stride of one.
+ * @brief Create a 2D sub-range of a multidimensional range with at least two axes. It is assumed that the inner range has a stride of
+ * one.
  *
  * @tparam OuterR Outer range type.
  * @tparam InnerR Inner range type.
  *
  * @note `InnerR` is not required to be an input range; only `OuterR` requires so because of `std::views::transform`.
  *
- * @param outer_r Input 2D range to be sliced.
+ * @param outer_r Input range to be sliced.
  * @param offset Coordinate of the first element in the slice.
  * @param extent Size of the slice.
  *
  * @return 2D sub-range of `outer_r`.
  */
-inline constexpr auto SubRange2d = RangeAdaptorClosure([]<
+inline constexpr auto Slice2d = RangeAdaptorClosure([]<
 	std::ranges::viewable_range OuterR,
 	std::ranges::viewable_range InnerR = std::ranges::range_reference_t<OuterR>,
 	std::integral Size = std::common_type_t<std::ranges::range_difference_t<OuterR>, std::ranges::range_difference_t<InnerR>>

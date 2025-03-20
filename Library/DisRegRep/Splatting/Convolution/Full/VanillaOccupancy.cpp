@@ -66,14 +66,14 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(VanillaOccupancy) {
 		}()...) | Core::View::Functional::MakeFromTuple<DimensionType>;
 	}(make_integer_sequence<LengthType, DimensionType::length()> {});
 	const auto kernel_rg = element_rg
-		| transform([d, &regionfield](const auto idx) constexpr noexcept {
-			return regionfield.range2dInput()
-				| Core::View::Matrix::SubRange2d(idx, DimensionType(d))
+		| transform([d, rf_2d = regionfield.range2d()](const auto idx) constexpr noexcept {
+			return rf_2d
+				| Core::View::Matrix::Slice2d(idx, DimensionType(d))
 				| join;
-		  });
+		});
 
 	using std::ranges::transform, std::ranges::for_each;
-	transform(kernel_rg, output_memory.rangeInput().begin(),
+	transform(kernel_rg, output_memory.range().begin(),
 		[&kernel_memory, norm_factor = Base::kernelNormalisationFactor(d)](auto kernel) noexcept {
 			kernel_memory.clear();
 			for_each(kernel, [&kernel_memory](const auto region_id) noexcept { kernel_memory.increment(region_id); });

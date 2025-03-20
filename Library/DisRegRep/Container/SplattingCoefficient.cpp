@@ -60,7 +60,7 @@ typename BasicSparse<V>::SizeType BasicSparse<V>::sizeByte() const noexcept {
 
 template<typename V>
 void BasicSparse<V>::resize(const Dimension3Type dim) {
-	//Region count is unused in sparse matrix.
+	//Region count is unused in a sparse matrix.
 	const Type::Dimension2Type dim_wh = dim;
 	DRR_ASSERT(glm::all(glm::greaterThan(dim_wh, Type::Dimension2Type(0U))));
 
