@@ -17,6 +17,8 @@ inline constexpr std::string_view
 	FullName = "${DRR_PROJECT_NAME}",
 	ShortName = "${PROJECT_NAME}",
 	Description = "${PROJECT_DESCRIPTION}",
-	HomePage = "${PROJECT_HOMEPAGE_URL}";
+	HomePage = "${PROJECT_HOMEPAGE_URL}",
+
+	VersionLine = "${PROJECT_NAME} Revision ${PROJECT_VERSION_MAJOR}";
 
 }

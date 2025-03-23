@@ -177,7 +177,7 @@ private:
 
 	template<typename Self, std::ranges::input_range R>
 	requires std::ranges::viewable_range<R>
-	[[nodiscard]] constexpr auto view(this Self& self, R&& r) noexcept {
+	[[nodiscard]] constexpr std::ranges::view auto view(this Self& self, R&& r) noexcept {
 		using std::views::transform, std::bool_constant;
 
 		return std::forward<R>(r)
@@ -397,7 +397,7 @@ private:
 
 	template<typename Self, std::ranges::forward_range R>
 	requires std::ranges::viewable_range<R>
-	[[nodiscard]] constexpr auto view(this Self& self, R&& r) noexcept {
+	[[nodiscard]] constexpr std::ranges::view auto view(this Self& self, R&& r) noexcept {
 		using std::views::pairwise, std::views::transform;
 		using ProxyType = ValueProxy<std::is_const_v<Self>>;
 

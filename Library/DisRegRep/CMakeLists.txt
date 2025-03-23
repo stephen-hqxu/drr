@@ -1,6 +1,7 @@
 add_library(${DRR_CURRENT_TARGET} STATIC)
 add_subdirectory(Container)
 add_subdirectory(Core)
+add_subdirectory(Image)
 add_subdirectory(RegionfieldGenerator)
 add_subdirectory(Splatting)
 drrTargetSource(
@@ -13,6 +14,7 @@ PRIVATE
 	${PROJECT_NAME}::xxHash
 PUBLIC
 	glm::glm
+	TIFF::tiff
 )
 
 drrSourceGroup()

@@ -98,7 +98,7 @@ int main(const int argc, const char* const* const argv) try {
 	namespace Info = DisRegRep::Info;
 	auto parser = CLI::App(string(Info::Description));
 	parser.footer(format("Further details can be found on the {} project homepage at {}.", Info::FullName, Info::HomePage));
-	parser.set_version_flag("--version,-v", format("{} Revision {}", Info::ShortName, Info::Revision));
+	parser.set_version_flag("--version,-v", string(Info::VersionLine));
 	parser.require_subcommand(1);
 
 	//NOLINTBEGIN(misc-const-correctness)

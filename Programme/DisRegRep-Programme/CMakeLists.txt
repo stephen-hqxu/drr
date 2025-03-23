@@ -15,6 +15,7 @@ target_link_libraries(${DRR_CURRENT_TARGET} PRIVATE
 	${PROJECT_NAME}::Library
 
 	CLI11::CLI11
+	glm::glm
 	nanobench::nanobench
 	yaml-cpp::yaml-cpp
 )

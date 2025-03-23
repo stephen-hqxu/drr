@@ -36,6 +36,7 @@ endif()
 ### Dependency ###
 ##################
 find_package(glm 1 CONFIG REQUIRED)
+find_package(Tiff 4 CONFIG REQUIRED)
 find_package(xxHash 0.8 CONFIG REQUIRED)
 
 add_subdirectory(External)
