@@ -1,0 +1,22 @@
+#pragma once
+
+#include <version>
+
+#if __cpp_lib_ranges_concat >= 2024'03L
+#define DRR_CORE_VIEW_HAS_STD_RANGES_CONCAT
+#endif
+
+#ifdef DRR_CORE_VIEW_HAS_STD_RANGES_CONCAT
+#include <ranges>
+#else
+#include "${DRR_CXX26_REF_IMPL_STD_RANGES_CONCAT_HEADER}"
+#endif
+
+namespace DisRegRep::Core::View {
+
+/**
+ * @brief Concat range adaptor.
+ */
+inline constexpr auto Concat = std::views::concat;
+
+}

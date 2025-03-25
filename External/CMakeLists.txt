@@ -1,3 +1,9 @@
+######################################
+### C++26 Reference Implementation ###
+######################################
+cmake_path(APPEND CMAKE_CURRENT_SOURCE_DIR cpp_papers impl concat concat.hpp OUTPUT_VARIABLE std_ranges_concat_hdr)
+set(DRR_CXX26_REF_IMPL_STD_RANGES_CONCAT_HEADER ${std_ranges_concat_hdr} PARENT_SCOPE)
+
 ##############
 ### xxHash ###
 ##############

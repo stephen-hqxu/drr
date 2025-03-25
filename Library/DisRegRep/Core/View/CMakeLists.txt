@@ -10,4 +10,6 @@ HEADER
 	RangeAdaptorClosure
 	ToInput
 	Trait
+HEADER_TEMPLATE
+	Concat
 )
