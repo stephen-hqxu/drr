@@ -94,7 +94,7 @@ inline constexpr auto AddressOf = RangeAdaptorClosure([]<std::ranges::viewable_r
 inline constexpr auto Dereference =
 	RangeAdaptorClosure([]<std::ranges::viewable_range R, typename Value = std::ranges::range_value_t<R>>
 		requires std::ranges::input_range<R> && requires(Value value) { *value; }
-		(R && r) static constexpr noexcept(Trait::IsNothrowViewable<R>) -> std::ranges::view auto {
+		(R&& r) static constexpr noexcept(Trait::IsNothrowViewable<R>) -> std::ranges::view auto {
 			using std::views::transform;
 			return std::forward<R>(r)
 				 | transform([]<typename V>(V&& v) static noexcept(

@@ -4,6 +4,8 @@
 #include "RangeAdaptorClosure.hpp"
 #include "Trait.hpp"
 
+#include <DisRegRep/Core/View/Concat.hpp>
+
 #include <glm/fwd.hpp>
 
 #include <functional>
@@ -18,6 +20,15 @@
  * @brief Standard algebraic operations.
  */
 namespace DisRegRep::Core::View::Arithmetic {
+
+/**
+ * `R` can be padded with clamp to edge addressing mode with size of type `Size`.
+ */
+template<typename R, typename Size>
+concept ClampToEdgePaddableRange = std::ranges::bidirectional_range<R>
+	&& std::ranges::common_range<R>
+	&& std::ranges::sized_range<R>
+	&& std::is_invocable_v<decltype(std::views::repeat), std::ranges::range_reference_t<R>, Size>;
 
 /**
  * @brief Normalise each value in a range.
@@ -62,5 +73,36 @@ requires std::is_arithmetic_v<T>
 		| transform(bind_front(plus {}, from))
 		| Functional::Cast<T>;
 };
+
+/**
+ * @brief Pad a range such that its size is no less than the specified size. For element outside the original range, the last element
+ * is repeated to pad the size up to the specified.
+ *
+ * @tparam R Range type.
+ * @tparam Size Padding size type.
+ *
+ * @param r Range to be padded.
+ * @param total_size Total size of the range. No padding is performed if total size is no greater than the original range size.
+ *
+ * @return Range padded by its last element.
+ */
+inline constexpr auto PadClampToEdge = RangeAdaptorClosure([]<
+	std::ranges::viewable_range R,
+	typename Size
+> requires ClampToEdgePaddableRange<R, Size>
+(R&& r, const Size total_size) static constexpr noexcept(
+	Trait::IsNothrowViewable<R>
+	&& std::conjunction_v<
+		std::is_nothrow_invocable<decltype(std::views::repeat), std::ranges::range_reference_t<R>, Size>,
+		std::is_nothrow_invocable<decltype(std::ranges::size), R>
+	>
+) -> std::ranges::view auto {
+	using std::ranges::size, std::views::repeat, std::cmp_greater_equal;
+
+	const auto range_size = size(r);
+	const Size pad_size = cmp_greater_equal(total_size, range_size) ? total_size - range_size : Size {};
+	auto&& last = r.back();
+	return Concat(std::forward<R>(r), repeat(std::forward<decltype(last)>(last), pad_size));
+});
 
 }

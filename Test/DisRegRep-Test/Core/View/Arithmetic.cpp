@@ -3,6 +3,7 @@
 #include <catch2/generators/catch_generators_adapters.hpp>
 #include <catch2/generators/catch_generators_random.hpp>
 
+#include <catch2/matchers/catch_matchers_container_properties.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/matchers/catch_matchers_quantifiers.hpp>
 #include <catch2/matchers/catch_matchers_range_equals.hpp>
@@ -19,11 +20,12 @@
 
 namespace Arithmetic = DisRegRep::Core::View::Arithmetic;
 
-using Catch::Matchers::WithinAbs, Catch::Matchers::RangeEquals, Catch::Matchers::AllMatch;
+using Catch::Matchers::IsEmpty,
+	Catch::Matchers::WithinAbs, Catch::Matchers::RangeEquals, Catch::Matchers::AllMatch;
 
 using std::ranges::fold_left_first, std::ranges::sort,
 	std::plus, std::minus, std::negate, std::bind_front,
-	std::views::empty, std::views::single, std::views::pairwise_transform, std::views::transform;
+	std::views::single, std::views::repeat, std::views::pairwise_transform, std::views::transform;
 
 SCENARIO("Normalise: Divide a range of numeric values by a factor", "[Core][View][Arithmetic]") {
 
@@ -57,7 +59,7 @@ SCENARIO("LinSpace: Create a range of evenly space numbers over a specified inte
 		WHEN("Size is zero") {
 
 			THEN("LinSpace is empty") {
-				CHECK_THAT(linspace_n(0U), RangeEquals(empty<glm::float32_t>));
+				CHECK_THAT(linspace_n(0U), IsEmpty());
 			}
 
 		}
@@ -83,6 +85,41 @@ SCENARIO("LinSpace: Create a range of evenly space numbers over a specified inte
 				const auto adjacent_difference = linspace | pairwise_transform(minus {}) | transform(negate {});
 
 				CHECK_THAT(adjacent_difference, AllMatch(WithinAbs(adjacent_difference.front(), 1e-4F)));
+			}
+
+		}
+
+	}
+
+}
+
+SCENARIO("PadClampToEdge: Pad a range up to the specified size by repeating the last element", "[Core][View][Arithmetic]") {
+
+	GIVEN("An array of values") {
+		const auto size = GENERATE(take(3U, random<std::uint_fast8_t>(10U, 25U)));
+		const auto value = GENERATE_COPY(take(1U, chunk(size, random<std::uint_least8_t>(0U, 100U))));
+		const auto make_padded = [&value](const auto padding_size) constexpr noexcept -> auto {
+			return value | Arithmetic::PadClampToEdge(padding_size);
+		};
+
+		WHEN("Padding size is smaller than the array") {
+			const auto padded = make_padded(size / 2U);
+
+			THEN("No padding is done; the original array is unmodified") {
+				CHECK_THAT(padded, RangeEquals(value));
+			}
+
+		}
+
+		WHEN("Padding size is greater than the array") {
+			const auto padded = make_padded(size * 2U);
+
+			THEN("The padded range is clamped to edge") {
+				using std::views::take, std::views::drop;
+				const auto last = value.back();
+
+				CHECK_THAT(padded | take(size), RangeEquals(value));
+				CHECK_THAT(padded | drop(size), RangeEquals(repeat(last, size)));
 			}
 
 		}

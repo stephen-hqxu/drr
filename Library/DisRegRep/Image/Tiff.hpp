@@ -2,6 +2,7 @@
 
 #include <DisRegRep/Core/Exception.hpp>
 
+#include <glm/fwd.hpp>
 #include <glm/vec3.hpp>
 
 #include <tiffio.h>
@@ -42,7 +43,7 @@ public:
 	using ColourPaletteRandomEngine = std::ranlux48;
 	using ColourPaletteRandomEngineSeed = ColourPaletteRandomEngine::result_type;
 
-	using ExtentType = glm::vec<3U, std::uint32_t>; /**< Width, Length, Depth */
+	using ExtentType = glm::u32vec3; /**< Width, Length, Depth */
 
 private:
 
@@ -78,6 +79,13 @@ public:
 
 	[[nodiscard]] explicit constexpr operator bool() const noexcept {
 		return static_cast<bool>(this->Handle);
+	}
+
+	/**
+	 * @brief Release all resources and close the handle.
+	 */
+	void close() noexcept {
+		this->Handle.reset();
 	}
 
 	/**
