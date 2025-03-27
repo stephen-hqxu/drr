@@ -128,8 +128,7 @@ public:
 	 *
 	 * @return The mdspan of the regionfield.
 	 */
-	template<typename Self>
-	[[nodiscard]] constexpr auto mdspan(this Self& self) noexcept {
+	[[nodiscard]] constexpr auto mdspan(this auto& self) noexcept {
 		return std::mdspan(self.Data.data(), self.Mapping);
 	}
 
@@ -138,8 +137,7 @@ public:
 	 *
 	 * @return The span of the regionfield.
 	 */
-	template<typename Self>
-	[[nodiscard]] constexpr auto span(this Self& self) noexcept {
+	[[nodiscard]] constexpr auto span(this auto& self) noexcept {
 		return std::span(self.Data);
 	}
 
@@ -148,8 +146,7 @@ public:
 	 *
 	 * @return The 2D range of the regionfield.
 	 */
-	template<typename Self>
-	[[nodiscard]] constexpr std::ranges::view auto range2d(this Self& self) noexcept {
+	[[nodiscard]] constexpr std::ranges::view auto range2d(this auto& self) noexcept {
 		return self.view2d(self.Data);
 	}
 

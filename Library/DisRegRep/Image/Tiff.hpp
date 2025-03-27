@@ -3,6 +3,7 @@
 #include <DisRegRep/Core/Exception.hpp>
 
 #include <glm/fwd.hpp>
+#include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 
 #include <tiffio.h>
@@ -34,16 +35,16 @@ class [[nodiscard]] Tiff {
 public:
 
 	using Tag = std::uint32_t;
+
 	using ColourPaletteElement = std::uint16_t;
 	/**
 	 * @brief RGB data, each has size of `1 << bits per sample`.
 	 */
 	using ConstColourPalette = std::array<std::span<const ColourPaletteElement>, 3U>;
-
 	using ColourPaletteRandomEngine = std::ranlux48;
 	using ColourPaletteRandomEngineSeed = ColourPaletteRandomEngine::result_type;
 
-	using ExtentType = glm::u32vec3; /**< Width, Length, Depth */
+	using BinaryBuffer = std::span<std::byte>;
 
 private:
 
@@ -124,6 +125,20 @@ public:
 	void setColourPalette(ColourPaletteRandomEngineSeed) const;
 
 	/**
+	 * @brief Set image width, length and depth.
+	 *
+	 * @param extent Image extent to be set to.
+	 */
+	void setImageExtent(glm::u32vec3) const;
+
+	/**
+	 * @brief Set the number of pixels per resolution unit in image width and length directions.
+	 *
+	 * @param resolution Pixel per resolution unit.
+	 */
+	void setResolution(glm::f32vec2) const;
+
+	/**
 	 * @brief Set the tile size to the optimal size of the current handle. This only changes the tile width and length.
 	 */
 	void setOptimalTileSize() const;
@@ -172,12 +187,36 @@ public:
 	 *
 	 * @return Tile extent.
 	 */
-	[[nodiscard]] ExtentType getTileExtent() const;
+	[[nodiscard]] glm::u32vec3 getTileExtent() const;
 
 	/**
 	 * @brief Set various fields of the current TIFF to the project's default metadata.
+	 *
+	 * @param description Describe the subject of the image. Must be null-terminated.
 	 */
-	void setDefaultMetadata() const;
+	void setDefaultMetadata(std::string_view) const;
+
+	/**
+	 * @brief Equivalent size for a tile of data as it would be read or written.
+	 *
+	 * @note Please use the 64-bit size version for a BigTIFF handle. This is for the 32-bit version only.
+	 *
+	 * @return Tile size in bytes.
+	 *
+	 * @exception Core::Exception If an error occur.
+	 */
+	[[nodiscard]] std::size_t tileSize() const;
+
+	/**
+	 * @brief Write the data for the tile containing the specified coordinates.
+	 *
+	 * @param buffer Data to be written.
+	 * @param coordiante Tile coordinate.
+	 * @param sample Sample index when data are organised in separate planes.
+	 *
+	 * @exception Core::Exception If an error is detected.
+	 */
+	void writeTile(BinaryBuffer, glm::u32vec3, std::uint16_t) const;
 
 };
 

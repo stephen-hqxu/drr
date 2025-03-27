@@ -248,8 +248,7 @@ public:
 	 *
 	 * @return A range to the dense matrix.
 	 */
-	template<typename Self>
-	[[nodiscard]] constexpr std::ranges::view auto range(this Self& self) noexcept {
+	[[nodiscard]] constexpr std::ranges::view auto range(this auto& self) noexcept {
 		return self.view(self.DenseMatrix);
 	}
 
@@ -489,8 +488,7 @@ public:
 	 *
 	 * @return A range to the sparse matrix.
 	 */
-	template<typename Self>
-	[[nodiscard]] constexpr std::ranges::view auto range(this Self& self) noexcept {
+	[[nodiscard]] constexpr std::ranges::view auto range(this auto& self) noexcept {
 		return self.view(self.Offset);
 	}
 

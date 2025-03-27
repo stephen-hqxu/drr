@@ -4,6 +4,10 @@
 
 #include <DisRegRep/Info.hpp>
 
+#include <glm/fwd.hpp>
+#include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
+
 #include <tiff.h>
 #include <tiffio.h>
 
@@ -27,6 +31,8 @@
 #include <cstdint>
 
 using DisRegRep::Image::Tiff;
+
+using glm::f32vec2, glm::u32vec3;
 
 using std::array, std::string_view, std::span,
 	std::tuple, std::apply;
@@ -82,7 +88,23 @@ void Tiff::setColourPalette(const ColourPaletteRandomEngineSeed seed) const {
 	this->setColourPalette(palette_split);
 }
 
+void Tiff::setImageExtent(const u32vec3 extent) const {
+	static constexpr array Tag { TIFFTAG_IMAGEWIDTH, TIFFTAG_IMAGELENGTH, TIFFTAG_IMAGEDEPTH };
+	[this, &extent]<u32vec3::length_type... I>(integer_sequence<u32vec3::length_type, I...>) {
+		(this->setField(Tag[I], extent[I]), ...);
+	}(make_integer_sequence<u32vec3::length_type, u32vec3::length()> {});
+}
+
+void Tiff::setResolution(const f32vec2 resolution) const {
+	static constexpr array Tag { TIFFTAG_XRESOLUTION, TIFFTAG_YRESOLUTION };
+	[this, &resolution]<f32vec2::length_type... I>(integer_sequence<f32vec2::length_type, I...>) {
+		(this->setField(Tag[I], resolution[I]), ...);
+	}(make_integer_sequence<f32vec2::length_type, f32vec2::length()> {});
+}
+
 void Tiff::setOptimalTileSize() const {
+	assert(*this);
+
 	auto tw = std::numeric_limits<std::uint32_t>::max(), th = tw;
 	TIFFDefaultTileSize(**this, &tw, &th);
 	this->setField(TIFFTAG_TILEWIDTH, tw);
@@ -93,12 +115,12 @@ std::size_t Tiff::getColourPaletteSize() const {
 	return 1UZ << this->getField<std::uint16_t>(TIFFTAG_BITSPERSAMPLE).value();
 }
 
-Tiff::ExtentType Tiff::getTileExtent() const {
-	return apply([this](const auto... tag) { return ExtentType(this->getField<ExtentType::value_type>(tag).value_or(1U)...); },
+u32vec3 Tiff::getTileExtent() const {
+	return apply([this](const auto... tag) { return u32vec3(this->getField<u32vec3::value_type>(tag).value_or(1U)...); },
 		array { TIFFTAG_TILEWIDTH, TIFFTAG_TILELENGTH, TIFFTAG_TILEDEPTH });
 }
 
-void Tiff::setDefaultMetadata() const {
+void Tiff::setDefaultMetadata(const string_view description) const {
 	array<string_view::value_type, 20U> datetime;
 	format_to(datetime.begin(), "{:%Y:%m:%d %H:%M:%S}", time_point_cast<sys_seconds::duration>(system_clock::now()));
 	datetime.back() = {};
@@ -107,4 +129,18 @@ void Tiff::setDefaultMetadata() const {
 	this->setField(TIFFTAG_COPYRIGHT,
 		format("For comprehensive copyright information, please refer to the license available at {}.", Info::HomePage).c_str());
 	this->setField(TIFFTAG_DATETIME, datetime.data());
+	this->setField(TIFFTAG_IMAGEDESCRIPTION, description.data());
+}
+
+std::size_t Tiff::tileSize() const {
+	assert(*this);
+
+	const tmsize_t size = TIFFTileSize(**this);
+	DRR_ASSERT(size != 0);
+	return size;
+}
+
+void Tiff::writeTile(const BinaryBuffer buffer, const u32vec3 coordinate, const std::uint16_t sample) const {
+	assert(*this);
+	DRR_ASSERT(TIFFWriteTile(**this, buffer.data(), coordinate.x, coordinate.y, coordinate.z, sample) != -1);
 }
