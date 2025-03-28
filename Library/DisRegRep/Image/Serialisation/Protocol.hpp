@@ -7,6 +7,6 @@ namespace DisRegRep::Image::Serialisation {
  * controlling the definition of such protocol.
  */
 template<typename>
-struct Basic;
+struct Protocol;
 
 }

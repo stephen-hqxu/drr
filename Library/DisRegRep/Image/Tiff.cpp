@@ -34,7 +34,8 @@ using DisRegRep::Image::Tiff;
 
 using glm::f32vec2, glm::u32vec3;
 
-using std::array, std::string_view, std::span,
+using std::array, std::to_array,
+	std::string_view, std::span,
 	std::tuple, std::apply;
 using std::ranges::generate, std::ranges::transform,
 	std::views::adjacent, std::views::chunk;
@@ -89,16 +90,16 @@ void Tiff::setColourPalette(const ColourPaletteRandomEngineSeed seed) const {
 }
 
 void Tiff::setImageExtent(const u32vec3 extent) const {
-	static constexpr array Tag { TIFFTAG_IMAGEWIDTH, TIFFTAG_IMAGELENGTH, TIFFTAG_IMAGEDEPTH };
+	static constexpr auto ExtentTag = to_array<Tag>({ TIFFTAG_IMAGEWIDTH, TIFFTAG_IMAGELENGTH, TIFFTAG_IMAGEDEPTH });
 	[this, &extent]<u32vec3::length_type... I>(integer_sequence<u32vec3::length_type, I...>) {
-		(this->setField(Tag[I], extent[I]), ...);
+		(this->setField(ExtentTag[I], extent[I]), ...);
 	}(make_integer_sequence<u32vec3::length_type, u32vec3::length()> {});
 }
 
 void Tiff::setResolution(const f32vec2 resolution) const {
-	static constexpr array Tag { TIFFTAG_XRESOLUTION, TIFFTAG_YRESOLUTION };
+	static constexpr auto ResolutionTag = to_array<Tag>({ TIFFTAG_XRESOLUTION, TIFFTAG_YRESOLUTION });
 	[this, &resolution]<f32vec2::length_type... I>(integer_sequence<f32vec2::length_type, I...>) {
-		(this->setField(Tag[I], resolution[I]), ...);
+		(this->setField(ResolutionTag[I], resolution[I]), ...);
 	}(make_integer_sequence<f32vec2::length_type, f32vec2::length()> {});
 }
 
