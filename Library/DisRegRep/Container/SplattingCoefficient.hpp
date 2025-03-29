@@ -253,6 +253,15 @@ public:
 	}
 
 	/**
+	 * @brief Get a 2D range to the dense matrix.
+	 *
+	 * @return A 2D range to the dense matrix.
+	 */
+	[[nodiscard]] constexpr std::ranges::view auto range2d(this auto& self) noexcept {
+		return self.range() | Core::View::Matrix::NewAxisLeft(self.Mapping.extents().extent(1U));
+	}
+
+	/**
 	 * @brief Get a transposed 2D range to the dense matrix.
 	 *
 	 * @return A transposed 2D range to the dense matrix.
@@ -490,6 +499,15 @@ public:
 	 */
 	[[nodiscard]] constexpr std::ranges::view auto range(this auto& self) noexcept {
 		return self.view(self.Offset);
+	}
+
+	/**
+	 * @brief Get a 2D range to the sparse matrix.
+	 *
+	 * @return A 2D range to the sparse matrix.
+	 */
+	[[nodiscard]] constexpr std::ranges::view auto range2d(this auto& self) noexcept {
+		return self.range() | Core::View::Matrix::NewAxisLeft(self.OffsetMapping.stride(0U));
 	}
 
 	/**

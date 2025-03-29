@@ -111,7 +111,7 @@ public:
 			(this const auto& self, RankConstant<Rank>, In&& in, Out&& out) constexpr {
 				const ExtentType out_size = size(out),
 					current_extent = FinalRank ? last_rank_extent : out_size;
-				const auto in_padded = std::forward<In>(in)
+				auto in_padded = std::forward<In>(in)
 					| drop(tile_offset[Rank])
 					| take(current_extent)
 					| Core::View::Arithmetic::PadClampToEdge(current_extent);
@@ -121,12 +121,12 @@ public:
 						copy(unseq, in_padded.cbegin(), in_padded.cend(), std::move(out_it));
 						return;
 					}
-					const auto in_packed = in_padded | chunk(pack_spec->PackingFactor);
+					const auto in_packed = std::move(in_padded) | chunk(pack_spec->PackingFactor);
 					assert(size(in_packed) == out_size);
 					transform(unseq, in_packed.cbegin(), in_packed.cend(), std::move(out_it),
 						[pack_spec](auto pack_group) constexpr noexcept { return Bit::pack(std::move(pack_group), *pack_spec); });
 				} else {
-					for (auto [tile_in, tile_out] : zip(in_padded, std::forward<Out>(out))) [[likely]] {
+					for (auto [tile_in, tile_out] : zip(std::move(in_padded), std::forward<Out>(out))) [[likely]] {
 						self(RankConstant<Rank + 1> {}, std::move(tile_in), std::move(tile_out));
 					}
 				}

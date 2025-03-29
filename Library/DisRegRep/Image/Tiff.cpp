@@ -43,6 +43,7 @@ using std::chrono::system_clock, std::chrono::time_point_cast, std::chrono::sys_
 	std::format, std::format_to,
 	std::make_unique_for_overwrite,
 	std::integer_sequence, std::make_integer_sequence;
+using std::numeric_limits;
 
 void Tiff::Close::operator()(TIFF* const tif) noexcept {
 	TIFFClose(tif);
@@ -66,7 +67,8 @@ void Tiff::setColourPalette(const ConstColourPalette& palette) const {
 
 void Tiff::setColourPalette(const ColourPaletteRandomEngineSeed seed) const {
 	static_assert(
-		ColourPaletteRandomEngine::min() == 0U && ColourPaletteRandomEngine::max() == (1UZ << sizeof(ColourPaletteElement) * 8U * 3U) - 1U,
+		ColourPaletteRandomEngine::min() == 0U
+			&& ColourPaletteRandomEngine::max() == (1UZ << numeric_limits<ColourPaletteElement>::digits * 3U) - 1U,
 		"Choose a random number generator whose range can cover exactly the size of three colour palette channels to ensure maximum instruction level parallelism."
 	);
 
@@ -75,12 +77,9 @@ void Tiff::setColourPalette(const ColourPaletteRandomEngineSeed seed) const {
 	const auto palette_ptr = make_unique_for_overwrite<ColourPaletteElement[]>(rgb_palette_size);
 	const auto palette = span(palette_ptr.get(), rgb_palette_size);
 	generate(palette | adjacent<3U>, [rng = ColourPaletteRandomEngine(seed)]() mutable {
-		using Limit = std::numeric_limits<ColourPaletteElement>;
-		static constexpr auto Mask = Limit::max();
-		static constexpr std::uint_fast8_t Shift = Limit::digits;
-
+		using Limit = numeric_limits<ColourPaletteElement>;
 		return [rgb = rng()]<std::uint_fast8_t... Stride>(integer_sequence<std::uint_fast8_t, Stride...>) constexpr noexcept {
-			return tuple(Mask & rgb >> Shift * Stride...);
+			return tuple(Limit::max() & rgb >> Limit::digits * Stride...);
 		}(make_integer_sequence<std::uint_fast8_t, 3U> {});
 	});
 

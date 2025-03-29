@@ -97,10 +97,10 @@ inline constexpr auto PadClampToEdge = RangeAdaptorClosure([]<
 		std::is_nothrow_invocable<decltype(std::ranges::size), R>
 	>
 ) -> std::ranges::view auto {
-	using std::ranges::size, std::views::repeat, std::cmp_greater_equal;
+	using std::ranges::size, std::views::repeat, std::cmp_greater;
 
 	const auto range_size = size(r);
-	const Size pad_size = cmp_greater_equal(total_size, range_size) ? total_size - range_size : Size {};
+	const Size pad_size = cmp_greater(total_size, range_size) ? total_size - range_size : Size {};
 	auto&& last = r.back();
 	return Concat(std::forward<R>(r), repeat(std::forward<decltype(last)>(last), pad_size));
 });
