@@ -58,7 +58,7 @@ void Protocol<Regionfield>::write(const Tiff& tif, const Serialisable& regionfie
 
 	const auto tile_extent = static_cast<Serialisable::DimensionType>(tif.getTileExtent());
 	const auto rf_matrix = regionfield.range2d();
-	const auto tile_matrix = tile_buffer.shape(tile_extent, &bps_result);
+	const auto tile_matrix = tile_buffer.shape<true>(tile_extent, &bps_result);
 	for (const auto offset : Index::ForeachTile(rf_extent, tile_extent)) [[likely]] {
 		const auto [offset_x, offset_y] = offset;
 		tile_matrix.fromMatrix(rf_matrix, make_from_tuple<Serialisable::DimensionType>(offset));

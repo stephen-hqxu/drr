@@ -10,6 +10,7 @@
 
 #include <concepts>
 #include <limits>
+#include <type_traits>
 
 #include <cassert>
 #include <cstdint>
@@ -104,6 +105,30 @@ template<
 		packed |= element << shift * bps;
 	}
 	return packed;
+}
+
+/**
+ * @brief Unpack an integer into an array of values, from MSB to LSB.
+ *
+ * @tparam DataType The packed integer and result type.
+ *
+ * @param packed A single unsigned integer that provides the data source unpacked from.
+ * @param size Limit the output size so that the remaining bits are trimmed, starting from MSB.
+ * @param bps_result @link BitPerSampleResult.
+ *
+ * @return A range of values unpacked from `packed`.
+ */
+template<std::unsigned_integral DataType>
+[[nodiscard]] constexpr std::ranges::view auto unpack(
+	const DataType packed, const std::type_identity_t<DataType> size, const BitPerSampleResult& bps_result) noexcept {
+	using std::views::iota, std::views::stride, std::views::reverse, std::views::transform, std::views::take;
+
+	const auto [bps, packing_factor, _, sample_mask] = bps_result;
+	return iota(DataType {}, packing_factor)
+		| stride(bps_result.Bit)
+		| transform([packed, sample_mask](const auto shift) constexpr noexcept -> DataType { return packed >> shift & sample_mask; })
+		| reverse
+		| take(size);
 }
 
 }
