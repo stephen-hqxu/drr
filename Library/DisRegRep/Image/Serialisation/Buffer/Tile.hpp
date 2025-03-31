@@ -322,8 +322,8 @@ public:
 			assert(bps_result);
 		}
 		auto shaped_memory = [
-			packing_factor_log2 = bps_result ? bps_result->PackingFactorLog2 : Bit::BitPerSampleResult::BitType {},
-			&tile_extent
+			&tile_extent,
+			packing_factor_log2 = Packed ? bps_result->PackingFactorLog2 : Bit::BitPerSampleResult::BitType {}
 		]<glm::length_t Rank, typename Matrix>(
 			this const auto& self,
 			RankConstant<Rank>,
