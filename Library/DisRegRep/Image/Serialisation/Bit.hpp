@@ -3,6 +3,7 @@
 #include <DisRegRep/Core/View/Arithmetic.hpp>
 
 #include <algorithm>
+#include <functional>
 #include <ranges>
 
 #include <bit>
@@ -130,15 +131,17 @@ template<
  */
 template<std::unsigned_integral DataType>
 [[nodiscard]] constexpr std::ranges::view auto unpack(
-	const DataType packed, const std::type_identity_t<DataType> size, const BitPerSampleResult& bps_result) noexcept {
-	using std::views::iota, std::views::stride, std::views::reverse, std::views::transform, std::views::take;
+	const DataType packed, const std::integral auto size, const BitPerSampleResult& bps_result) noexcept {
+	using std::bind_front, std::multiplies, std::bit_and,
+		std::views::iota, std::views::reverse, std::views::take, std::views::transform;
 
 	const auto [bps, packing_factor, _, sample_mask] = bps_result;
-	return iota(DataType {}, packing_factor)
-		| stride(bps_result.Bit)
-		| transform([packed, sample_mask](const auto shift) constexpr noexcept -> DataType { return packed >> shift & sample_mask; })
+	return iota(DataType {}, static_cast<DataType>(packing_factor))
 		| reverse
-		| take(size);
+		| take(size)
+		| transform(bind_front(multiplies {}, bps))
+		| transform([packed](const auto shift) constexpr noexcept { return packed >> shift; })
+		| transform(bind_front(bit_and<DataType> {}, sample_mask));
 }
 
 }
