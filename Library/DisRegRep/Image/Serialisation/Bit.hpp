@@ -33,6 +33,24 @@ struct BitPerSampleResult {
 		PackingFactorLog2; /**< Base 2 log of the packing factor. */
 	MaskType SampleMask; /**< A mask to be applied to the data elements when packing them to an integer. */
 
+	/**
+	 * @brief Automatically calculate all fields given a baseline bits per sample for a particular data type.
+	 *
+	 * @tparam DataType Type of each element in a data array.
+	 *
+	 * @param bps Number of bits per sample. The behaviour is undefined unless it is a power-of-two number and no more than the maximum
+	 * bit storage capacity supported by `DataType`.
+	 */
+	template<std::unsigned_integral DataType>
+	explicit constexpr BitPerSampleResult(std::type_identity<DataType>, const BitType bps) noexcept :
+		Bit(bps),
+		PackingFactor(std::numeric_limits<DataType>::digits >> std::countr_zero(bps)),
+		PackingFactorLog2(std::countr_zero(this->PackingFactor)),
+		SampleMask((1U << bps) - 1U) {
+		assert(std::has_single_bit(bps));
+		assert(this->PackingFactor > 0U);
+	}
+
 };
 
 /**
@@ -49,19 +67,11 @@ struct BitPerSampleResult {
  */
 template<std::ranges::input_range Data, std::unsigned_integral DataType = std::ranges::range_value_t<Data>>
 [[nodiscard]] constexpr BitPerSampleResult minimumBitPerSample(Data&& data) noexcept {
-	using std::countr_zero;
-
 	const auto data_max = std::ranges::max(std::forward<Data>(data));
 	const BitPerSampleResult::BitType min_bps = std::bit_width(std::bit_floor(data_max)),
 		//Computer generally does not work well with non-power-of-two bits of data; need to round it up.
-		bps_power_of_two = std::bit_ceil(min_bps),
-		packing_factor = std::numeric_limits<DataType>::digits >> countr_zero(bps_power_of_two);
-	return BitPerSampleResult {
-		.Bit = bps_power_of_two,
-		.PackingFactor = packing_factor,
-		.PackingFactorLog2 = static_cast<BitPerSampleResult::BitType>(countr_zero(packing_factor)),
-		.SampleMask = static_cast<BitPerSampleResult::MaskType>((1U << bps_power_of_two) - 1U)
-	};
+		bps_power_of_two = std::bit_ceil(min_bps);
+	return BitPerSampleResult(std::type_identity<DataType> {}, bps_power_of_two);
 }
 
 /**

@@ -10,6 +10,8 @@ struct DisRegRep::Image::Serialisation::Protocol<DisRegRep::Container::Regionfie
 
 	using Serialisable = Container::Regionfield;
 
+	static void initialise();
+	static void read(const Tiff&, Serialisable&);
 	static void write(const Tiff&, const Serialisable&, Tiff::ColourPaletteRandomEngineSeed);
 
 };

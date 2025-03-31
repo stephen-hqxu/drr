@@ -139,9 +139,9 @@ public:
 	void setResolution(glm::f32vec2) const;
 
 	/**
-	 * @brief Set the tile size to the optimal size of the current handle. This only changes the tile width and length.
+	 * @brief Set the tile extent to the optimal extent of the current handle. This only changes the tile width and length.
 	 */
-	void setOptimalTileSize() const;
+	void setOptimalTileExtent() const;
 
 	/**
 	 * @brief Get value of a tag associated with the current directory of the handle.
@@ -183,6 +183,13 @@ public:
 	[[nodiscard]] std::size_t getColourPaletteSize() const;
 
 	/**
+	 * @brief Get image width, length and depth.
+	 *
+	 * @return Image extent of this handle.
+	 */
+	[[nodiscard]] glm::u32vec3 getImageExtent() const;
+
+	/**
 	 * @brief Get tile extent of the handle. For any axis whose extent is not set, 1 is returned.
 	 *
 	 * @return Tile extent.
@@ -197,6 +204,13 @@ public:
 	void setDefaultMetadata(std::string_view) const;
 
 	/**
+	 * @brief Check if image data has a tiled organisation.
+	 *
+	 * @return True if image is tiled.
+	 */
+	[[nodiscard]] bool isTiled() const noexcept;
+
+	/**
 	 * @brief Equivalent size for a tile of data as it would be read or written.
 	 *
 	 * @note Please use the 64-bit size version for a BigTIFF handle. This is for the 32-bit version only.
@@ -208,6 +222,15 @@ public:
 	[[nodiscard]] std::size_t tileSize() const;
 
 	/**
+	 * @brief Return the data for the tile containing the specified coordinates.
+	 *
+	 * @param buffer Decompressed data stored to, written in native byte- and bit-ordering.
+	 * @param coordinate Tile coordiante.
+	 * @param sample Sample index when data are organised in separate planes.
+	 */
+	void readTile(BinaryBuffer, glm::u32vec3, std::uint16_t) const;
+
+	/**
 	 * @brief Write the data for the tile containing the specified coordinates.
 	 *
 	 * @param buffer Data to be written.
@@ -217,6 +240,31 @@ public:
 	 * @exception Core::Exception If an error is detected.
 	 */
 	void writeTile(BinaryBuffer, glm::u32vec3, std::uint16_t) const;
+
+	/**
+	 * @brief Define an application tag so that it can be read or written.
+	 *
+	 * @tparam Size Number of field info.
+	 * @tparam FieldInfo An array of field info structures. Each provides a definition for a tag.
+	 *
+	 * @exception Core::Exception If application tags are redefined. This function does not check the content of the field info array,
+	 * however. Providing duplicate entries is an error that will not be captured.
+	 */
+	template<std::size_t Size, const std::array<TIFFFieldInfo, Size>& FieldInfo>
+	static void defineApplicationTag() {
+		static constinit bool defined = false;
+		static constinit TIFFExtendProc parent_extender = nullptr;
+		DRR_ASSERT(!defined);
+
+		constexpr auto extender = [](TIFF* const tif) static noexcept -> void {
+			TIFFMergeFieldInfo(tif, FieldInfo.data(), Size);
+			if (parent_extender) [[likely]] {
+				parent_extender(tif);
+			}
+		};
+		parent_extender = TIFFSetTagExtender(extender);
+		defined = true;
+	}
 
 };
 

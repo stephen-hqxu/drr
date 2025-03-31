@@ -45,6 +45,18 @@ using std::chrono::system_clock, std::chrono::time_point_cast, std::chrono::sys_
 	std::integer_sequence, std::make_integer_sequence;
 using std::numeric_limits;
 
+namespace {
+
+namespace TiffTag {
+
+constexpr auto ImageExtent = to_array<Tiff::Tag>({ TIFFTAG_IMAGEWIDTH, TIFFTAG_IMAGELENGTH, TIFFTAG_IMAGEDEPTH });
+constexpr auto TileExtent = to_array<Tiff::Tag>({ TIFFTAG_TILEWIDTH, TIFFTAG_TILELENGTH, TIFFTAG_TILEDEPTH });
+constexpr auto Resolution = to_array<Tiff::Tag>({ TIFFTAG_XRESOLUTION, TIFFTAG_YRESOLUTION });
+
+}
+
+}
+
 void Tiff::Close::operator()(TIFF* const tif) noexcept {
 	TIFFClose(tif);
 }
@@ -55,7 +67,7 @@ Tiff::Tiff(const string_view filename, const string_view mode) : Handle(TIFFOpen
 }
 
 void Tiff::setColourPalette(const ConstColourPalette& palette) const {
-	DRR_ASSERT(this->getField<std::uint16_t>(TIFFTAG_PHOTOMETRIC).value() == PHOTOMETRIC_PALETTE);
+	DRR_ASSERT(this->getField<std::uint16_t>(TIFFTAG_PHOTOMETRIC) == PHOTOMETRIC_PALETTE);
 	apply(
 		[this, size = this->getColourPaletteSize()](const auto&... channel) {
 			DRR_ASSERT(((channel.size() == size) && ...));
@@ -89,35 +101,38 @@ void Tiff::setColourPalette(const ColourPaletteRandomEngineSeed seed) const {
 }
 
 void Tiff::setImageExtent(const u32vec3 extent) const {
-	static constexpr auto ExtentTag = to_array<Tag>({ TIFFTAG_IMAGEWIDTH, TIFFTAG_IMAGELENGTH, TIFFTAG_IMAGEDEPTH });
 	[this, &extent]<u32vec3::length_type... I>(integer_sequence<u32vec3::length_type, I...>) {
-		(this->setField(ExtentTag[I], extent[I]), ...);
+		(this->setField(TiffTag::ImageExtent[I], extent[I]), ...);
 	}(make_integer_sequence<u32vec3::length_type, u32vec3::length()> {});
 }
 
 void Tiff::setResolution(const f32vec2 resolution) const {
-	static constexpr auto ResolutionTag = to_array<Tag>({ TIFFTAG_XRESOLUTION, TIFFTAG_YRESOLUTION });
 	[this, &resolution]<f32vec2::length_type... I>(integer_sequence<f32vec2::length_type, I...>) {
-		(this->setField(ResolutionTag[I], resolution[I]), ...);
+		(this->setField(TiffTag::Resolution[I], resolution[I]), ...);
 	}(make_integer_sequence<f32vec2::length_type, f32vec2::length()> {});
 }
 
-void Tiff::setOptimalTileSize() const {
+void Tiff::setOptimalTileExtent() const {
 	assert(*this);
 
 	auto tw = std::numeric_limits<std::uint32_t>::max(), th = tw;
 	TIFFDefaultTileSize(**this, &tw, &th);
-	this->setField(TIFFTAG_TILEWIDTH, tw);
-	this->setField(TIFFTAG_TILELENGTH, th);
+	this->setField(TiffTag::TileExtent[0], tw);
+	this->setField(TiffTag::TileExtent[1], th);
 }
 
 std::size_t Tiff::getColourPaletteSize() const {
 	return 1UZ << this->getField<std::uint16_t>(TIFFTAG_BITSPERSAMPLE).value();
 }
 
+u32vec3 Tiff::getImageExtent() const {
+	return apply(
+		[this](const auto... tag) { return u32vec3(this->getField<u32vec3::value_type>(tag).value_or(1U)...); }, TiffTag::ImageExtent);
+}
+
 u32vec3 Tiff::getTileExtent() const {
-	return apply([this](const auto... tag) { return u32vec3(this->getField<u32vec3::value_type>(tag).value_or(1U)...); },
-		array { TIFFTAG_TILEWIDTH, TIFFTAG_TILELENGTH, TIFFTAG_TILEDEPTH });
+	return apply(
+		[this](const auto... tag) { return u32vec3(this->getField<u32vec3::value_type>(tag).value_or(1U)...); }, TiffTag::TileExtent);
 }
 
 void Tiff::setDefaultMetadata(const string_view description) const {
@@ -132,12 +147,22 @@ void Tiff::setDefaultMetadata(const string_view description) const {
 	this->setField(TIFFTAG_IMAGEDESCRIPTION, description.data());
 }
 
+bool Tiff::isTiled() const noexcept {
+	assert(*this);
+	return TIFFIsTiled(**this);
+}
+
 std::size_t Tiff::tileSize() const {
 	assert(*this);
 
 	const tmsize_t size = TIFFTileSize(**this);
 	DRR_ASSERT(size != 0);
 	return size;
+}
+
+void Tiff::readTile(const BinaryBuffer buffer, const u32vec3 coordinate, const std::uint16_t sample) const {
+	assert(*this);
+	DRR_ASSERT(TIFFReadTile(**this, buffer.data(), coordinate.x, coordinate.y, coordinate.z, sample) != -1);
 }
 
 void Tiff::writeTile(const BinaryBuffer buffer, const u32vec3 coordinate, const std::uint16_t sample) const {

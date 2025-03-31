@@ -57,6 +57,10 @@ public:
 	using MemoryType = std::vector<ValueType, Core::UninitialisedAllocator<ValueType>>;
 	using SizeType = typename MemoryType::size_type;
 
+	//Tags for deducing packing argument when creating a shaped tile view.
+	static constexpr std::bool_constant<true> EnablePacking;
+	static constexpr std::bool_constant<false> DisablePacking;
+
 private:
 
 	template<glm::length_t Rank>
@@ -235,14 +239,14 @@ public:
 		template<typename Matrix, glm::length_t L, glm::qualifier Q>
 		constexpr void toMatrix(Matrix&& matrix, const glm::vec<L, ExtentType, Q>& tile_offset) const {
 			using std::views::drop, std::views::take, std::views::zip,
-				std::ranges::input_range, std::ranges::viewable_range,
+				std::ranges::input_range, std::ranges::viewable_range, std::ranges::sized_range,
 				std::ranges::range_const_reference_t, std::ranges::range_reference_t;
 			[this, &tile_offset]<
 				glm::length_t Rank,
 				input_range In,
 				input_range Out,
 				bool FinalRank = Rank == L - 1
-			> requires viewable_range<In> && viewable_range<Out>
+			> requires viewable_range<In> && viewable_range<Out> && sized_range<Out>
 				&& (FinalRank
 					|| (std::is_move_constructible_v<range_const_reference_t<In>> && std::is_move_constructible_v<range_reference_t<Out>>))
 			(this const auto& self, RankConstant<Rank>, In&& in, Out&& out) constexpr {
@@ -311,9 +315,9 @@ public:
 	 *
 	 * @return @link Shaped.
 	 */
-	template<bool Packed, typename Self, glm::length_t L, std::integral Ext, glm::qualifier Q>
-	constexpr auto shape(this Self& self,
-		const glm::vec<L, Ext, Q>& tile_extent, const Bit::BitPerSampleResult* const bps_result = nullptr) noexcept {
+	template<typename Self, bool Packed, glm::length_t L, std::integral Ext, glm::qualifier Q>
+	constexpr auto shape(this Self& self, std::bool_constant<Packed>, const glm::vec<L, Ext, Q>& tile_extent,
+		const Bit::BitPerSampleResult* const bps_result = nullptr) noexcept {
 		if constexpr (Packed) {
 			assert(bps_result);
 		}

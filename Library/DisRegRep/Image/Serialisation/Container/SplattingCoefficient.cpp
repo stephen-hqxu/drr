@@ -58,7 +58,7 @@ void Protocol<DenseMask>::write(const Tiff& tif, const Serialisable& dense_mask)
 	tif.setImageExtent(mask_extent);
 	//Although it is a 3D matrix, we reckon the region axis is shallow compared to width and height axis.
 	//It does not worth to use a 3D tile because the region axis may have a lot of paddings.
-	tif.setOptimalTileSize();
+	tif.setOptimalTileExtent();
 
 	Buffer::Tile<PixelType> tile_buffer;
 	tile_buffer.allocate(tif.tileSize());
@@ -69,7 +69,7 @@ void Protocol<DenseMask>::write(const Tiff& tif, const Serialisable& dense_mask)
 		return *std::move(proxy)
 			| transform([](const auto mask) static constexpr noexcept -> PixelType { return std::round(mask * PixelLimit::max()); });
 	})));
-	const auto tile_matrix = tile_buffer.shape<false>(tile_extent);
+	const auto tile_matrix = tile_buffer.shape(decltype(tile_buffer)::DisablePacking, tile_extent);
 	for (const auto offset : Index::ForeachTile(mask_extent, tile_extent)) [[likely]] {
 		const auto [offset_x, offset_y, offset_region] = offset;
 		tile_matrix.fromMatrix(mask_matrix, make_from_tuple<Serialisable::Dimension3Type>(offset));
