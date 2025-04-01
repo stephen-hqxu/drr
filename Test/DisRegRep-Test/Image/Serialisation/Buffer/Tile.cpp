@@ -38,8 +38,8 @@ using ExtentType = glm::vec<2U, ScalarType>;
 using TileType = Tile<ValueType>;
 
 constexpr auto MatrixExtent = ExtentType(5U, 7U),
-	TileExtent = ExtentType(3U, 4U),
-	TileOffset = ExtentType(3U, 5U);
+	TileExtent = ExtentType(4U, 3U),
+	TileOffset = ExtentType(2U, 5U);
 
 constexpr auto Matrix = to_array<ValueType>({
 	4, 2, 6, 8, 7, 7, 7,
@@ -49,15 +49,18 @@ constexpr auto Matrix = to_array<ValueType>({
 	3, 3, 0, 5, 9, 2, 3
 });
 constexpr auto TileContent = to_array<ValueType>({
-	7, 4, 4, 4,
-	2, 3, 3, 3,
-	2, 3, 3, 3
+	8, 4, 4,
+	7, 4, 4,
+	2, 3, 3,
+	2, 3, 3
 });
 constexpr auto TileContentBounded = to_array<ValueType>({
+	8, 4,
 	7, 4,
 	2, 3
 });
 constexpr auto TileContentPacked = to_array<ValueType>({
+	0x84, 0x44,
 	0x74, 0x44,
 	0x23, 0x33,
 	0x23, 0x33

@@ -39,9 +39,8 @@ using PreparedGenerationInfo = tuple<Ctn::Regionfield, const StockGen::Base::Gen
 	);
 }
 
-template<derived_from<StockGen::Base> Gen>
 //NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
-Ctn::Regionfield generate(const Gen& generator, PreparedGenerationInfo&& prepared_generation_info) {
+Ctn::Regionfield generate(const derived_from<StockGen::Base> auto& generator, PreparedGenerationInfo&& prepared_generation_info) {
 	auto& [regionfield, stock_gen_info] = prepared_generation_info;
 	invoke(generator, StockGen::ExecutionPolicy::MultiThreadingTrait, regionfield, stock_gen_info);
 	return std::move(regionfield);

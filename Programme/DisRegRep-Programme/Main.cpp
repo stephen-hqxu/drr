@@ -24,6 +24,8 @@
 #include <cstdint>
 #include <cstdlib>
 
+namespace Info = DisRegRep::Info;
+
 namespace fs = std::filesystem;
 using std::chrono::system_clock, std::chrono::sys_seconds, std::chrono::duration_cast;
 using std::format, std::string;
@@ -72,30 +74,36 @@ struct Profile {
 //NOLINTEND(cppcoreguidelines-pro-type-member-init)
 
 void runProfiler(const Argument::Profile& arg_profile) {
-	const auto& [config_file, result_dir, thread_count] = arg_profile;
-	const YAML::Node config = YAML::LoadFile(config_file);
-	const YAML::Node& affinity_mask = config["thread affinity mask"];
+	const auto start = system_clock::now();
+	println("The {} profiling engine was initiated at {:%c}.", Info::FullName, start);
+	{
+		const auto& [config_file, result_dir, thread_count] = arg_profile;
+		const YAML::Node config = YAML::LoadFile(config_file);
+		const YAML::Node& affinity_mask = config["thread affinity mask"];
 
-	namespace Prof = DisRegRep::Programme::Profiler;
-	const Prof::Splatting::ThreadPoolCreateInfo tp_info {
-		.Size = thread_count,
-		.AffinityMask = affinity_mask["profiler"].as<std::uint64_t>()
-	};
-	const auto parameter_set = config["parameter set"].as<Prof::Driver::SplattingInfo::ParameterSetType>();
-	Prof::Driver::splatting({
-		.ResultDirectory = &result_dir,
-		.ThreadPoolCreateInfo = &tp_info,
-		.BackgroundThreadAffinityMask = affinity_mask["background"].as<std::uint64_t>(),
-		.Seed = config["seed"].as<Prof::Splatting::SeedType>(),
-		.ProgressLog = &cout,
-		.ParameterSet = &parameter_set
-	});
+		namespace Prof = DisRegRep::Programme::Profiler;
+		const Prof::Splatting::ThreadPoolCreateInfo tp_info {
+			.Size = thread_count,
+			.AffinityMask = affinity_mask["profiler"].as<std::uint64_t>()
+		};
+		const auto parameter_set = config["parameter set"].as<Prof::Driver::SplattingInfo::ParameterSetType>();
+		Prof::Driver::splatting({
+			.ResultDirectory = &result_dir,
+			.ThreadPoolCreateInfo = &tp_info,
+			.BackgroundThreadAffinityMask = affinity_mask["background"].as<std::uint64_t>(),
+			.Seed = config["seed"].as<Prof::Splatting::SeedType>(),
+			.ProgressLog = &cout,
+			.ParameterSet = &parameter_set
+		});
+	}
+	const auto end = system_clock::now();
+	println("The profiling engine exits normally at {:%c}, with a total runtime of {:%M min %S s}.", end,
+		duration_cast<sys_seconds::duration>(end - start));
 }
 
 }
 
 int main(const int argc, const char* const* const argv) try {
-	namespace Info = DisRegRep::Info;
 	auto parser = CLI::App(string(Info::Description));
 	parser.footer(format("Further details can be found on the {} project homepage at {}.", Info::FullName, Info::HomePage));
 	parser.set_version_flag("--version,-v", string(Info::VersionLine));
@@ -109,14 +117,7 @@ int main(const int argc, const char* const* const argv) try {
 	CLI11_PARSE(parser, argc, argv);
 
 	if (cmd_profile) {
-		const auto start = system_clock::now();
-		println("The {} profiling engine was initiated at {:%c}.", Info::FullName, start);
-
 		runProfiler(arg_profile);
-
-		const auto end = system_clock::now();
-		println("The profiling engine exits normally at {:%c}, with a total runtime of {:%M min %S s}.",
-			end, duration_cast<sys_seconds::duration>(end - start));
 	}
 	return EXIT_SUCCESS;
 } catch (const exception& e) {

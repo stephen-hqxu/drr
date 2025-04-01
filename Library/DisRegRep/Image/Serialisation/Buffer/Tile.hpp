@@ -321,10 +321,7 @@ public:
 		if constexpr (Packed) {
 			assert(bps_result);
 		}
-		auto shaped_memory = [
-			&tile_extent,
-			packing_factor_log2 = Packed ? bps_result->PackingFactorLog2 : Bit::BitPerSampleResult::BitType {}
-		]<glm::length_t Rank, typename Matrix>(
+		auto shaped_memory = [&tile_extent, bps_result]<glm::length_t Rank, typename Matrix>(
 			this const auto& self,
 			RankConstant<Rank>,
 			Matrix&& matrix
@@ -333,8 +330,9 @@ public:
 				return std::forward<Matrix>(matrix) | std::views::all;
 			} else {
 				Ext extent = tile_extent[Rank];
-				if constexpr (Rank == L - 1) {
-					extent >>= packing_factor_log2;
+				if constexpr (Packed && Rank == L - 1) {
+					const auto [_1, packing_factor, packing_factor_log2, _2] = *bps_result;
+					extent = (extent + packing_factor - 1U) >> packing_factor_log2;
 				}
 				return self(RankConstant<Rank - 1> {}, std::forward<Matrix>(matrix) | Core::View::Matrix::NewAxisLeft(extent));
 			}

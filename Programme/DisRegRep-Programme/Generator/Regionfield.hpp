@@ -6,7 +6,7 @@
 #include <DisRegRep/RegionfieldGenerator/VoronoiDiagram.hpp>
 
 /**
- * @brief Generate a regionfield using one of the stock regionfield generators, and save it to a file.
+ * @brief Generate a regionfield using one of the stock regionfield generators.
  */
 namespace DisRegRep::Programme::Generator::Regionfield {
 
