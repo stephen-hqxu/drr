@@ -21,8 +21,7 @@ namespace DisRegRep::RegionfieldGenerator::ExecutionPolicy {
  */
 enum class Threading : std::uint_fast8_t {
 	Single = 0x00U,
-	Multi = 0xFFU,
-	Default = Single
+	Multi = 0xFFU
 };
 
 /**
@@ -55,6 +54,10 @@ struct Trait {
 	}();
 
 };
+
+//Convenience tags for specifying different execution policies when invoking a regionfield generator.
+inline constexpr DRR_REGIONFIELD_GENERATOR_EXECUTION_POLICY_TRAIT(Single) SingleThreadingTrait;
+inline constexpr DRR_REGIONFIELD_GENERATOR_EXECUTION_POLICY_TRAIT(Multi) MultiThreadingTrait;
 
 /**
  * `Tr` is an execution policy trait.

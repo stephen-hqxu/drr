@@ -79,7 +79,7 @@ SCENARIO("Regionfield is a matrix of region identifiers", "[Container][Regionfie
 			THEN("Regionfield can be filled with region identifiers") {
 				rf.resize(make_vec2(GENERATE(take(2U, chunk(2U, random<std::uint_least8_t>(5U, 20U)))).data()));
 				rf.RegionCount = GENERATE(take(2U, random<Regionfield::ValueType>(1U, 10U)));
-				Generator(DRR_REGIONFIELD_GENERATOR_EXECUTION_POLICY_TRAIT(Multi) {}, rf, {
+				Generator(RfGenExec::MultiThreadingTrait, rf, {
 					.Seed = Catch::getSeed()
 				});
 

@@ -458,17 +458,17 @@ public:
 
 	//Generate a regionfield with automate execution policy selection.
 	template<typename... Arg>
-	requires is_invocable_v<const RfGen::Base, DRR_REGIONFIELD_GENERATOR_EXECUTION_POLICY_TRAIT(Default), Arg...>
+	requires is_invocable_v<const RfGen::Base, decltype(RfGen::ExecutionPolicy::SingleThreadingTrait), Arg...>
 	void generateRegionfield(const RfGen::Base& rf_gen, Arg&&... arg) const {
 		if (const auto generate = bind_back(std::cref(rf_gen), std::ref(std::forward<Arg>(arg))...);
 			this->ThreadPool.sizeThread() == 1U) {
 			//It is fine to generate regionfield in parallel if there is only one profiler thread,
 			//	since it will be waiting for generation anyway, and by theory it should not cause resource contention.
-			generate(DRR_REGIONFIELD_GENERATOR_EXECUTION_POLICY_TRAIT(Multi) {});
+			generate(RfGen::ExecutionPolicy::MultiThreadingTrait);
 		} else {
 			//If profiler is run in parallel, then we have to force single-thread execution
 			//	to ensure generator does not contend with profiler threads.
-			generate(DRR_REGIONFIELD_GENERATOR_EXECUTION_POLICY_TRAIT(Single) {});
+			generate(RfGen::ExecutionPolicy::SingleThreadingTrait);
 		}
 	}
 

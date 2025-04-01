@@ -3,6 +3,7 @@ find_package(nanobench CONFIG REQUIRED)
 find_package(yaml-cpp 0.8 CONFIG REQUIRED)
 
 add_executable(${DRR_CURRENT_TARGET})
+add_subdirectory(Generator)
 add_subdirectory(Profiler)
 drrTargetSource(
 HEADER
