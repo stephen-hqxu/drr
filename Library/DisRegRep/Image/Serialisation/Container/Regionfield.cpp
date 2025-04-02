@@ -53,7 +53,7 @@ void Protocol<Regionfield>::initialise() {
 			.field_type = TIFF_BYTE,
 			.field_bit = FIELD_CUSTOM,
 			.field_oktochange = true,
-			.field_name = const_cast<char*>("RegionfieldRegionCount")
+			.field_name = const_cast<char*>("RegionCount")
 		}
 	});
 	Tiff::defineApplicationTag<FieldInfo.size(), FieldInfo>();

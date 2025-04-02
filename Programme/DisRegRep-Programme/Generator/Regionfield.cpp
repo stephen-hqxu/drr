@@ -53,7 +53,7 @@ Ctn::Regionfield RfGen::uniform(const GenerateInfo& gen_info) {
 	return generate(Uniform, prepareRegionfieldGeneration(gen_info));
 }
 
-Ctn::Regionfield RfGen::voronoiDiagram(const GenerateInfo& gen_info, const StockGen::VoronoiDiagram::SizeType centroid_count) {
+Ctn::Regionfield RfGen::voronoiDiagram(const GenerateInfo& gen_info, const CentroidCountType centroid_count) {
 	StockGen::VoronoiDiagram voronoi_diagram;
 	voronoi_diagram.CentroidCount = centroid_count;
 	return generate(voronoi_diagram, prepareRegionfieldGeneration(gen_info));

@@ -1,4 +1,4 @@
-find_package(CLI11 2 CONFIG REQUIRED)
+find_package(CLI11 2.4 CONFIG REQUIRED)
 find_package(nanobench CONFIG REQUIRED)
 find_package(yaml-cpp 0.8 CONFIG REQUIRED)
 

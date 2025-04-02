@@ -10,15 +10,21 @@
  */
 namespace DisRegRep::Programme::Generator::Regionfield {
 
+using DimensionType = Container::Regionfield::DimensionType;
+using RegionCountType = Container::Regionfield::ValueType;
+
+using SeedType = RegionfieldGenerator::Base::SeedType;
+using CentroidCountType = RegionfieldGenerator::VoronoiDiagram::SizeType;
+
 /**
  * @brief Common settings shared by different regionfield generators.
  */
 struct GenerateInfo {
 
-	Container::Regionfield::DimensionType Resolution;
-	Container::Regionfield::ValueType RegionCount;
+	DimensionType Resolution;
+	RegionCountType RegionCount;
 
-	RegionfieldGenerator::Base::SeedType Seed;
+	SeedType Seed;
 
 };
 
@@ -39,6 +45,6 @@ struct GenerateInfo {
  *
  * @return Regionfield generated using Voronoi Diagram.
  */
-[[nodiscard]] Container::Regionfield voronoiDiagram(const GenerateInfo&, RegionfieldGenerator::VoronoiDiagram::SizeType);
+[[nodiscard]] Container::Regionfield voronoiDiagram(const GenerateInfo&, CentroidCountType);
 
 }
