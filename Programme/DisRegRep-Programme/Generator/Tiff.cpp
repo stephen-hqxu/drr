@@ -13,13 +13,13 @@ using std::visit;
 
 namespace {
 
-void setFieldCompression(const Tiff& tif, TifGen::Compression::None) {
+void setCompression(const Tiff& tif, TifGen::Compression::None) {
 	tif.setField(TIFFTAG_COMPRESSION, COMPRESSION_NONE);
 }
-void setFieldCompression(const Tiff& tif, TifGen::Compression::LempelZivWelch) {
+void setCompression(const Tiff& tif, TifGen::Compression::LempelZivWelch) {
 	tif.setField(TIFFTAG_COMPRESSION, COMPRESSION_LZW);
 }
-void setFieldCompression(const Tiff& tif, const TifGen::Compression::ZStandard option) {
+void setCompression(const Tiff& tif, const TifGen::Compression::ZStandard option) {
 	const auto [compression_level] = option;
 	tif.setField(TIFFTAG_COMPRESSION, COMPRESSION_ZSTD);
 	tif.setField(TIFFTAG_ZSTD_LEVEL, compression_level);
@@ -28,5 +28,5 @@ void setFieldCompression(const Tiff& tif, const TifGen::Compression::ZStandard o
 }
 
 void TifGen::setCompression(const Image::Tiff& tif, const Compression::Option& option) {
-	visit([&tif](const auto& compression) { setFieldCompression(tif, compression); }, option);
+	visit([&tif](const auto& compression) { ::setCompression(tif, compression); }, option);
 }

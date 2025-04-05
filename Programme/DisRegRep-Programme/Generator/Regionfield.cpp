@@ -8,6 +8,7 @@
 #include <DisRegRep/RegionfieldGenerator/VoronoiDiagram.hpp>
 
 #include <tuple>
+#include <variant>
 
 #include <functional>
 #include <utility>
@@ -15,46 +16,48 @@
 #include <concepts>
 
 namespace RfGen = DisRegRep::Programme::Generator::Regionfield;
-namespace Ctn = DisRegRep::Container;
 namespace StockGen = DisRegRep::RegionfieldGenerator;
+using DisRegRep::Container::Regionfield;
 
-using std::tuple;
+using std::tuple, std::visit;
 using std::invoke;
 using std::derived_from;
 
 namespace {
 
-using PreparedGenerationInfo = tuple<Ctn::Regionfield, const StockGen::Base::GenerateInfo>;
+using PreparedGenerationInfo = tuple<Regionfield, const StockGen::Base::GenerateInfo>;
 
-[[nodiscard]] PreparedGenerationInfo prepareRegionfieldGeneration(const RfGen::GenerateInfo& gen_info) {
-	const auto [resolution, region_count, seed] = gen_info;
-	Ctn::Regionfield regionfield;
-	regionfield.resize(resolution);
-	regionfield.RegionCount = region_count;
-	return tuple(
-		std::move(regionfield),
-		StockGen::Base::GenerateInfo {
-			.Seed = seed
-		}
-	);
-}
-
-//NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
-Ctn::Regionfield generate(const derived_from<StockGen::Base> auto& generator, PreparedGenerationInfo&& prepared_generation_info) {
+[[nodiscard]] Regionfield generate(
+	//NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
+	const derived_from<StockGen::Base> auto& generator, PreparedGenerationInfo&& prepared_generation_info) {
 	auto& [regionfield, stock_gen_info] = prepared_generation_info;
 	invoke(generator, StockGen::ExecutionPolicy::MultiThreadingTrait, regionfield, stock_gen_info);
 	return std::move(regionfield);
 }
 
-}
-
-Ctn::Regionfield RfGen::uniform(const GenerateInfo& gen_info) {
+[[nodiscard]] Regionfield generate(PreparedGenerationInfo&& prepared_gen_info, RfGen::Generator::Uniform) {
 	static constexpr StockGen::Uniform Uniform;
-	return generate(Uniform, prepareRegionfieldGeneration(gen_info));
+	return generate(Uniform, std::move(prepared_gen_info));
 }
-
-Ctn::Regionfield RfGen::voronoiDiagram(const GenerateInfo& gen_info, const CentroidCountType centroid_count) {
+[[nodiscard]] Regionfield generate(PreparedGenerationInfo&& prepared_gen_info, const RfGen::Generator::VoronoiDiagram option) {
+	const auto [centroid_count] = option;
 	StockGen::VoronoiDiagram voronoi_diagram;
 	voronoi_diagram.CentroidCount = centroid_count;
-	return generate(voronoi_diagram, prepareRegionfieldGeneration(gen_info));
+	return generate(voronoi_diagram, std::move(prepared_gen_info));
+}
+
+}
+
+Regionfield RfGen::generate(const GenerateInfo& gen_info, const Generator::Option& option) {
+	const auto [resolution, region_count, seed] = gen_info;
+	Container::Regionfield regionfield;
+	regionfield.resize(resolution);
+	regionfield.RegionCount = region_count;
+
+	return visit([
+		&regionfield,
+		stock_gen_info = StockGen::Base::GenerateInfo {
+			.Seed = seed
+		}
+	](const auto& generator) { return ::generate(PreparedGenerationInfo(std::move(regionfield), stock_gen_info), generator); }, option);
 }

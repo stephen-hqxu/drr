@@ -27,7 +27,7 @@ namespace DisRegRep::Core::Bit {
 struct BitPerSampleResult {
 
 	using BitType = std::uint_fast8_t;
-	using MaskType = std::uint_fast64_t;
+	using MaskType = std::uintmax_t;
 
 	template<typename T>
 	static constexpr std::type_identity<T> DataTypeTag; /**< A convenient way of specifying data type when constructing a bit per sample result. */
@@ -50,7 +50,7 @@ struct BitPerSampleResult {
 		Bit(bps),
 		PackingFactor(std::numeric_limits<DataType>::digits >> std::countr_zero(bps)),
 		PackingFactorLog2(std::countr_zero(this->PackingFactor)),
-		SampleMask((1U << bps) - 1U) {
+		SampleMask((MaskType { 1 } << bps) - MaskType { 1 }) {
 		assert(std::has_single_bit(bps));
 		assert(this->PackingFactor > 0U);
 	}
