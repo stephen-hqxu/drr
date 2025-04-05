@@ -1,13 +1,13 @@
 #include <DisRegRep/Image/Serialisation/Container/Regionfield.hpp>
 
 #include <DisRegRep/Image/Serialisation/Buffer/Tile.hpp>
-#include <DisRegRep/Image/Serialisation/Bit.hpp>
 #include <DisRegRep/Image/Serialisation/Index.hpp>
 #include <DisRegRep/Image/Serialisation/Protocol.hpp>
 #include <DisRegRep/Image/Tiff.hpp>
 
 #include <DisRegRep/Container/Regionfield.hpp>
 
+#include <DisRegRep/Core/Bit.hpp>
 #include <DisRegRep/Core/Exception.hpp>
 #include <DisRegRep/Core/MdSpan.hpp>
 
@@ -23,12 +23,10 @@
 #include <span>
 #include <tuple>
 
-#include <type_traits>
-
 #include <cstdint>
 
 using DisRegRep::Image::Serialisation::Protocol, DisRegRep::Container::Regionfield;
-using DisRegRep::Core::MdSpan::reverse;
+using DisRegRep::Core::Bit::BitPerSampleResult, DisRegRep::Core::MdSpan::reverse;
 
 using glm::f32vec2;
 
@@ -69,8 +67,8 @@ void Protocol<Regionfield>::read(const Tiff& tif, Serialisable& regionfield) {
 
 	DRR_ASSERT(tif.getField<std::uint16_t>(TIFFTAG_SAMPLEFORMAT) == SAMPLEFORMAT_UINT);
 	DRR_ASSERT(tif.getField<std::uint16_t>(TIFFTAG_SAMPLESPERPIXEL) == 1U);
-	const auto bps_result = Bit::BitPerSampleResult(std::type_identity<ValueType> {},
-		tif.getField<std::uint16_t>(TIFFTAG_BITSPERSAMPLE).value());
+	const auto bps_result =
+		BitPerSampleResult(BitPerSampleResult::DataTypeTag<ValueType>, tif.getField<std::uint16_t>(TIFFTAG_BITSPERSAMPLE).value());
 
 	DRR_ASSERT(tif.isTiled());
 
@@ -101,7 +99,7 @@ void Protocol<Regionfield>::write(const Tiff& tif, const Serialisable& regionfie
 	DRR_ASSERT(regionfield.RegionCount > 1U);
 	const DimensionType rf_extent = regionfield.extent();
 	DRR_ASSERT(glm::all(glm::greaterThan(rf_extent, DimensionType(0U))));
-	const Bit::BitPerSampleResult bps_result = Bit::minimumBitPerSample(regionfield.span());
+	const BitPerSampleResult bps_result = Core::Bit::minimumBitPerSample(regionfield.span());
 
 	tif.setField(TiffTag::RegionCount, regionfield.RegionCount);
 

@@ -1,4 +1,4 @@
-#include <DisRegRep/Image/Serialisation/Bit.hpp>
+#include <DisRegRep/Core/Bit.hpp>
 
 #include <catch2/generators/catch_generators_adapters.hpp>
 #include <catch2/generators/catch_generators_random.hpp>
@@ -18,13 +18,13 @@
 #include <cmath>
 #include <cstdint>
 
-namespace Bit = DisRegRep::Image::Serialisation::Bit;
+namespace Bit = DisRegRep::Core::Bit;
 using Bit::BitPerSampleResult;
 
 using std::to_array;
 using std::ranges::equal,
 	std::ranges::range_value_t;
-using std::numeric_limits, std::type_identity, std::add_const_t, std::is_same_v;
+using std::numeric_limits, std::add_const_t, std::is_same_v;
 
 namespace {
 
@@ -37,7 +37,7 @@ constexpr NumberType PackedNumber = 0b10'01'11'10'00'01'01'01U;
 
 }
 
-TEMPLATE_TEST_CASE("BitPerSampleResult calculates storage requirements based on a given bits per sample", "[Image][Serialisation][Bit]", std::uint_fast8_t, std::uint_fast16_t) {
+TEMPLATE_TEST_CASE("BitPerSampleResult calculates storage requirements based on a given bits per sample", "[Core][Bit]", std::uint_fast8_t, std::uint_fast16_t) {
 	using DataType = TestType;
 	using Limit = numeric_limits<DataType>;
 
@@ -45,7 +45,7 @@ TEMPLATE_TEST_CASE("BitPerSampleResult calculates storage requirements based on 
 		const BitPerSampleResult::BitType bps = 1U << GENERATE(take(3U, random<std::uint_fast8_t>(0U, 3U)));
 
 		WHEN("A bit per sample result is constructed") {
-			const auto bps_result = BitPerSampleResult(type_identity<DataType> {}, bps);
+			const auto bps_result = BitPerSampleResult(BitPerSampleResult::DataTypeTag<DataType>, bps);
 			const auto [bit, packing_factor, packing_factor_log2, sample_mask] = bps_result;
 
 			THEN("All related storage requirement members are calculated correctly") {
@@ -64,7 +64,7 @@ TEMPLATE_TEST_CASE("BitPerSampleResult calculates storage requirements based on 
 
 }
 
-SCENARIO("Pack an array of small unsigned integers to a single unsigned integer", "[Image][Serialisation][Bit]") {
+SCENARIO("Pack an array of small unsigned integers to a single unsigned integer", "[Core][Bit]") {
 
 	GIVEN("An array of unsigned integers") {
 
@@ -85,7 +85,7 @@ SCENARIO("Pack an array of small unsigned integers to a single unsigned integer"
 
 }
 
-SCENARIO("Unpack a single unsigned integer to an array of small unsigned integers", "[Image][Serialisation][Bit]") {
+SCENARIO("Unpack a single unsigned integer to an array of small unsigned integers", "[Core][Bit]") {
 
 	GIVEN("A packed unsigned integer") {
 

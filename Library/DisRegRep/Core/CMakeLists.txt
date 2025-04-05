@@ -3,6 +3,7 @@ add_subdirectory(View)
 
 drrTargetSource(
 HEADER
+	Bit
 	Exception
 	MdSpan
 	ThreadPool

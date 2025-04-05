@@ -1,9 +1,8 @@
 #pragma once
 
-#include "../Bit.hpp"
-
 #include <DisRegRep/Core/View/Arithmetic.hpp>
 #include <DisRegRep/Core/View/Matrix.hpp>
+#include <DisRegRep/Core/Bit.hpp>
 #include <DisRegRep/Core/UninitialisedAllocator.hpp>
 
 #include <glm/fwd.hpp>
@@ -95,13 +94,13 @@ public:
 		 * also includes a size of the right-most axis of the tile without any bit packing consideration.
 		 */
 		std::conditional_t<RequirePacking,
-			std::tuple<const Bit::BitPerSampleResult*, ExtentType>,
+			std::tuple<const Core::Bit::BitPerSampleResult*, ExtentType>,
 			std::tuple<>
 		> PackSpec;
 
 		explicit constexpr Shaped(ViewType view) noexcept(std::is_nothrow_move_constructible_v<ViewType>) : View(std::move(view)) { }
 
-		explicit constexpr Shaped(ViewType view, const Bit::BitPerSampleResult& bps_result, const ExtentType last_rank_extent)
+		explicit constexpr Shaped(ViewType view, const Core::Bit::BitPerSampleResult& bps_result, const ExtentType last_rank_extent)
 			noexcept(std::is_nothrow_move_constructible_v<ViewType>)
 		requires(RequirePacking)
 			: View(std::move(view)), PackSpec(&bps_result, last_rank_extent) { }
@@ -142,7 +141,7 @@ public:
 			using std::transform, std::execution::unseq,
 				std::views::chunk,
 				std::ranges::size, std::ranges::begin;
-			const Bit::BitPerSampleResult& bps_result = *std::get<0U>(this->PackSpec);
+			const Core::Bit::BitPerSampleResult& bps_result = *std::get<0U>(this->PackSpec);
 
 			const auto in_packed = std::forward<In>(in) | chunk(bps_result.PackingFactor);
 			assert(size(in_packed) == size(out));
@@ -150,7 +149,7 @@ public:
 
 			transform(unseq, in_packed.cbegin(), in_packed.cend(), std::move(out_it),
 				[&bps_result]<typename PackGroup>(PackGroup pack_group) constexpr noexcept(
-					std::is_nothrow_move_constructible_v<PackGroup>) { return Bit::pack(std::move(pack_group), bps_result); });
+					std::is_nothrow_move_constructible_v<PackGroup>) { return Core::Bit::pack(std::move(pack_group), bps_result); });
 		}
 		//A fallback function when packing is not required.
 		template<TileInternal_::SimpleLinearCopyableInput In, TileInternal_::SimpleLinearCopyableOutput<In> Out>
@@ -168,12 +167,12 @@ public:
 			using std::for_each, std::execution::unseq,
 				std::ranges::copy,
 				std::views::zip, std::views::chunk;
-			const Bit::BitPerSampleResult& bps_result = *std::get<0U>(this->PackSpec);
+			const Core::Bit::BitPerSampleResult& bps_result = *std::get<0U>(this->PackSpec);
 
 			const auto in_out_pair = zip(std::forward<In>(in), std::forward<Out>(out) | chunk(bps_result.PackingFactor));
 			for_each(unseq, in_out_pair.cbegin(), in_out_pair.cend(), [&bps_result](const auto in_out) constexpr noexcept {
 				const auto [in_packed, out_group] = in_out;
-				copy(Bit::unpack(in_packed, out_group.size(), bps_result), out_group.begin());
+				copy(Core::Bit::unpack(in_packed, out_group.size(), bps_result), out_group.begin());
 			});
 		}
 
@@ -317,7 +316,7 @@ public:
 	 */
 	template<typename Self, bool Packed, glm::length_t L, std::integral Ext, glm::qualifier Q>
 	constexpr auto shape(this Self& self, std::bool_constant<Packed>, const glm::vec<L, Ext, Q>& tile_extent,
-		const Bit::BitPerSampleResult* const bps_result = nullptr) noexcept {
+		const Core::Bit::BitPerSampleResult* const bps_result = nullptr) noexcept {
 		if constexpr (Packed) {
 			assert(bps_result);
 		}

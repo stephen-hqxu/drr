@@ -5,7 +5,6 @@ HEADER
 	Container/Regionfield
 	Container/SplattingCoefficient
 
-	Bit
 	Index
 	Protocol
 SOURCE

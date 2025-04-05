@@ -1,6 +1,6 @@
 #pragma once
 
-#include <DisRegRep/Core/View/Arithmetic.hpp>
+#include "View/Arithmetic.hpp"
 
 #include <algorithm>
 #include <functional>
@@ -17,9 +17,9 @@
 #include <cstdint>
 
 /**
- * @brief Common utilities of bit logic and arithmetic for serialising any data structure into an image.
+ * @brief Common utilities of bit logic and arithmetic.
  */
-namespace DisRegRep::Image::Serialisation::Bit {
+namespace DisRegRep::Core::Bit {
 
 /**
  * @brief Computed storage requirement.
@@ -28,6 +28,9 @@ struct BitPerSampleResult {
 
 	using BitType = std::uint_fast8_t;
 	using MaskType = std::uint_fast64_t;
+
+	template<typename T>
+	static constexpr std::type_identity<T> DataTypeTag; /**< A convenient way of specifying data type when constructing a bit per sample result. */
 
 	BitType Bit, /**< Minimum number of bits per sample for storing some data. */
 		PackingFactor, /**< How many elements can be packed into an unsigned integer whose width is the same as the original data representation. */
@@ -72,7 +75,7 @@ template<std::ranges::input_range Data, std::unsigned_integral DataType = std::r
 	const BitPerSampleResult::BitType min_bps = std::bit_width(std::bit_floor(data_max)),
 		//Computer generally does not work well with non-power-of-two bits of data; need to round it up.
 		bps_power_of_two = std::bit_ceil(min_bps);
-	return BitPerSampleResult(std::type_identity<DataType> {}, bps_power_of_two);
+	return BitPerSampleResult(BitPerSampleResult::DataTypeTag<DataType>, bps_power_of_two);
 }
 
 /**
@@ -88,7 +91,7 @@ template<std::ranges::input_range Data, std::unsigned_integral DataType = std::r
  * repeating the last element of `data`.
  */
 template<
-	Core::View::Arithmetic::ClampToEdgePaddableRange<BitPerSampleResult::BitType> Data,
+	View::Arithmetic::ClampToEdgePaddableRange<BitPerSampleResult::BitType> Data,
 	std::unsigned_integral DataType = std::ranges::range_value_t<Data>
 > requires std::ranges::viewable_range<Data>
 [[nodiscard]] constexpr DataType pack(Data&& data, const BitPerSampleResult& bps_result) noexcept {
@@ -105,15 +108,12 @@ template<
 	//Double reverse here is for reversing the enumeration order.
 	for (const auto [shift, element] : std::forward<Data>(data)
 		| as_const
-		| Core::View::Arithmetic::PadClampToEdge(packing_factor)
+		| View::Arithmetic::PadClampToEdge(packing_factor)
 		| reverse
 		| enumerate
 		| reverse//NOLINT(misc-redundant-expression)
 	) [[likely]] {
-		//Optimally we should mask the element to limit it within the sample.
-		//Since we have warned the user, this is omitted to improve performance.
-		assert((element | sample_mask) == sample_mask);
-		packed |= element << shift * bps;
+		packed |= (sample_mask & element) << shift * bps;
 	}
 	return packed;
 }
