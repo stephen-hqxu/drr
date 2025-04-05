@@ -4,10 +4,7 @@
 #include <DisRegRep/Core/Exception.hpp>
 #include <DisRegRep/Core/MdSpan.hpp>
 
-#include <glm/gtc/type_ptr.hpp>
 #include <glm/vector_relational.hpp>
-
-#include <span>
 
 #include <algorithm>
 #include <execution>
@@ -15,10 +12,7 @@
 
 using DisRegRep::Container::Regionfield;
 
-using glm::value_ptr;
-
-using std::span;
-using std::for_each, std::ranges::reverse, std::ranges::copy,
+using std::for_each, std::ranges::copy,
 	std::execution::par_unseq,
 	std::views::zip;
 
@@ -31,7 +25,7 @@ Regionfield Regionfield::transpose() const {
 	//	but performance is generally poor on large matrices (even though it saves us memory) as not being parallelisable.
 	Regionfield transposed;
 	transposed.RegionCount = this->RegionCount;
-	transposed.resize(Core::MdSpan::toVector(Core::MdSpan::flip(this->Mapping.extents())));
+	transposed.resize(Core::MdSpan::reverse(this->extent()));
 
 	//Cannot use join on a parallel algorithm because it is not a forward range.
 	//Mainly because of the xvalue return on the 2D range adaptor, such that inner range is not a reference type.

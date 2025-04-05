@@ -17,12 +17,9 @@
 #include <tiff.h>
 
 #include <span>
-#include <tuple>
 
 #include <functional>
 #include <ranges>
-
-#include <utility>
 
 #include <limits>
 
@@ -32,14 +29,17 @@ using DisRegRep::Image::Serialisation::Protocol, DisRegRep::Container::Splatting
 
 using glm::f32vec2;
 
-using std::span, std::make_from_tuple,
+using std::span,
 	std::bind_back, std::bit_or,
 	std::views::transform;
 
 void Protocol<DenseMask>::write(const Tiff& tif, const Serialisable& dense_mask) {
+	using Dimension2Type = Container::SplattingCoefficient::Type::Dimension2Type;
+	using Dimension3Type = Serialisable::Dimension3Type;
 	using PixelLimit = std::numeric_limits<PixelType>;
-	const Serialisable::Dimension3Type mask_extent = Core::MdSpan::toVector(dense_mask.mapping().extents());
-	DRR_ASSERT(glm::all(glm::greaterThan(mask_extent, Serialisable::Dimension3Type(0U))));
+
+	const Dimension3Type mask_extent = Core::MdSpan::toVector(dense_mask.mapping().extents());
+	DRR_ASSERT(glm::all(glm::greaterThan(mask_extent, Dimension3Type(0U))));
 
 	tif.setDefaultMetadata("Dense Region Feature Splatting Mask");
 	tif.setField(TIFFTAG_ORIENTATION, ORIENTATION_LEFTTOP);
@@ -55,7 +55,7 @@ void Protocol<DenseMask>::write(const Tiff& tif, const Serialisable& dense_mask)
 
 	tif.setField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
 
-	tif.setImageExtent(mask_extent);
+	tif.setImageExtent(Dimension3Type(Core::MdSpan::reverse(Dimension2Type(mask_extent)), mask_extent.z));
 	//Although it is a 3D matrix, we reckon the region axis is shallow compared to width and height axis.
 	//It does not worth to use a 3D tile because the region axis may have a lot of paddings.
 	tif.setOptimalTileExtent();
@@ -64,16 +64,17 @@ void Protocol<DenseMask>::write(const Tiff& tif, const Serialisable& dense_mask)
 	tile_buffer.allocate(tif.tileSize());
 	const span raw_buffer = tile_buffer.buffer();
 
-	const Serialisable::Dimension3Type tile_extent = tif.getTileExtent();
-	const auto mask_matrix = dense_mask.range2d() | transform(bind_back(bit_or {}, transform([](auto proxy) static constexpr noexcept {
-		return *std::move(proxy)
-			| transform([](const auto mask) static constexpr noexcept -> PixelType { return std::round(mask * PixelLimit::max()); });
-	})));
-	const auto tile_matrix = tile_buffer.shape(decltype(tile_buffer)::DisablePacking, tile_extent);
-	for (const auto offset : Index::ForeachTile(mask_extent, tile_extent)) [[likely]] {
-		const auto [offset_x, offset_y, offset_region] = offset;
-		tile_matrix.fromMatrix(mask_matrix, make_from_tuple<Serialisable::Dimension3Type>(offset));
+	const Dimension3Type tile_extent = tif.getTileExtent();
+	const auto mask_matrix = dense_mask.range2d();
+	const auto tile_matrix = tile_buffer.shape(decltype(tile_buffer)::DisablePacking, Dimension2Type(tile_extent));
+	for (const auto [offset_x, offset_y, offset_region] : Index::ForeachTile(mask_extent, tile_extent)) [[likely]] {
+		tile_matrix.fromMatrix(
+			mask_matrix | transform(bind_back(bit_or {}, transform([offset_region](const auto proxy) constexpr noexcept -> PixelType {
+				return std::round((*proxy)[offset_region] * PixelLimit::max());
+			}))),
+			Dimension2Type(offset_x, offset_y)
+		);
 		//Remember to transpose the tile writing order.
-		tif.writeTile(raw_buffer, Serialisable::Dimension3Type(offset_y, offset_x, offset_region), 0U);
+		tif.writeTile(raw_buffer, Dimension3Type(offset_y, offset_x, offset_region), 0U);
 	}
 }
