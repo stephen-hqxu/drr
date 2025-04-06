@@ -103,19 +103,23 @@ public:
 
 };
 
+//Convenience tags for specifying different splatting containers when invoking a splatting method.
+inline constexpr DRR_SPLATTING_CONTAINER_TRAIT(Dense, Dense) DenseKernelDenseOutputTrait;
+inline constexpr DRR_SPLATTING_CONTAINER_TRAIT(Dense, Sparse) DenseKernelSparseOutputTrait;
+inline constexpr DRR_SPLATTING_CONTAINER_TRAIT(Sparse, Sparse) SparseKernelSparseOutputTrait;
+
+//All valid container trait combinations.
+inline constexpr auto Combination = std::tuple(
+	DenseKernelDenseOutputTrait,
+	DenseKernelSparseOutputTrait,
+	SparseKernelSparseOutputTrait
+);
+using CombinationType = decltype(Combination);
+
 /**
  * `Tr` is a container trait.
  */
 template<typename Tr>
 concept IsTrait = std::is_same_v<Tr, Trait<Tr::KernelImplementation, Tr::OutputImplementation>>;
-
-/**
- * @brief All valid container trait combinations.
- */
-using Combination = std::tuple<
-	DRR_SPLATTING_CONTAINER_TRAIT(Dense, Dense),
-	DRR_SPLATTING_CONTAINER_TRAIT(Dense, Sparse),
-	DRR_SPLATTING_CONTAINER_TRAIT(Sparse, Sparse)
->;
 
 }

@@ -613,7 +613,7 @@ void Splatting::sweepRadius(
 		.Regionfield = rf | transform([](const auto* const rf_ptr) static constexpr noexcept { return rf_ptr; }),
 		.Splatting_ = splat_conv | chunk(splat_size),
 		.Tag = tag
-	}, Splt::Container::Combination {});
+	}, Splt::Container::Combination);
 }
 
 void Splatting::sweepRegionCount(const span<const Splt::Base* const> splat, const span<const RegionCountType> region_count,
@@ -653,7 +653,7 @@ void Splatting::sweepRegionCount(const span<const Splt::Base* const> splat, cons
 		.Regionfield = Impl::UseBuiltInRegionfield,
 		.Splatting_ = ToSplatting2dRange(splat),
 		.Tag = tag
-	}, Splt::Container::Combination {});
+	}, Splt::Container::Combination);
 }
 
 void Splatting::sweepCentroidCount(const span<const Splt::Base* const> splat, const span<const CentroidCountType> centroid_count,
@@ -698,5 +698,5 @@ void Splatting::sweepCentroidCount(const span<const Splt::Base* const> splat, co
 		.Regionfield = Impl::UseBuiltInRegionfield,
 		.Splatting_ = ToSplatting2dRange(splat),
 		.Tag = tag
-	}, Splt::Container::Combination {});
+	}, Splt::Container::Combination);
 }

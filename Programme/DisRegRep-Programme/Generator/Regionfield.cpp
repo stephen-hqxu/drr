@@ -1,37 +1,41 @@
 #include <DisRegRep-Programme/Generator/Regionfield.hpp>
 
 #include <DisRegRep/Container/Regionfield.hpp>
+#include <DisRegRep/Container/SplattingCoefficient.hpp>
 
 #include <DisRegRep/RegionfieldGenerator/Base.hpp>
 #include <DisRegRep/RegionfieldGenerator/ExecutionPolicy.hpp>
 #include <DisRegRep/RegionfieldGenerator/Uniform.hpp>
 #include <DisRegRep/RegionfieldGenerator/VoronoiDiagram.hpp>
 
+#include <DisRegRep/Splatting/Convolution/Full/FastOccupancy.hpp>
+#include <DisRegRep/Splatting/Base.hpp>
+#include <DisRegRep/Splatting/Container.hpp>
+
+#include <any>
 #include <tuple>
 #include <variant>
 
-#include <functional>
 #include <utility>
-
-#include <concepts>
 
 namespace RfGen = DisRegRep::Programme::Generator::Regionfield;
 namespace StockGen = DisRegRep::RegionfieldGenerator;
-using DisRegRep::Container::Regionfield;
+namespace StockSplt = DisRegRep::Splatting;
+using DisRegRep::Container::Regionfield, DisRegRep::Container::SplattingCoefficient::DenseMask;
 
-using std::tuple, std::visit;
-using std::invoke;
-using std::derived_from;
+using std::any, std::tuple, std::visit;
 
 namespace {
 
 using PreparedGenerationInfo = tuple<Regionfield, const StockGen::Base::GenerateInfo>;
+using PreparedSplattingInfo = tuple<const Regionfield&, any&>;
 
 [[nodiscard]] Regionfield generate(
 	//NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
-	const derived_from<StockGen::Base> auto& generator, PreparedGenerationInfo&& prepared_generation_info) {
-	auto& [regionfield, stock_gen_info] = prepared_generation_info;
-	invoke(generator, StockGen::ExecutionPolicy::MultiThreadingTrait, regionfield, stock_gen_info);
+	const StockGen::Base& generator, PreparedGenerationInfo&& prepared_gen_info) {
+	auto& [regionfield, stock_gen_info] = prepared_gen_info;
+
+	generator(StockGen::ExecutionPolicy::MultiThreadingTrait, regionfield, stock_gen_info);
 	return std::move(regionfield);
 }
 
@@ -46,18 +50,50 @@ using PreparedGenerationInfo = tuple<Regionfield, const StockGen::Base::Generate
 	return generate(voronoi_diagram, std::move(prepared_gen_info));
 }
 
+[[nodiscard]] const DenseMask& splat(
+	//NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
+	const StockSplt::Base& splatting, PreparedSplattingInfo&& prepared_splat_info) {
+	auto& [regionfield, memory] = prepared_splat_info;
+
+	const StockSplt::Base::DimensionType offset = splatting.minimumOffset();
+	return splatting(StockSplt::Container::DenseKernelDenseOutputTrait, regionfield, memory,
+		StockSplt::Base::InvokeInfo {
+			.Offset = offset,
+			.Extent = splatting.maximumExtent(regionfield, offset)
+		});
+}
+
+[[nodiscard]] const DenseMask& splat(
+	PreparedSplattingInfo&& prepared_splat_info, const RfGen::Splatting::FullConvolutionOccupancy option) {
+	const auto [radius] = option;
+	StockSplt::Convolution::Full::FastOccupancy fast_occupancy;
+	fast_occupancy.Radius = radius;
+	return splat(fast_occupancy, std::move(prepared_splat_info));
+}
+
 }
 
 Regionfield RfGen::generate(const GenerateInfo& gen_info, const Generator::Option& option) {
-	const auto [resolution, region_count, seed] = gen_info;
+	const auto [resolution, region_count, stock_gen_info] = gen_info;
 	Container::Regionfield regionfield;
 	regionfield.resize(resolution);
 	regionfield.RegionCount = region_count;
 
-	return visit([
-		&regionfield,
-		stock_gen_info = StockGen::Base::GenerateInfo {
-			.Seed = seed
-		}
-	](const auto& generator) { return ::generate(PreparedGenerationInfo(std::move(regionfield), stock_gen_info), generator); }, option);
+	return visit(
+		[&](const auto& generator) { return ::generate(PreparedGenerationInfo(
+			std::move(regionfield),
+			stock_gen_info
+		), generator); },
+		option
+	);
+}
+
+const DenseMask& RfGen::splat(const Splatting::Option& option, const Container::Regionfield& regionfield, any& memory) {
+	return visit(
+		[&](const auto& splatting) -> const DenseMask& { return ::splat(PreparedSplattingInfo(
+			regionfield,
+			memory
+		), splatting); },
+		option
+	);
 }

@@ -51,7 +51,7 @@ namespace DisRegRep::Splatting::ImplementationHelper {
 template<template<Container::IsTrait> typename ScratchMemory>
 using ScratchMemoryCombination = decltype(std::apply(
 	[]<typename... Trait>(Trait...) -> std::default_initializable auto { return std::tuple<ScratchMemory<Trait>...> {}; },
-	Container::Combination {}));
+	Container::Combination));
 
 /**
  * Internal, type-erased scratch memory type, which is basically a variant of every @link ScratchMemoryCombination.

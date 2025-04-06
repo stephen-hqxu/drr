@@ -2,6 +2,8 @@
 
 #include "../Base.hpp"
 
+#include <DisRegRep/Container/Regionfield.hpp>
+
 #include <cstdint>
 
 namespace DisRegRep::Splatting::Convolution {
@@ -21,6 +23,8 @@ public:
 	[[nodiscard]] DimensionType minimumRegionfieldDimension(const InvokeInfo&) const noexcept override;
 
 	[[nodiscard]] DimensionType minimumOffset() const noexcept override;
+
+	[[nodiscard]] DimensionType maximumExtent(const DisRegRep::Container::Regionfield&, DimensionType) const noexcept override;
 
 	/**
 	 * @brief Calculate the kernel diametre with the current radius.

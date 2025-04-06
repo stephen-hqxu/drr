@@ -64,7 +64,7 @@ namespace DisRegRep::Splatting {
 class Base {
 public:
 
-	//The reason why we take the common of these two types is because we will be using this as 2D index to access these containers.
+	//The reason we take the common of these two types is because we will be using this as 2D index to access these containers.
 	using DimensionType = std::common_type_t<
 		DisRegRep::Container::Regionfield::DimensionType,
 		DisRegRep::Container::SplattingCoefficient::Type::Dimension2Type
@@ -124,7 +124,7 @@ public:
 	 *
 	 * @param info @link InvokeInfo.
 	 *
-	 * @return Minimum regionfield dimension to be allocated by @link Container::Regionfield::resize.
+	 * @return Minimum regionfield dimension to be allocated by @link DisRegRep::Container::Regionfield::resize.
 	 */
 	[[nodiscard]] virtual DimensionType minimumRegionfieldDimension(const InvokeInfo&) const noexcept;
 
@@ -134,6 +134,16 @@ public:
 	 * @return Minimum offset for @link InvokeInfo::Offset.
 	 */
 	[[nodiscard]] virtual DimensionType minimumOffset() const noexcept;
+
+	/**
+	 * @brief Maximum splatting extent that can cover the specified regionfield matrix.
+	 *
+	 * @param regionfield Regionfield used for splatting.
+	 * @param offset @link InvokeInfo::Offset.
+	 *
+	 * @return Maximum splatting extent for @link InvokeInfo::Extent.
+	 */
+	[[nodiscard]] virtual DimensionType maximumExtent(const DisRegRep::Container::Regionfield&, DimensionType) const noexcept;
 
 	/**
 	 * @brief Query the usage of scratch memory.

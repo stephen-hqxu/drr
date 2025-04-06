@@ -1,20 +1,24 @@
 #pragma once
 
 #include <DisRegRep/Container/Regionfield.hpp>
+#include <DisRegRep/Container/SplattingCoefficient.hpp>
 
 #include <DisRegRep/RegionfieldGenerator/Base.hpp>
 #include <DisRegRep/RegionfieldGenerator/VoronoiDiagram.hpp>
 
+#include <DisRegRep/Splatting/Convolution/Full/Base.hpp>
+
+#include <any>
 #include <variant>
 
 /**
- * @brief Generate a regionfield using one of the stock regionfield generators.
+ * @brief Process a regionfield using one of the stock regionfield processing methods, such as regionfield generator and splatting
+ * algorithm.
  */
 namespace DisRegRep::Programme::Generator::Regionfield {
 
 using DimensionType = Container::Regionfield::DimensionType;
 using RegionCountType = Container::Regionfield::ValueType;
-using SeedType = RegionfieldGenerator::Base::SeedType;
 
 /**
  * @brief Choose a regionfield generator to generate a regionfield matrix.
@@ -43,6 +47,27 @@ using Option = std::variant<
 }
 
 /**
+ * @brief Choose an algorithm for computing the region feature splatting coefficients.
+ */
+namespace Splatting {
+
+/**
+ * @brief The splatting coefficient is defined as the number of times each region identifier appears on the convolution kernel in a
+ * regionfield matrix. Every element in such a kernel is taken into account to derive the splatting coefficient.
+ */
+struct FullConvolutionOccupancy {
+
+	DisRegRep::Splatting::Convolution::Full::Base::KernelSizeType Radius; /**< @link DisRegRep::Splatting::Convolution::Full::Base::Radius. */
+
+};
+
+using Option = std::variant<
+	FullConvolutionOccupancy
+>; /**< Supply configurations to all supported region feature splatting coefficient computing algorithms. */
+
+}
+
+/**
  * @brief Common settings shared by different regionfield generators.
  */
 struct GenerateInfo {
@@ -50,7 +75,7 @@ struct GenerateInfo {
 	DimensionType Resolution;
 	RegionCountType RegionCount;
 
-	SeedType Seed;
+	RegionfieldGenerator::Base::GenerateInfo RegionfieldGeneratorGenerateInfo;
 
 };
 
@@ -63,5 +88,18 @@ struct GenerateInfo {
  * @return Regionfield generated using the specified generator.
  */
 [[nodiscard]] Container::Regionfield generate(const GenerateInfo&, const Generator::Option&);
+
+/**
+ * @brief Compute region feature splatting coefficients for the whole domain of a given regionfield matrix.
+ *
+ * @param splat_info @link SplattingInfo.
+ * @param option Choose a region feature splatting coefficient algorithm.
+ * @param regionfield Regionfield input that provides region identifiers whose splatting coefficients are to be computed.
+ * @param memory Scratch memory for splatting.
+ *
+ * @return The computed dense region mask.
+ */
+[[nodiscard]] const Container::SplattingCoefficient::DenseMask& splat(
+	const Splatting::Option&, const Container::Regionfield&, std::any&);
 
 }

@@ -6,6 +6,7 @@
 
 #include <DisRegRep/Core/View/Arithmetic.hpp>
 #include <DisRegRep/Core/View/Functional.hpp>
+#include <DisRegRep/Core/MdSpan.hpp>
 #include <DisRegRep/Core/Type.hpp>
 
 #include <DisRegRep/Splatting/Convolution/Full/Base.hpp>
@@ -44,7 +45,8 @@ namespace SpltCoef = DisRegRep::Container::SplattingCoefficient;
 namespace View = DisRegRep::Core::View;
 namespace Type = DisRegRep::Core::Type;
 namespace Splt = DisRegRep::Splatting;
-using DisRegRep::Container::Regionfield;
+using DisRegRep::Container::Regionfield,
+	DisRegRep::Core::MdSpan::reverse;
 
 using Catch::Matchers::WithinAbs, Catch::Matchers::RangeEquals, Catch::Matchers::ContainsSubstring;
 
@@ -94,9 +96,9 @@ using Splt::Convolution::Full::Base;
 
 constexpr Base::KernelSizeType Radius = 2U;
 constexpr auto Offset = Base::DimensionType(Radius, Radius + 1U),
-	OffsetTransposed = Base::DimensionType(Offset.y, Offset.x),
+	OffsetTransposed = reverse(Offset),
 	Extent = Base::DimensionType(2U, 3U),
-	ExtentTransposed = Base::DimensionType(Extent.y, Extent.x);
+	ExtentTransposed = reverse(Extent);
 
 template<typename T>
 using SplattingCoefficientMatrixType = array<array<T, Regionfield::RegionCount>, Extent.x * Extent.y>;
@@ -197,7 +199,7 @@ void GndTth::checkSplattingCoefficient(BaseFullConvolution& splatting) {
 			memory = any()
 		]() mutable -> void {
 			apply(
-				[&](const auto... trait) { (splatting(trait, rf, memory, invoke_info), ...); }, Splt::Container::Combination {});
+				[&](const auto... trait) { (splatting(trait, rf, memory, invoke_info), ...); }, Splt::Container::Combination);
 		};
 
 		WHEN("Regionfield is too small") {
@@ -216,7 +218,7 @@ void GndTth::checkSplattingCoefficient(BaseFullConvolution& splatting) {
 
 	WHEN("It is invoked with ground truth data") {
 		namespace CurrentRef = Reference::Convolution::Full;
-		array<any, tuple_size_v<Splt::Container::Combination>> memory;
+		array<any, tuple_size_v<Splt::Container::CombinationType>> memory;
 
 		splatting.Radius = CurrentRef::Radius;
 		const auto result = apply([&splatting = std::as_const(splatting), &memory](const auto... trait) {
@@ -230,7 +232,7 @@ void GndTth::checkSplattingCoefficient(BaseFullConvolution& splatting) {
 				};
 				return tie(splatting(trait, rf, memory, invoke_info)...);
 			}, memory);
-		}, Splt::Container::Combination {});
+		}, Splt::Container::Combination);
 
 		THEN("Splatting coefficients computed are correct") {
 			apply([](auto&... matrix) static { (CurrentRef::compare(matrix), ...); }, result);

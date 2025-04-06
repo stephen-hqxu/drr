@@ -208,7 +208,8 @@ struct Regionfield {
 		using DimensionArray = array<DimensionType::value_type, DimensionType::length()>;
 		using enum Generator;
 
-		auto& [resolution, region_count, seed] = this->GenerateInfo;
+		auto& [resolution, region_count, rf_gen_info] = this->GenerateInfo;
+		auto& [seed] = rf_gen_info;
 		auto& [centroid_count] = this->VoronoiDiagram;
 
 		static constexpr auto SeedSequencePacking = Bit::BitPerSampleResult(
