@@ -38,7 +38,7 @@ using Dimension3 = glm::vec<3U, Regionfield::IndexType>;
 
 namespace TiffTag {
 
-constexpr DisRegRep::Image::Tiff::Tag RegionCount = 1821613508U;
+constexpr DisRegRep::Image::Tiff::Tag RegionCount = 18007U;
 
 }
 

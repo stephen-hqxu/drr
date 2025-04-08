@@ -29,12 +29,9 @@ Regionfield Regionfield::transpose() const {
 
 	//Cannot use join on a parallel algorithm because it is not a forward range.
 	//Mainly because of the xvalue return on the 2D range adaptor, such that inner range is not a reference type.
-	const auto zip_data = zip(
-		this->Data | Core::View::Matrix::NewAxisLeft(this->Mapping.stride(0U)),
-		transposed.Data | Core::View::Matrix::NewAxisRight(transposed.Mapping.stride(0U))
-	);
-	for_each(par_unseq, zip_data.cbegin(), zip_data.cend(), [](const auto it) static constexpr noexcept {
-		const auto& [input, output] = it;
+	const auto zip_data = zip(this->range2d(), transposed.rangeTransposed2d());
+	for_each(par_unseq, zip_data.cbegin(), zip_data.cend(), [](const auto io) static constexpr noexcept {
+		const auto& [input, output] = io;
 		copy(input, output.begin());
 	});
 

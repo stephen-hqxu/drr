@@ -34,11 +34,11 @@ using std::span,
 	std::views::transform;
 
 void Protocol<DenseMask>::write(const Tiff& tif, const Serialisable& dense_mask) {
-	using Dimension2Type = Container::SplattingCoefficient::Type::Dimension2Type;
+	using Dimension2Type = Serialisable::Dimension2Type;
 	using Dimension3Type = Serialisable::Dimension3Type;
 	using PixelLimit = std::numeric_limits<PixelType>;
 
-	const Dimension3Type mask_extent = Core::MdSpan::toVector(dense_mask.mapping().extents());
+	const Dimension3Type mask_extent = dense_mask.extent();
 	DRR_ASSERT(glm::all(glm::greaterThan(mask_extent, Dimension3Type(0U))));
 
 	tif.setDefaultMetadata("Dense Region Feature Splatting Mask");

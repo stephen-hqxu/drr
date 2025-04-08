@@ -5,19 +5,19 @@
 #include <DisRegRep-Programme/Profiler/Splatting.hpp>
 
 #include <DisRegRep/Container/Regionfield.hpp>
+#include <DisRegRep/Container/SplattingCoefficient.hpp>
 
 #include <DisRegRep/Core/Bit.hpp>
 #include <DisRegRep/Core/Exception.hpp>
 #include <DisRegRep/Core/ThreadPool.hpp>
 
 #include <DisRegRep/Image/Serialisation/Container/Regionfield.hpp>
+#include <DisRegRep/Image/Serialisation/Container/SplattingCoefficient.hpp>
 #include <DisRegRep/Image/Tiff.hpp>
 
 #include <DisRegRep/Info.hpp>
 
-#include <CLI/App.hpp>
-#include <CLI/Validators.hpp>
-
+#include <CLI/CLI.hpp>
 #include <yaml-cpp/yaml.h>
 
 #include <array>
@@ -50,6 +50,8 @@ namespace Generator = DisRegRep::Programme::Generator;
 namespace Container = DisRegRep::Container;
 namespace Image = DisRegRep::Image;
 namespace Info = DisRegRep::Info;
+using RegionfieldProtocol = Image::Serialisation::Protocol<Container::Regionfield>;
+using DenseMaskProtocol = Image::Serialisation::Protocol<Container::SplattingCoefficient::DenseMask>;
 
 namespace fs = std::filesystem;
 using std::array, std::unordered_map,
@@ -87,14 +89,14 @@ struct Profile {
 
 	void bind(CLI::App& cmd) & {
 		cmd.add_option(
-			"config",
+			"config-yaml",
 			this->ConfigurationFilename,
-			"Filename is specified for the profiler configuration file."
+			"Filename is specified for the profiler configuration YAML file."
 		)	->required()
-			->type_name("CONFIG")
+			->type_name("YAML")
 			->check(CLI::ExistingFile);
 		cmd.add_option(
-			"--output,-o",
+			"result",
 			this->ResultDirectory,
 			"A directory intended for the storage of profiling results. It should be noted that a new directory is created in this directory, in which all relevant outputs are located."
 		)	->required()
@@ -113,14 +115,12 @@ struct Profile {
 
 struct TiffCompression {
 
-	enum struct Algorithm : std::uint_fast8_t {
+	enum struct Compression : std::uint_fast8_t {
 		None,
 		Lzw,
 		ZStd
-	};
-
-	Algorithm Algorithm_;
-	Generator::Tiff::Compression::ZStandard ZStdOption;
+	} Compression_;
+	Generator::Tiff::Compression::ZStandard ZStandard;
 
 	constexpr TiffCompression() noexcept = default;
 
@@ -135,19 +135,19 @@ struct TiffCompression {
 	constexpr ~TiffCompression() = default;
 
 	void bind(CLI::App& cmd) & {
-		using enum Algorithm;
-		auto& [compression_level] = this->ZStdOption;
+		using enum Compression;
+		auto& [compression_level] = this->ZStandard;
 
 		cmd.add_option(
 			"--compression,-c",
-			this->Algorithm_,
+			this->Compression_,
 			"Specify the compression algorithm to be employed for data being written to the TIFF image."
-		)	->type_name("ALGO")
-			->transform(CLI::CheckedTransformer(unordered_map<string_view, Algorithm>({
+		)	->type_name("COMPRESS")
+			->transform(CLI::CheckedTransformer(unordered_map<string_view, Compression> {
 				{ "none", None },
 				{ "lzw", Lzw },
 				{ "zstd", ZStd }
-			})))
+			}))
 			->default_val(None);
 		cmd.add_option(
 			"-l",
@@ -160,12 +160,12 @@ struct TiffCompression {
 
 	void setCompression(const Image::Tiff& tif) const {
 		namespace Cprs = Generator::Tiff::Compression;
-		Generator::Tiff::setCompression(tif, [this] constexpr noexcept -> Cprs::Option {
-			using enum Algorithm;
-			switch (this->Algorithm_) {
+		Generator::Tiff::setCompression(tif, [this] noexcept -> Cprs::Option {
+			using enum Compression;
+			switch (this->Compression_) {
 			case None: return Cprs::None {};
 			case Lzw: return Cprs::LempelZivWelch {};
-			case ZStd: return this->ZStdOption;
+			case ZStd: return this->ZStandard;
 			default: std::unreachable();
 			}
 		}());
@@ -177,14 +177,12 @@ struct Regionfield {
 
 	using SeedType = Image::Tiff::ColourPaletteRandomEngineSeed;
 
+	string OutputFilename;
+
 	enum struct Generator : std::uint_fast8_t {
 		Uniform,
 		Voronoi
-	};
-
-	string OutputFilename;
-
-	Generator Generator_;
+	} Generator_;
 	::Generator::Regionfield::GenerateInfo GenerateInfo;
 	::Generator::Regionfield::Generator::VoronoiDiagram VoronoiDiagram;
 
@@ -200,12 +198,12 @@ struct Regionfield {
 
 	Regionfield& operator=(Regionfield&&) = delete;
 
-	~Regionfield() = default;
+	constexpr ~Regionfield() = default;
 
 	void bind(CLI::App& cmd) & {
 		namespace Bit = DisRegRep::Core::Bit;
-		using ::Generator::Regionfield::DimensionType;
-		using DimensionArray = array<DimensionType::value_type, DimensionType::length()>;
+		using ResolutionType = decltype(this->GenerateInfo.Resolution);
+		using ResolutionArray = array<ResolutionType::value_type, ResolutionType::length()>;
 		using enum Generator;
 
 		auto& [resolution, region_count, rf_gen_info] = this->GenerateInfo;
@@ -222,7 +220,7 @@ struct Regionfield {
 		}();
 
 		cmd.add_option(
-			"--output,-o",
+			"regionfield-tif",
 			this->OutputFilename,
 			"The designation of the TIFF image is constituted by the region identifiers derived from the regionfield matrix."
 		)	->required()
@@ -233,15 +231,15 @@ struct Regionfield {
 			"One of the built-in regionfield generators that is used for generating the regionfield matrix."
 		)	->required()
 			->type_name("GEN")
-			->transform(CLI::CheckedTransformer(unordered_map<string_view, Generator>( {
+			->transform(CLI::CheckedTransformer(unordered_map<string_view, Generator> {
 				{ "uniform", Uniform },
 				{ "voronoi", Voronoi }
-			})));
+			}));
 
 		//These default settings provide a good balance between generation speed and visual diversity.
-		cmd.add_option_function<DimensionArray>(
+		cmd.add_option_function<ResolutionArray>(
 			"--dim",
-			[&resolution](const DimensionArray dim) constexpr noexcept { resolution = make_from_tuple<DimensionType>(dim); },
+			[&resolution](const ResolutionArray res) constexpr noexcept { resolution = make_from_tuple<ResolutionType>(res); },
 			"The regionfield matrix is characterised by a specific dimension."
 		)	->type_name("DIM")
 			->delimiter('x')
@@ -277,7 +275,7 @@ struct Regionfield {
 
 	[[nodiscard]] Container::Regionfield generateRegionfield() const {
 		namespace Gnrt = ::Generator::Regionfield::Generator;
-		return ::Generator::Regionfield::generate(this->GenerateInfo, [this] constexpr noexcept -> Gnrt::Option {
+		return ::Generator::Regionfield::generate(this->GenerateInfo, [this] noexcept -> Gnrt::Option {
 			using enum Generator;
 			switch (this->Generator_) {
 			case Uniform: return Gnrt::Uniform {};
@@ -285,6 +283,81 @@ struct Regionfield {
 			default: std::unreachable();
 			}
 		}());
+	}
+
+};
+
+struct Splat {
+
+	string RegionfieldFilename, OutputFilename;
+
+	enum struct Splatting : std::uint_fast8_t {
+		FullConvolution
+	} Splatting_;
+	Generator::Regionfield::Splatting::FullConvolutionOccupancy FullConvolutionOccupancy;
+
+	constexpr Splat() noexcept = default;
+
+	Splat(const Splat&) = delete;
+
+	Splat(Splat&&) = delete;
+
+	Splat& operator=(const Splat&) = delete;
+
+	Splat& operator=(Splat&&) = delete;
+
+	constexpr ~Splat() = default;
+
+	void bind(CLI::App& cmd) & {
+		using enum Splatting;
+		auto& [radius] = this->FullConvolutionOccupancy;
+
+		cmd.add_option(
+			"regionfield-tif",
+			this->RegionfieldFilename,
+			"A TIFF image that supplies region identifiers. The region feature splatting mask for the regionfield matrix is computed."
+		)
+			->required()
+			->type_name("TIF");
+		cmd.add_option(
+			"mask-tif",
+			this->OutputFilename,
+			"The region feature splatting mask, which has been computed from the input regionfield matrix, is saved to the specified TIFF image."
+		)
+			->required()
+			->type_name("TIF");
+
+		cmd.add_option(
+			"-S",
+			this->Splatting_,
+			"Select an algorithm for the calculation of the region feature splatting coefficient."
+		)
+			->required()
+			->type_name("SPLAT")
+			->transform(CLI::CheckedTransformer(unordered_map<string_view, Splatting> {
+				{ "full-conv", FullConvolution }
+			}));
+		//It is not easy to pick a default radius, since it depends on the dimension of the regionfield matrix.
+		//It is an error if the convolution kernel is too large and goes over the matrix boundary.
+		cmd.add_option(
+			"--radius,-r",
+			radius,
+			"In the context of convolution-based region feature splatting, it is imperative to specify the radius of the convolution kernel."
+		)
+			->required()
+			->type_name("RADIUS")
+			->check(CLI::NonNegativeNumber);
+	}
+
+	[[nodiscard]] Container::SplattingCoefficient::DenseMask splatRegionfield(const Container::Regionfield& regionfield) const {
+		namespace Splt = Generator::Regionfield::Splatting;
+		return Generator::Regionfield::splat([this] noexcept -> Splt::Option {
+			using enum Splatting;
+			switch (this->Splatting_) {
+			case FullConvolution: return this->FullConvolutionOccupancy;
+			default: std::unreachable();
+			}
+		}(), regionfield);
 	}
 
 };
@@ -321,13 +394,25 @@ void runProfiler(const Argument::Profile& arg_profile) {
 }
 
 void generateRegionfield(const Argument::Regionfield& arg_regionfield, const Argument::TiffCompression& arg_tiff_compression) {
-	using RegionfieldProtocol = Image::Serialisation::Protocol<Container::Regionfield>;
-	const auto& [output_filename, _1, _2, _3, full_seed] = arg_regionfield;
+	const auto& [output_file, _1, _2, _3, full_seed] = arg_regionfield;
 
 	RegionfieldProtocol::initialise();
-	const auto regionfield_tif = Image::Tiff(output_filename, "w");
+	const auto regionfield_tif = Image::Tiff(output_file, "w");
 	arg_tiff_compression.setCompression(regionfield_tif);
 	RegionfieldProtocol::write(regionfield_tif, arg_regionfield.generateRegionfield(), full_seed);
+}
+
+void splatRegionfield(const Argument::Splat& arg_splat, const Argument::TiffCompression& arg_tiff_compression) {
+	const auto& [regionfield_file, output_file, _1, _2] = arg_splat;
+
+	RegionfieldProtocol::initialise();
+	const auto regionfield_tif = Image::Tiff(regionfield_file, "r");
+	Container::Regionfield regionfield;
+	RegionfieldProtocol::read(regionfield_tif, regionfield);
+
+	const auto dense_mask_tif = Image::Tiff(output_file, "w");
+	arg_tiff_compression.setCompression(dense_mask_tif);
+	DenseMaskProtocol::write(dense_mask_tif, arg_splat.splatRegionfield(regionfield));
 }
 
 }
@@ -341,18 +426,18 @@ int main(const int argc, const char* const* const argv) try {
 	);
 	parser.require_subcommand(1);
 
-	Argument::Profile arg_profile;
 	CLI::App& cmd_profile = *parser.add_subcommand(
 		"profile",
 		"Initiate the profiler and then measure the execution time of various splatting implementations."
 	);
+	Argument::Profile arg_profile;
 	arg_profile.bind(cmd_profile);
 
-	Argument::TiffCompression arg_tiff_compression;
 	CLI::App& group_tiff_compression = *parser.add_option_group(
 		"tiff-compression",
 		"Exercise control over the compression of generated data for the TIFF writer."
 	)	->disabled_by_default();
+	Argument::TiffCompression arg_tiff_compression;
 	arg_tiff_compression.bind(group_tiff_compression);
 
 	CLI::App& group_generator = *parser.add_option_group(
@@ -360,13 +445,21 @@ int main(const int argc, const char* const* const argv) try {
 		format("The generation and processing of region data is to be carried out in a procedural manner, with the purpose of visually demonstrating the functionality of {} in the context of region splatting.", Info::FullName)
 	)	->fallthrough();
 
-	Argument::Regionfield arg_regionfield;
 	CLI::App& cmd_regionfield = *group_generator.add_subcommand(
 		"regionfield",
 		"A built-in regionfield generator is utilised to generate a regionfield matrix, which must then be stored as a TIFF image."
 	);
 	CLI::TriggerOn(&cmd_regionfield, &group_tiff_compression);
+	Argument::Regionfield arg_regionfield;
 	arg_regionfield.bind(cmd_regionfield);
+
+	CLI::App& cmd_splat = *group_generator.add_subcommand(
+		"splat",
+		"Given a regionfield matrix, the region feature splatting mask is computed and saved as a TIFF image."
+	);
+	CLI::TriggerOn(&cmd_splat, &group_tiff_compression);
+	Argument::Splat arg_splat;
+	arg_splat.bind(cmd_splat);
 
 	CLI11_PARSE(parser, argc, argv);
 
@@ -374,6 +467,8 @@ int main(const int argc, const char* const* const argv) try {
 		runProfiler(arg_profile);
 	} else if (cmd_regionfield) {
 		generateRegionfield(arg_regionfield, arg_tiff_compression);
+	} else if (cmd_splat) {
+		splatRegionfield(arg_splat, arg_tiff_compression);
 	}
 	return EXIT_SUCCESS;
 } catch (const exception& e) {

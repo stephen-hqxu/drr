@@ -1,7 +1,5 @@
 #include <DisRegRep/Container/Regionfield.hpp>
 
-#include <DisRegRep/Core/View/Matrix.hpp>
-
 #include <DisRegRep/RegionfieldGenerator/ExecutionPolicy.hpp>
 #include <DisRegRep/RegionfieldGenerator/Uniform.hpp>
 
@@ -24,7 +22,6 @@
 
 #include <cstdint>
 
-namespace View = DisRegRep::Core::View;
 namespace RfGenExec = DisRegRep::RegionfieldGenerator::ExecutionPolicy;
 using DisRegRep::Container::Regionfield, DisRegRep::RegionfieldGenerator::Uniform;
 
@@ -95,15 +92,15 @@ SCENARIO("Regionfield is a matrix of region identifiers", "[Container][Regionfie
 					}
 
 					THEN("Its extent gets swapped") {
-						const Regionfield::ExtentType& ext = rf.mapping().extents(),
-							&ext_t = rf_t.mapping().extents();
+						const Regionfield::DimensionType ext = rf.extent(),
+							ext_t = rf_t.extent();
 
-						CHECK(ext_t.extent(0U) == ext.extent(1U));
-						CHECK(ext_t.extent(1U) == ext.extent(0U));
+						CHECK(ext_t.x == ext.y);
+						CHECK(ext_t.y == ext.x);
 					}
 
 					THEN("Data are transposed") {
-						auto rf_view_t = rf.span() | View::Matrix::NewAxisRight(rf.mapping().stride(0U)) | join;
+						auto rf_view_t = rf.rangeTransposed2d() | join;
 						CHECK_THAT(rf_t.range2d() | join, RangeEquals(rf_view_t));
 					}
 

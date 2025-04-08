@@ -8,7 +8,6 @@
 
 #include <DisRegRep/Splatting/Convolution/Full/Base.hpp>
 
-#include <any>
 #include <variant>
 
 /**
@@ -16,9 +15,6 @@
  * algorithm.
  */
 namespace DisRegRep::Programme::Generator::Regionfield {
-
-using DimensionType = Container::Regionfield::DimensionType;
-using RegionCountType = Container::Regionfield::ValueType;
 
 /**
  * @brief Choose a regionfield generator to generate a regionfield matrix.
@@ -72,8 +68,8 @@ using Option = std::variant<
  */
 struct GenerateInfo {
 
-	DimensionType Resolution;
-	RegionCountType RegionCount;
+	Container::Regionfield::DimensionType Resolution; /**< @link Container::Regionfield::resize. */
+	Container::Regionfield::ValueType RegionCount; /**< @link Container::Regionfield::RegionCount. */
 
 	RegionfieldGenerator::Base::GenerateInfo RegionfieldGeneratorGenerateInfo;
 
@@ -95,11 +91,9 @@ struct GenerateInfo {
  * @param splat_info @link SplattingInfo.
  * @param option Choose a region feature splatting coefficient algorithm.
  * @param regionfield Regionfield input that provides region identifiers whose splatting coefficients are to be computed.
- * @param memory Scratch memory for splatting.
  *
  * @return The computed dense region mask.
  */
-[[nodiscard]] const Container::SplattingCoefficient::DenseMask& splat(
-	const Splatting::Option&, const Container::Regionfield&, std::any&);
+[[nodiscard]] Container::SplattingCoefficient::DenseMask splat(const Splatting::Option&, const Container::Regionfield&);
 
 }

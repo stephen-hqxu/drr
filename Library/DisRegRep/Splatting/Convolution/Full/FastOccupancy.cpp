@@ -7,6 +7,7 @@
 
 #include <DisRegRep/Core/View/Functional.hpp>
 #include <DisRegRep/Core/View/Matrix.hpp>
+#include <DisRegRep/Core/MdSpan.hpp>
 
 #include <tuple>
 
@@ -31,7 +32,7 @@ using std::ranges::for_each,
 using std::output_iterator;
 using std::ranges::forward_range, std::ranges::view,
 	std::ranges::range_difference_t, std::ranges::range_value_t, std::ranges::range_const_reference_t;
-using std::invocable, std::invoke_result_t;
+using std::invocable, std::invoke_result_t, std::common_type_t;
 
 namespace {
 
@@ -40,7 +41,10 @@ public:
 
 	DRR_SPLATTING_SCRATCH_MEMORY_CONTAINER_TRAIT;
 
-	using ExtentType = DisRegRep::Container::SplattingCoefficient::Type::Dimension3Type;
+	using ExtentType = common_type_t<
+		typename ContainerTrait::ImportanceOutputType::Dimension3Type,
+		typename ContainerTrait::MaskOutputType::Dimension3Type
+	>;
 
 	typename ContainerTrait::KernelType Kernel;
 	typename ContainerTrait::ImportanceOutputType Vertical;
@@ -48,9 +52,12 @@ public:
 
 	//(width, height, region count)
 	void resize(const tuple<ExtentType, FastOccupancy::KernelSizeType> arg) {
+		using DisRegRep::Core::MdSpan::reverse;
 		auto [extent, padding] = arg;
+
 		this->Kernel.resize(extent.z);
-		this->Horizontal.resize(extent);
+		//The final mask output will be a transposed of the input regionfield, so we flip the dense axes.
+		this->Horizontal.resize(ExtentType(reverse(typename ContainerTrait::MaskOutputType::Dimension2Type(extent)), extent.z));
 		extent.x += padding;
 		this->Vertical.resize(extent);
 	}

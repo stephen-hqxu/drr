@@ -13,7 +13,7 @@
 #include <array>
 #include <span>
 
-#include <algorithm>
+#include <functional>
 
 #include <type_traits>
 
@@ -27,6 +27,7 @@ using Catch::Matchers::RangeEquals;
 
 using std::to_array,
 	std::span, std::as_bytes;
+using std::bind_back, std::bit_or;
 using std::remove_const_t;
 
 namespace {
@@ -54,16 +55,18 @@ constexpr auto TileContent = to_array<ValueType>({
 	2, 3, 3,
 	2, 3, 3
 });
-constexpr auto TileContentBounded = to_array<ValueType>({
-	8, 4,
-	7, 4,
-	2, 3
-});
 constexpr auto TileContentPacked = to_array<ValueType>({
 	0x84, 0x44,
 	0x74, 0x44,
 	0x23, 0x33,
 	0x23, 0x33
+});
+constexpr auto MatrixUntiled = to_array<ValueType>({
+	0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 8, 4,
+	0, 0, 0, 0, 0, 7, 4,
+	0, 0, 0, 0, 0, 2, 3
 });
 
 constexpr Bit::BitPerSampleResult MatrixBitPerSampleResult = Bit::minimumBitPerSample(Matrix);
@@ -73,6 +76,7 @@ constexpr Bit::BitPerSampleResult MatrixBitPerSampleResult = Bit::minimumBitPerS
 TEMPLATE_TEST_CASE_SIG("A multidimensional serialisation buffer with support for out-of-bound padding and bit packing", "[Image][Serialisation][Buffer][Tile]", ((bool Packed), Packed), false, true) {
 
 	GIVEN("An tile buffer initialised for a matrix as data source") {
+		static constexpr auto reshapeMatrix = bind_back(bit_or {}, NewAxisLeft(MatrixExtent.y));
 		static constexpr auto ExpectedTileContent = [] static consteval noexcept {
 			if constexpr (Packed) {
 				return span(TileContentPacked);
@@ -94,18 +98,17 @@ TEMPLATE_TEST_CASE_SIG("A multidimensional serialisation buffer with support for
 			}(), TileExtent, &MatrixBitPerSampleResult);
 
 		WHEN("Tile is loaded from the matrix") {
-			shaped.fromMatrix(Matrix | NewAxisLeft(MatrixExtent.y), TileOffset);
+			shaped.fromMatrix(reshapeMatrix(Matrix), TileOffset);
 
 			THEN("Tile buffer is filled with content") {
 				CHECK_THAT(tile_buffer, RangeEquals(as_bytes(ExpectedTileContent)));
 
 				AND_WHEN("Tile is unloaded to an empty matrix") {
-					remove_const_t<decltype(TileContentBounded)> empty_matrix;
-					shaped.toMatrix(
-						empty_matrix | NewAxisLeft(std::min<ScalarType>(MatrixExtent.y - TileOffset.y, TileExtent.y)), ExtentType(0U));
+					remove_const_t<decltype(MatrixUntiled)> empty_matrix {};
+					shaped.toMatrix(reshapeMatrix(empty_matrix), TileOffset);
 
 					THEN("The empty matrix is filled with the exact same content as the original input with padding removed") {
-						CHECK_THAT(empty_matrix, RangeEquals(TileContentBounded));
+						CHECK_THAT(empty_matrix, RangeEquals(MatrixUntiled));
 					}
 
 				}

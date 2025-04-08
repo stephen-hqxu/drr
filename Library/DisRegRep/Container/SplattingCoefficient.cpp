@@ -24,6 +24,11 @@ using std::for_each, std::all_of,
 using std::mem_fn;
 
 template<typename V>
+typename BasicDense<V>::Dimension3Type BasicDense<V>::extent() const noexcept {
+	return Core::MdSpan::toVector(this->Mapping.extents());
+}
+
+template<typename V>
 typename BasicDense<V>::SizeType BasicDense<V>::sizeByte() const noexcept {
 	return span(this->DenseMatrix).size_bytes();
 }
@@ -53,6 +58,11 @@ bool BasicSparse<V>::isSorted() const {
 }
 
 template<typename V>
+typename BasicSparse<V>::Dimension2Type BasicSparse<V>::extent() const noexcept {
+	return Core::MdSpan::toVector(this->OffsetMapping.extents());
+}
+
+template<typename V>
 typename BasicSparse<V>::SizeType BasicSparse<V>::sizeByte() const noexcept {
 	return apply([](const auto&... matrix) static constexpr noexcept { return (span(matrix).size_bytes() + ...); },
 		tie(this->Offset, this->SparseMatrix));
@@ -61,8 +71,8 @@ typename BasicSparse<V>::SizeType BasicSparse<V>::sizeByte() const noexcept {
 template<typename V>
 void BasicSparse<V>::resize(const Dimension3Type dim) {
 	//Region count is unused in a sparse matrix.
-	const Type::Dimension2Type dim_wh = dim;
-	DRR_ASSERT(glm::all(glm::greaterThan(dim_wh, Type::Dimension2Type(0U))));
+	const Dimension2Type dim_wh = dim;
+	DRR_ASSERT(glm::all(glm::greaterThan(dim_wh, Dimension2Type(0U))));
 
 	this->OffsetMapping = Core::MdSpan::toExtent(dim_wh);
 	//Initialise starting offset for each element in the new sparse matrix.

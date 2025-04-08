@@ -249,13 +249,15 @@ public:
 				&& (FinalRank
 					|| (std::is_move_constructible_v<range_const_reference_t<In>> && std::is_move_constructible_v<range_reference_t<Out>>))
 			(this const auto& self, RankConstant<Rank>, In&& in, Out&& out) constexpr {
-				auto in_trimmed = std::forward<In>(in)
+				auto out_tiled = std::forward<Out>(out)
 					| drop(tile_offset[Rank])
-					| take(size(out));
+					| take(this->template currentExtent<FinalRank>(in));
+				auto in_trimmed = std::forward<In>(in)
+					| take(size(out_tiled));
 				if constexpr (FinalRank) {
-					this->copyUnpacked(std::move(in_trimmed), std::forward<Out>(out));
+					this->copyUnpacked(std::move(in_trimmed), std::move(out_tiled));
 				} else {
-					for (auto [tile_in, tile_out] : zip(std::move(in_trimmed), std::forward<Out>(out))) [[likely]] {
+					for (auto [tile_in, tile_out] : zip(std::move(in_trimmed), std::move(out_tiled))) [[likely]] {
 						self(RankConstant<Rank + 1> {}, std::move(tile_in), std::move(tile_out));
 					}
 				}

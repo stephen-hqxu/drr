@@ -41,12 +41,6 @@ private:
 	MappingType Mapping;
 	std::vector<ValueType, Core::UninitialisedAllocator<ValueType>> Data;
 
-	template<std::ranges::viewable_range R>
-	requires std::ranges::input_range<R>
-	[[nodiscard]] constexpr std::ranges::view auto view2d(R&& r) const noexcept {
-		return std::forward<R>(r) | Core::View::Matrix::NewAxisLeft(this->Mapping.stride(0U));
-	}
-
 public:
 
 	/**
@@ -115,15 +109,6 @@ public:
 	}
 
 	/**
-	 * @brief Get the index mapping of the regionfield.
-	 * 
-	 * @return Index mapping.
-	 */
-	[[nodiscard]] constexpr const MappingType& mapping() const noexcept {
-		return this->Mapping;
-	}
-
-	/**
 	 * @brief Get a multi-dimension view on the regionfield matrix.
 	 *
 	 * @return The mdspan of the regionfield.
@@ -147,7 +132,16 @@ public:
 	 * @return The 2D range of the regionfield.
 	 */
 	[[nodiscard]] constexpr std::ranges::view auto range2d(this auto& self) noexcept {
-		return self.view2d(self.Data);
+		return self.Data | Core::View::Matrix::NewAxisLeft(self.Mapping.stride(0U));
+	}
+
+	/**
+	 * @brief Form a transposed 2D view on the regionfield matrix.
+	 *
+	 * @return The transposed 2D range of the regionfield.
+	 */
+	[[nodiscard]] constexpr std::ranges::view auto rangeTransposed2d(this auto& self) noexcept {
+		return self.Data | Core::View::Matrix::NewAxisRight(self.Mapping.stride(0U));
 	}
 
 };

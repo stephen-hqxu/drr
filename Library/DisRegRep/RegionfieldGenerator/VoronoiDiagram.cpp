@@ -41,13 +41,13 @@ DRR_REGIONFIELD_GENERATOR_DEFINE_DELEGATING_FUNCTOR(VoronoiDiagram) {
 	DRR_ASSERT(this->CentroidCount > 0U);
 
 	const span rf_span = regionfield.span();
-	const Regionfield::ExtentType& rf_extent = regionfield.mapping().extents();
+	const Regionfield::DimensionType rf_extent = regionfield.extent();
 	const auto [seed] = info;
 
 	auto rng = Core::XXHash::RandomEngine(Base::generateSecret(seed));
 	array<UniformDistributionType, 2U> dist;
 	std::ranges::transform(iota(RankType {}, static_cast<RankType>(dist.size())), dist.begin(),
-		[&rf_extent](const auto ext) { return UniformDistributionType(0U, rf_extent.extent(ext) - 1U); });
+		[&rf_extent](const auto ext) { return UniformDistributionType(0U, rf_extent[ext] - 1U); });
 
 	const auto region_centroid =
 		Core::View::Generate(
@@ -61,7 +61,7 @@ DRR_REGIONFIELD_GENERATOR_DEFINE_DELEGATING_FUNCTOR(VoronoiDiagram) {
 	//This is a pretty Naive algorithm, in practice it is better to use a quad tree or KD tree to find K-NN;
 	//	omitted here for simplicity.
 	const auto idx_rg = [&rf_extent]<RankType... I>(integer_sequence<RankType, I...>) constexpr noexcept {
-		return cartesian_product(iota(Regionfield::IndexType {}, rf_extent.extent(I))...)
+		return cartesian_product(iota(Regionfield::IndexType {}, rf_extent[I])...)
 			 | Core::View::Functional::MakeFromTuple<Regionfield::DimensionType>;
 	}(make_integer_sequence<RankType, Regionfield::ExtentType::rank()> {});
 	std::transform(EpTrait::Unsequenced, idx_rg.cbegin(), idx_rg.cend(), rf_span.begin(),

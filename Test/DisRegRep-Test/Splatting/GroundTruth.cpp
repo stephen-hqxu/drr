@@ -135,9 +135,10 @@ template<
 	> Comp
 > requires viewable_range<range_const_reference_t<Ref>>
 void compare(const Matrix& matrix, const Ref& reference, Comp comp) {
-	CHECK_THAT(matrix.range() | View::Functional::Dereference,
-		RangeEquals(reference,
-			[&comp](const auto source, const auto target) { return all_of(zip_transform(comp, source, target), identity {}); }));
+	CHECK(typename Matrix::Dimension2Type(matrix.extent()) == Extent);
+	CHECK_THAT(matrix.range() | View::Functional::Dereference, RangeEquals(reference, [&comp](const auto source, const auto target) {
+		return all_of(zip_transform(comp, source, target), identity {});
+	}));
 }
 
 template<SpltCoef::IsDense Matrix>

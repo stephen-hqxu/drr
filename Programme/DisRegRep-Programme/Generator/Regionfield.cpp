@@ -28,7 +28,7 @@ using std::any, std::tuple, std::visit;
 namespace {
 
 using PreparedGenerationInfo = tuple<Regionfield, const StockGen::Base::GenerateInfo>;
-using PreparedSplattingInfo = tuple<const Regionfield&, any&>;
+using PreparedSplattingInfo = tuple<const Regionfield&>;
 
 [[nodiscard]] Regionfield generate(
 	//NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
@@ -50,20 +50,29 @@ using PreparedSplattingInfo = tuple<const Regionfield&, any&>;
 	return generate(voronoi_diagram, std::move(prepared_gen_info));
 }
 
-[[nodiscard]] const DenseMask& splat(
+[[nodiscard]] DenseMask splat(
 	//NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
 	const StockSplt::Base& splatting, PreparedSplattingInfo&& prepared_splat_info) {
-	auto& [regionfield, memory] = prepared_splat_info;
+	const auto invoke_splat = [&splatting](const Regionfield& regionfield) -> DenseMask {
+		any memory;
+		const StockSplt::Base::DimensionType offset = splatting.minimumOffset();
+		return std::move(splatting(StockSplt::Container::DenseKernelDenseOutputTrait, regionfield, memory,
+			StockSplt::Base::InvokeInfo {
+				.Offset = offset,
+				.Extent = splatting.maximumExtent(regionfield, offset)
+			}));
+	};
 
-	const StockSplt::Base::DimensionType offset = splatting.minimumOffset();
-	return splatting(StockSplt::Container::DenseKernelDenseOutputTrait, regionfield, memory,
-		StockSplt::Base::InvokeInfo {
-			.Offset = offset,
-			.Extent = splatting.maximumExtent(regionfield, offset)
-		});
+	//Remember to transpose the input to maintain the same axes order if the splatting algorithm would do so.
+	if (const auto& [regionfield] = prepared_splat_info;
+		splatting.isTransposed()) {
+		return invoke_splat(regionfield.transpose());
+	} else {//NOLINT(readability-else-after-return)
+		return invoke_splat(regionfield);
+	}
 }
 
-[[nodiscard]] const DenseMask& splat(
+[[nodiscard]] DenseMask splat(
 	PreparedSplattingInfo&& prepared_splat_info, const RfGen::Splatting::FullConvolutionOccupancy option) {
 	const auto [radius] = option;
 	StockSplt::Convolution::Full::FastOccupancy fast_occupancy;
@@ -88,12 +97,6 @@ Regionfield RfGen::generate(const GenerateInfo& gen_info, const Generator::Optio
 	);
 }
 
-const DenseMask& RfGen::splat(const Splatting::Option& option, const Container::Regionfield& regionfield, any& memory) {
-	return visit(
-		[&](const auto& splatting) -> const DenseMask& { return ::splat(PreparedSplattingInfo(
-			regionfield,
-			memory
-		), splatting); },
-		option
-	);
+DenseMask RfGen::splat(const Splatting::Option& option, const Container::Regionfield& regionfield) {
+	return visit([&](const auto& splatting) { return ::splat(PreparedSplattingInfo(regionfield), splatting); }, option);
 }

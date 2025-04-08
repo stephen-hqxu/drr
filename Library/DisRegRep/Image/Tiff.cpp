@@ -1,5 +1,6 @@
 #include <DisRegRep/Image/Tiff.hpp>
 
+#include <DisRegRep/Core/Bit.hpp>
 #include <DisRegRep/Core/Exception.hpp>
 
 #include <DisRegRep/Info.hpp>
@@ -20,6 +21,7 @@
 #include <algorithm>
 #include <ranges>
 
+#include <bit>
 #include <chrono>
 #include <format>
 #include <memory>
@@ -36,9 +38,9 @@ using glm::f32vec2, glm::u32vec3;
 
 using std::array, std::to_array,
 	std::string_view, std::span,
-	std::tuple, std::apply;
-using std::ranges::generate, std::ranges::transform,
-	std::views::adjacent, std::views::chunk;
+	std::apply;
+using std::ranges::for_each, std::ranges::copy, std::ranges::transform,
+	std::views::chunk;
 using std::chrono::system_clock, std::chrono::time_point_cast, std::chrono::sys_seconds,
 	std::format, std::format_to,
 	std::make_unique_for_overwrite,
@@ -78,9 +80,8 @@ void Tiff::setColourPalette(const ConstColourPalette& palette) const {
 }
 
 void Tiff::setColourPalette(const ColourPaletteRandomEngineSeed seed) const {
-	static_assert(
-		ColourPaletteRandomEngine::min() == 0U
-			&& ColourPaletteRandomEngine::max() == (1UZ << numeric_limits<ColourPaletteElement>::digits * 3U) - 1U,
+	using Limit = numeric_limits<ColourPaletteElement>;
+	static_assert(ColourPaletteRandomEngine::min() == 0U && std::countr_one(ColourPaletteRandomEngine::max()) == Limit::digits * 3U,
 		"Choose a random number generator whose range can cover exactly the size of three colour palette channels to ensure maximum instruction level parallelism."
 	);
 
@@ -88,11 +89,12 @@ void Tiff::setColourPalette(const ColourPaletteRandomEngineSeed seed) const {
 		rgb_palette_size = palette_size * 3U;
 	const auto palette_ptr = make_unique_for_overwrite<ColourPaletteElement[]>(rgb_palette_size);
 	const auto palette = span(palette_ptr.get(), rgb_palette_size);
-	generate(palette | adjacent<3U>, [rng = ColourPaletteRandomEngine(seed)]() mutable {
-		using Limit = numeric_limits<ColourPaletteElement>;
-		return [rgb = rng()]<std::uint_fast8_t... Stride>(integer_sequence<std::uint_fast8_t, Stride...>) constexpr noexcept {
-			return tuple(Limit::max() & rgb >> Limit::digits * Stride...);
-		}(make_integer_sequence<std::uint_fast8_t, 3U> {});
+	for_each(palette | chunk(3U), [rng = ColourPaletteRandomEngine(seed)](const auto rgb) mutable {
+		using Core::Bit::BitPerSampleResult;
+		using EngineResult = ColourPaletteRandomEngine::result_type;
+		static constexpr auto RGBBpsResult = BitPerSampleResult(BitPerSampleResult::DataTypeTag<EngineResult>, Limit::digits);
+		//Unpack starts from MSB, shift up to fill in the gap.
+		copy(Core::Bit::unpack(rng() << RGBBpsResult.Bit, rgb.size(), RGBBpsResult), rgb.begin());
 	});
 
 	ConstColourPalette palette_split;

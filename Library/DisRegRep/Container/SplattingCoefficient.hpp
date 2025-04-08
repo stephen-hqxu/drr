@@ -82,6 +82,7 @@ public:
 	using ConstElement = std::add_const_t<ElementType>;
 	using IndexType = Type::IndexType;
 
+	using Dimension2Type = Type::Dimension2Type;
 	using Dimension3Type = Type::Dimension3Type;
 
 	using ExtentType = std::dextents<IndexType, 3U>;
@@ -173,22 +174,6 @@ public:
 	template<bool Const, typename R>
 	ValueProxy(std::bool_constant<Const>, R&&) -> ValueProxy<Const, std::views::all_t<R>>;
 
-private:
-
-	template<typename Self, std::ranges::input_range R>
-	requires std::ranges::viewable_range<R>
-	[[nodiscard]] constexpr std::ranges::view auto view(this Self& self, R&& r) noexcept {
-		using std::views::transform, std::bool_constant;
-
-		return std::forward<R>(r)
-			| Core::View::Matrix::NewAxisLeft(self.Mapping.stride(1U))
-			| transform([](auto region_val) static constexpr noexcept {
-				return ValueProxy(bool_constant<std::is_const_v<Self>> {}, std::move(region_val));
-			});
-	}
-
-public:
-
 	constexpr BasicDense() = default;
 
 	BasicDense(const BasicDense&) = delete;
@@ -202,13 +187,11 @@ public:
 	constexpr ~BasicDense() = default;
 
 	/**
-	 * @brief Get the index mapping of the dense matrix.
+	 * @brief Get the dense matrix extent.
 	 *
-	 * @return Index mapping.
+	 * @return Dense matrix extent.
 	 */
-	[[nodiscard]] constexpr const MappingType& mapping() const noexcept {
-		return this->Mapping;
-	}
+	[[nodiscard]] Dimension3Type extent() const noexcept;
 
 	/**
 	 * @brief Get the linear size of the dense matrix.
@@ -248,8 +231,15 @@ public:
 	 *
 	 * @return A range to the dense matrix.
 	 */
-	[[nodiscard]] constexpr std::ranges::view auto range(this auto& self) noexcept {
-		return self.view(self.DenseMatrix);
+	template<typename Self>
+	[[nodiscard]] constexpr std::ranges::view auto range(this Self& self) noexcept {
+		using std::views::transform, std::bool_constant;
+
+		return self.DenseMatrix
+			| Core::View::Matrix::NewAxisLeft(self.Mapping.stride(1U))
+			| transform([](auto region_val) static constexpr noexcept {
+				return ValueProxy(bool_constant<std::is_const_v<Self>> {}, std::move(region_val));
+			});
 	}
 
 	/**
@@ -283,6 +273,7 @@ public:
 	using ConstOffset = std::add_const_t<OffsetType>;
 	using IndexType = Type::IndexType;
 
+	using Dimension2Type = Type::Dimension2Type;
 	using Dimension3Type = Type::Dimension3Type;
 
 	using OffsetExtentType = std::dextents<IndexType, 2U>;
@@ -401,24 +392,6 @@ public:
 
 	};
 
-private:
-
-	template<typename Self, std::ranges::forward_range R>
-	requires std::ranges::viewable_range<R>
-	[[nodiscard]] constexpr std::ranges::view auto view(this Self& self, R&& r) noexcept {
-		using std::views::pairwise, std::views::transform;
-		using ProxyType = ValueProxy<std::is_const_v<Self>>;
-
-		//Not using pairwise_transform since I need to pass the original tuple to the proxy.
-		return std::forward<R>(r)
-			| pairwise
-			| transform([&elem = self.SparseMatrix](auto pairwise_offset) constexpr noexcept {
-				return ProxyType(std::move(pairwise_offset), elem);
-			});
-	}
-
-public:
-
 	constexpr BasicSparse() noexcept = default;
 
 	BasicSparse(const BasicSparse&) = delete;
@@ -448,15 +421,13 @@ public:
 	[[nodiscard]] bool isSorted() const;
 
 	/**
-	 * @brief Get the index mapping of the sparse matrix.
+	 * @brief Get the sparse matrix extent.
 	 *
-	 * @note Since sparse matrix is only *partially* sparse on the Z axis, the mapping only maps the dense axes.
+	 * @note Since the sparse matrix is only *partially* sparse on the Z axis, the mapping only maps the dense axes.
 	 *
-	 * @return Index mapping.
+	 * @return Sparse matrix extent.
 	 */
-	[[nodiscard]] constexpr const OffsetMappingType& mapping() const noexcept {
-		return this->OffsetMapping;
-	}
+	[[nodiscard]] Dimension2Type extent() const noexcept;
 
 	/**
 	 * @brief Get the linear size of the sparse matrix.
@@ -497,8 +468,17 @@ public:
 	 *
 	 * @return A range to the sparse matrix.
 	 */
-	[[nodiscard]] constexpr std::ranges::view auto range(this auto& self) noexcept {
-		return self.view(self.Offset);
+	template<typename Self>
+	[[nodiscard]] constexpr std::ranges::view auto range(this Self& self) noexcept {
+		using std::views::pairwise, std::views::transform;
+		using ProxyType = ValueProxy<std::is_const_v<Self>>;
+
+		//Not using pairwise_transform since I need to pass the original tuple to the proxy.
+		return self.Offset
+			| pairwise
+			| transform([&elem = self.SparseMatrix](auto pairwise_offset) constexpr noexcept {
+				return ProxyType(std::move(pairwise_offset), elem);
+			});
 	}
 
 	/**
