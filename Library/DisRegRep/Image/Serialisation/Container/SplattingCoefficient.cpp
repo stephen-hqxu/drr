@@ -26,6 +26,7 @@
 #include <cmath>
 
 using DisRegRep::Image::Serialisation::Protocol, DisRegRep::Container::SplattingCoefficient::DenseMask;
+using DisRegRep::Core::MdSpan::reverse;
 
 using glm::f32vec2;
 
@@ -55,7 +56,7 @@ void Protocol<DenseMask>::write(const Tiff& tif, const Serialisable& dense_mask)
 
 	tif.setField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
 
-	tif.setImageExtent(Dimension3Type(Core::MdSpan::reverse(Dimension2Type(mask_extent)), mask_extent.z));
+	tif.setImageExtent(Dimension3Type(reverse(Dimension2Type(mask_extent)), mask_extent.z));
 	//Although it is a 3D matrix, we reckon the region axis is shallow compared to width and height axis.
 	//It does not worth to use a 3D tile because the region axis may have a lot of paddings.
 	tif.setOptimalTileExtent();
@@ -67,14 +68,15 @@ void Protocol<DenseMask>::write(const Tiff& tif, const Serialisable& dense_mask)
 	const Dimension3Type tile_extent = tif.getTileExtent();
 	const auto mask_matrix = dense_mask.range2d();
 	const auto tile_matrix = tile_buffer.shape(decltype(tile_buffer)::DisablePacking, Dimension2Type(tile_extent));
-	for (const auto [offset_x, offset_y, offset_region] : Index::ForeachTile(mask_extent, tile_extent)) [[likely]] {
+	for (const auto offset : Index::ForeachTile(mask_extent, tile_extent)) [[likely]] {
+		const Dimension2Type offset_xy = offset;
 		tile_matrix.fromMatrix(
-			mask_matrix | transform(bind_back(bit_or {}, transform([offset_region](const auto proxy) constexpr noexcept -> PixelType {
-				return std::round((*proxy)[offset_region] * PixelLimit::max());
+			mask_matrix | transform(bind_back(bit_or {}, transform([region = offset.z](const auto proxy) constexpr noexcept -> PixelType {
+				return std::round((*proxy)[region] * PixelLimit::max());
 			}))),
-			Dimension2Type(offset_x, offset_y)
+			offset_xy
 		);
 		//Remember to transpose the tile writing order.
-		tif.writeTile(raw_buffer, Dimension3Type(offset_y, offset_x, offset_region), 0U);
+		tif.writeTile(raw_buffer, Dimension3Type(reverse(offset_xy), offset.z), 0U);
 	}
 }

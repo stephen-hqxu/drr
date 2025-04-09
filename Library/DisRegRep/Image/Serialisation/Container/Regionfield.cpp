@@ -21,7 +21,6 @@
 
 #include <array>
 #include <span>
-#include <tuple>
 
 #include <cstdint>
 
@@ -30,7 +29,7 @@ using DisRegRep::Core::Bit::BitPerSampleResult, DisRegRep::Core::MdSpan::reverse
 
 using glm::f32vec2;
 
-using std::to_array, std::span, std::make_from_tuple;
+using std::to_array, std::span;
 
 namespace {
 
@@ -86,9 +85,8 @@ void Protocol<Regionfield>::read(const Tiff& tif, Serialisable& regionfield) {
 	const auto rf_matrix = regionfield.range2d();
 	const auto tile_matrix = tile_buffer.shape(decltype(tile_buffer)::EnablePacking, tile_extent, &bps_result);
 	for (const auto offset : Index::ForeachTile(rf_extent, tile_extent)) [[likely]] {
-		const auto [offset_x, offset_y] = offset;
-		tif.readTile(raw_buffer, Dimension3(offset_y, offset_x, 0U), 0U);
-		tile_matrix.toMatrix(rf_matrix, make_from_tuple<DimensionType>(offset));
+		tif.readTile(raw_buffer, Dimension3(reverse(offset), 0U), 0U);
+		tile_matrix.toMatrix(rf_matrix, offset);
 	}
 }
 
@@ -128,8 +126,7 @@ void Protocol<Regionfield>::write(const Tiff& tif, const Serialisable& regionfie
 	const auto rf_matrix = regionfield.range2d();
 	const auto tile_matrix = tile_buffer.shape(decltype(tile_buffer)::EnablePacking, tile_extent, &bps_result);
 	for (const auto offset : Index::ForeachTile(rf_extent, tile_extent)) [[likely]] {
-		const auto [offset_x, offset_y] = offset;
-		tile_matrix.fromMatrix(rf_matrix, make_from_tuple<DimensionType>(offset));
-		tif.writeTile(raw_buffer, Dimension3(offset_y, offset_x, 0U), 0U);
+		tile_matrix.fromMatrix(rf_matrix, offset);
+		tif.writeTile(raw_buffer, Dimension3(reverse(offset), 0U), 0U);
 	}
 }

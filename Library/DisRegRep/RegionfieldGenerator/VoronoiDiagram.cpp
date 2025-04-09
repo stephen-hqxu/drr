@@ -42,9 +42,8 @@ DRR_REGIONFIELD_GENERATOR_DEFINE_DELEGATING_FUNCTOR(VoronoiDiagram) {
 
 	const span rf_span = regionfield.span();
 	const Regionfield::DimensionType rf_extent = regionfield.extent();
-	const auto [seed] = info;
 
-	auto rng = Core::XXHash::RandomEngine(Base::generateSecret(seed));
+	auto rng = Core::XXHash::RandomEngine(Base::generateSecret(gen_info));
 	array<UniformDistributionType, 2U> dist;
 	std::ranges::transform(iota(RankType {}, static_cast<RankType>(dist.size())), dist.begin(),
 		[&rf_extent](const auto ext) { return UniformDistributionType(0U, rf_extent[ext] - 1U); });

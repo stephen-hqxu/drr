@@ -12,7 +12,7 @@
 //Define `DisRegRep::RegionfieldGenerator::Base::operator()`.
 #define DRR_REGIONFIELD_GENERATOR_DEFINE_FUNCTOR(IMPL_NAME, THREADING) \
 	DRR_REGIONFIELD_GENERATOR_DECLARE_FUNCTOR(IMPL_NAME::, THREADING) { \
-		return this->invokeImpl<std::remove_const_t<decltype(ep_trait)>>(regionfield, info); \
+		return this->invokeImpl<std::remove_const_t<decltype(ep_trait)>>(regionfield, gen_info); \
 	}
 //Do `DRR_REGIONFIELD_GENERATOR_DEFINE_FUNCTOR` for every valid execution policy.
 #define DRR_REGIONFIELD_GENERATOR_DEFINE_FUNCTOR_ALL(IMPL_NAME) \

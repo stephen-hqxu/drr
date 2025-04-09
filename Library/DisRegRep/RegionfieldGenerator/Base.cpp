@@ -14,7 +14,8 @@ constexpr auto DefaultSecret = XXHash::makeApplicationSecret("60 e6 5a 64 a2 20 
 
 }
 
-XXHash::Secret Base::generateSecret(const SeedType seed) {
+XXHash::Secret Base::generateSecret(const GenerateInfo& gen_info) {
+	const auto [seed] = gen_info;
 	return XXHash::generateSecret(DefaultSecret, seed);
 }
 

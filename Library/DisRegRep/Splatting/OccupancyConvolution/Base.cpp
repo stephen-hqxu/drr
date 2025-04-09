@@ -6,8 +6,8 @@
 using DisRegRep::Splatting::OccupancyConvolution::Base,
 	DisRegRep::Container::Regionfield;
 
-Base::DimensionType Base::minimumRegionfieldDimension(const InvokeInfo& info) const noexcept {
-	return this->Splatting::Base::minimumRegionfieldDimension(info) + this->Radius;
+Base::DimensionType Base::minimumRegionfieldDimension(const InvokeInfo& invoke_info) const noexcept {
+	return this->Splatting::Base::minimumRegionfieldDimension(invoke_info) + this->Radius;
 }
 
 Base::DimensionType Base::minimumOffset() const noexcept {

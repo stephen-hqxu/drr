@@ -117,18 +117,14 @@ void conv1d(
 }
 
 DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(Fast) {
-	this->validate(regionfield, info);
-
-	using ScratchMemoryType = ScratchMemory<ContainerTrait>;
-	const auto [offset, extent] = info;
-
-	const KernelSizeType d = OccupancyConvolution::Base::diametre(this->Radius),
+	this->validate(regionfield, invoke_info);
+	const auto [offset, extent] = invoke_info;
+	const KernelSizeType d = this->diametre(),
 		//Padding does not include the centre element (only the halo), so minus one from the diametre.
 		d_halo = d - 1U;
-
 	//Vertical pass requires padding to the left and right of the matrix.
 	auto& [kernel_memory, vertical_memory, horizontal_memory] = ImplementationHelper::allocate<ScratchMemory, ContainerTrait>(
-		memory, tuple(typename ScratchMemoryType::ExtentType(extent, regionfield.RegionCount), d_halo));
+		memory, tuple(typename ScratchMemory<ContainerTrait>::ExtentType(extent, regionfield.RegionCount), d_halo));
 
 	//Need to read the whole halo from regionfield.
 	//In vertical scanline, this overlaps with the 1D kernel.
@@ -140,7 +136,6 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(Fast) {
 		d,
 		[](const auto& km) static constexpr noexcept { return km.span(); }
 	);
-
 	//Repeat the same process in the horizontal pass.
 	conv1d(
 		vertical_memory.rangeTransposed2d() | transform(bind_back(bit_or {}, Core::View::Functional::Dereference)),

@@ -25,7 +25,7 @@
 //Define `DisRegRep::Splatting::Base::operator()`. No trailing comma is allowed here.
 #define DRR_SPLATTING_DEFINE_FUNCTOR(IMPL_NAME, KERNEL, OUTPUT) \
 	DRR_SPLATTING_DECLARE_FUNCTOR(IMPL_NAME::, KERNEL, OUTPUT) { \
-		return this->invokeImpl<std::remove_const_t<decltype(container_trait)>>(regionfield, memory, info); \
+		return this->invokeImpl<std::remove_const_t<decltype(container_trait)>>(regionfield, memory, invoke_info); \
 	}
 //Do `DRR_SPLATTING_DEFINE_FUNCTOR` for every valid combination of container implementations.
 #define DRR_SPLATTING_DEFINE_FUNCTOR_ALL(IMPL_NAME) \

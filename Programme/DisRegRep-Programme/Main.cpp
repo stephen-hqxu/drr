@@ -175,8 +175,6 @@ struct TiffCompression {
 
 struct Regionfield {
 
-	using SeedType = Image::Tiff::ColourPaletteRandomEngineSeed;
-
 	string OutputFilename;
 
 	enum struct Generator : std::uint_fast8_t {
@@ -185,8 +183,6 @@ struct Regionfield {
 	} Generator_;
 	::Generator::Regionfield::GenerateInfo GenerateInfo;
 	::Generator::Regionfield::Generator::VoronoiDiagram VoronoiDiagram;
-
-	SeedType FullSeed;
 
 	constexpr Regionfield() noexcept = default;
 
@@ -202,13 +198,15 @@ struct Regionfield {
 
 	void bind(CLI::App& cmd) & {
 		namespace Bit = DisRegRep::Core::Bit;
-		using ResolutionType = decltype(this->GenerateInfo.Resolution);
-		using ResolutionArray = array<ResolutionType::value_type, ResolutionType::length()>;
 		using enum Generator;
 
 		auto& [resolution, region_count, rf_gen_info] = this->GenerateInfo;
 		auto& [seed] = rf_gen_info;
 		auto& [centroid_count] = this->VoronoiDiagram;
+
+		using ResolutionType = decltype(resolution);
+		using ResolutionArray = array<ResolutionType::value_type, ResolutionType::length()>;
+		using SeedType = decltype(seed);
 
 		static constexpr auto SeedSequencePacking = Bit::BitPerSampleResult(
 			Bit::BitPerSampleResult::DataTypeTag<SeedType>, numeric_limits<random_device::result_type>::digits);
@@ -253,12 +251,9 @@ struct Regionfield {
 		)	->type_name("COUNT")
 			->check(CLI::PositiveNumber)
 			->default_val(4U);
-		cmd.add_option_function<SeedType>(
+		cmd.add_option(
 			"--seed",
-			[&gen_seed = seed, &full_seed = this->FullSeed](const SeedType seed) constexpr noexcept {
-				gen_seed = seed;
-				full_seed = seed;
-			},
+			seed,
 			"Initialise the state of the random number generator employed for the generation of a regionfield."
 		)	->type_name("SEED")
 			->check(CLI::NonNegativeNumber)
@@ -271,6 +266,10 @@ struct Regionfield {
 		)	->type_name("COUNT")
 			->check(CLI::PositiveNumber)
 			->default_val(12U);
+	}
+
+	[[nodiscard]] constexpr auto seed() const noexcept {
+		return this->GenerateInfo.RegionfieldGeneratorGenerateInfo.Seed;
 	}
 
 	[[nodiscard]] Container::Regionfield generateRegionfield() const {
@@ -292,7 +291,7 @@ struct Splat {
 	string RegionfieldFilename, OutputFilename;
 
 	enum struct Splatting : std::uint_fast8_t {
-		FullOC
+		Full
 	} Splatting_;
 	Generator::Regionfield::Splatting::FullOccupancyConvolution FullOccupancyConvolution;
 
@@ -335,7 +334,7 @@ struct Splat {
 			->required()
 			->type_name("SPLAT")
 			->transform(CLI::CheckedTransformer(unordered_map<string_view, Splatting> {
-				{ "full-oc", FullOC }
+				{ "full", Full }
 			}));
 		//It is not easy to pick a default radius, since it depends on the dimension of the regionfield matrix.
 		//It is an error if the convolution kernel is too large and goes over the matrix boundary.
@@ -354,7 +353,7 @@ struct Splat {
 		return Generator::Regionfield::splat([this] noexcept -> Splt::Option {
 			using enum Splatting;
 			switch (this->Splatting_) {
-			case FullOC: return this->FullOccupancyConvolution;
+			case Full: return this->FullOccupancyConvolution;
 			default: std::unreachable();
 			}
 		}(), regionfield);
@@ -394,12 +393,12 @@ void runProfiler(const Argument::Profile& arg_profile) {
 }
 
 void generateRegionfield(const Argument::Regionfield& arg_regionfield, const Argument::TiffCompression& arg_tiff_compression) {
-	const auto& [output_file, _1, _2, _3, full_seed] = arg_regionfield;
+	const auto& [output_file, _1, _2, _3] = arg_regionfield;
 
 	RegionfieldProtocol::initialise();
 	const auto regionfield_tif = Image::Tiff(output_file, "w");
 	arg_tiff_compression.setCompression(regionfield_tif);
-	RegionfieldProtocol::write(regionfield_tif, arg_regionfield.generateRegionfield(), full_seed);
+	RegionfieldProtocol::write(regionfield_tif, arg_regionfield.generateRegionfield(), arg_regionfield.seed());
 }
 
 void splatRegionfield(const Argument::Splat& arg_splat, const Argument::TiffCompression& arg_tiff_compression) {

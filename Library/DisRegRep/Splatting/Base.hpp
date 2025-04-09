@@ -24,7 +24,7 @@
 		const DRR_SPLATTING_CONTAINER_TRAIT(KERNEL, OUTPUT) container_trait, \
 		const DisRegRep::Container::Regionfield& regionfield, \
 		std::any& memory, \
-		const DisRegRep::Splatting::Base::InvokeInfo& info \
+		const DisRegRep::Splatting::Base::InvokeInfo& invoke_info \
 	) const
 //Do `DRR_SPLATTING_DECLARE_FUNCTOR` for every valid combination of container implementations.
 #define DRR_SPLATTING_DECLARE_FUNCTOR_ALL(PREFIX, SUFFIX) \
@@ -41,7 +41,7 @@
 	FUNC_QUAL ContainerTrait::MaskOutputType& QUAL invokeImpl( \
 		const DisRegRep::Container::Regionfield& regionfield, \
 		std::any& memory, \
-		const DisRegRep::Splatting::Base::InvokeInfo& info \
+		const DisRegRep::Splatting::Base::InvokeInfo& invoke_info \
 	) const
 //Do `DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR` with the correct qualifier for splatting implementations.
 #define DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR_IMPL DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR(,)
@@ -84,7 +84,7 @@ protected:
 	 * @brief Check if given parameters are valid to be used for the selected splatting method.
 	 *
 	 * @param regionfield Regionfield used for splatting.
-	 * @param info @link InvokeInfo.
+	 * @param invoke_info @link InvokeInfo.
 	 */
 	virtual void validate(const DisRegRep::Container::Regionfield&, const InvokeInfo&) const;
 
@@ -122,7 +122,7 @@ public:
 	/**
 	 * @brief Minimum regionfield matrix dimension required by the given parameters.
 	 *
-	 * @param info @link InvokeInfo.
+	 * @param invoke_info @link InvokeInfo.
 	 *
 	 * @return Minimum regionfield dimension to be allocated by @link DisRegRep::Container::Regionfield::resize.
 	 */
@@ -166,7 +166,7 @@ public:
 	 * It is recommended to use the same memory instance across different invocation with the same `container_trait` to enable memory
 	 * reuse. Otherwise, existing contents captured in `memory` will be destroyed if it does not contain a valid type used by the
 	 * specific implementation.
-	 * @param info @link InvokeInfo.
+	 * @param invoke_info @link InvokeInfo.
 	 *
 	 * @return The generated region mask for this regionfield whose memory is sourced from `memory`. It is safe to modify its contents
 	 * should the application wish to.
