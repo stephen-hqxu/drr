@@ -1,8 +1,9 @@
-add_subdirectory(Full)
-
 drrTargetSource(
 HEADER
 	Base
+	Fast
+	Vanilla
 SOURCE
-	Base
+	Fast
+	Vanilla
 )

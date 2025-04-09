@@ -2,12 +2,12 @@
 
 #include "Base.hpp"
 
-namespace DisRegRep::Splatting::Convolution::Full {
+namespace DisRegRep::Splatting::OccupancyConvolution::Full {
 
 /**
- * @brief A vanilla (a.k.a. naive or brute-force) convolution-based splatting coefficient computer by the occupancy of each region.
+ * @brief A vanilla (a.k.a. naive or brute-force) convolution to compute the region occupancy.
  */
-class VanillaOccupancy final : public Base {
+class Vanilla final : public Base {
 private:
 
 	DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR_IMPL;

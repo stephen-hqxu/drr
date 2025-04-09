@@ -1,5 +1,5 @@
-#include <DisRegRep/Splatting/Convolution/Full/FastOccupancy.hpp>
-#include <DisRegRep/Splatting/Convolution/Base.hpp>
+#include <DisRegRep/Splatting/OccupancyConvolution/Full/Fast.hpp>
+#include <DisRegRep/Splatting/OccupancyConvolution/Base.hpp>
 #include <DisRegRep/Splatting/ImplementationHelper.hpp>
 
 #include <DisRegRep/Container/SplatKernel.hpp>
@@ -22,7 +22,7 @@
 #include <type_traits>
 
 namespace SpltKn = DisRegRep::Container::SplatKernel;
-using DisRegRep::Splatting::Convolution::Full::FastOccupancy;
+using DisRegRep::Splatting::OccupancyConvolution::Full::Fast;
 
 using std::tuple, std::tie, std::apply;
 using std::ranges::for_each,
@@ -51,7 +51,7 @@ public:
 	typename ContainerTrait::MaskOutputType Horizontal;
 
 	//(width, height, region count)
-	void resize(const tuple<ExtentType, FastOccupancy::KernelSizeType> arg) {
+	void resize(const tuple<ExtentType, Fast::KernelSizeType> arg) {
 		using DisRegRep::Core::MdSpan::reverse;
 		auto [extent, padding] = arg;
 
@@ -62,7 +62,7 @@ public:
 		this->Vertical.resize(extent);
 	}
 
-	[[nodiscard]] FastOccupancy::SizeType sizeByte() const noexcept {
+	[[nodiscard]] Fast::SizeType sizeByte() const noexcept {
 		return apply([](const auto&... member) static noexcept { return (member.sizeByte() + ...); },
 			tie(this->Kernel, this->Vertical, this->Horizontal));
 	}
@@ -116,13 +116,13 @@ void conv1d(
 
 }
 
-DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(FastOccupancy) {
+DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(Fast) {
 	this->validate(regionfield, info);
 
 	using ScratchMemoryType = ScratchMemory<ContainerTrait>;
 	const auto [offset, extent] = info;
 
-	const KernelSizeType d = Convolution::Base::diametre(this->Radius),
+	const KernelSizeType d = OccupancyConvolution::Base::diametre(this->Radius),
 		//Padding does not include the centre element (only the halo), so minus one from the diametre.
 		d_halo = d - 1U;
 
@@ -154,5 +154,5 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(FastOccupancy) {
 	return horizontal_memory;
 }
 
-DRR_SPLATTING_DEFINE_SIZE_BYTE(FastOccupancy)
-DRR_SPLATTING_DEFINE_FUNCTOR_ALL(FastOccupancy)
+DRR_SPLATTING_DEFINE_SIZE_BYTE(Fast)
+DRR_SPLATTING_DEFINE_FUNCTOR_ALL(Fast)

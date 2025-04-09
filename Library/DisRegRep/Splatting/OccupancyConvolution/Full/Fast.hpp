@@ -2,16 +2,14 @@
 
 #include "Base.hpp"
 
-namespace DisRegRep::Splatting::Convolution::Full {
+namespace DisRegRep::Splatting::OccupancyConvolution::Full {
 
 /**
- * @brief An improved version of the vanilla convolution-based splatting coefficient computer by region occupancy, with two commonly
- * used convolution optimisations integrated, being separation and accumulation. Due to the use of separation and linear construction
- * of the splatting coefficient matrix, the output is transposed.
- *
- * @link VanillaOccupancy
+ * @brief An improved version over the vanilla occupancy convolution, with two commonly used convolution optimisations integrated,
+ * being separation and accumulation. Due to the use of separation and linear construction of the splatting coefficient matrix, the
+ * output is transposed.
  */
-class FastOccupancy final : public Base {
+class Fast final : public Base {
 private:
 
 	DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR_IMPL;

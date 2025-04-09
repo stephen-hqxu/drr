@@ -8,7 +8,7 @@
 #include <DisRegRep/RegionfieldGenerator/Uniform.hpp>
 #include <DisRegRep/RegionfieldGenerator/VoronoiDiagram.hpp>
 
-#include <DisRegRep/Splatting/Convolution/Full/FastOccupancy.hpp>
+#include <DisRegRep/Splatting/OccupancyConvolution/Full/Fast.hpp>
 #include <DisRegRep/Splatting/Base.hpp>
 #include <DisRegRep/Splatting/Container.hpp>
 
@@ -72,10 +72,9 @@ using PreparedSplattingInfo = tuple<const Regionfield&>;
 	}
 }
 
-[[nodiscard]] DenseMask splat(
-	PreparedSplattingInfo&& prepared_splat_info, const RfGen::Splatting::FullConvolutionOccupancy option) {
+[[nodiscard]] DenseMask splat(PreparedSplattingInfo&& prepared_splat_info, const RfGen::Splatting::FullOccupancyConvolution option) {
 	const auto [radius] = option;
-	StockSplt::Convolution::Full::FastOccupancy fast_occupancy;
+	StockSplt::OccupancyConvolution::Full::Fast fast_occupancy;
 	fast_occupancy.Radius = radius;
 	return splat(fast_occupancy, std::move(prepared_splat_info));
 }

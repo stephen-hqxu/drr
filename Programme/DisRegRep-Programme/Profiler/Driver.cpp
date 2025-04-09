@@ -13,9 +13,9 @@
 #include <DisRegRep/RegionfieldGenerator/Uniform.hpp>
 #include <DisRegRep/RegionfieldGenerator/VoronoiDiagram.hpp>
 
-#include <DisRegRep/Splatting/Convolution/Full/FastOccupancy.hpp>
-#include <DisRegRep/Splatting/Convolution/Full/VanillaOccupancy.hpp>
-#include <DisRegRep/Splatting/Convolution/Base.hpp>
+#include <DisRegRep/Splatting/OccupancyConvolution/Full/Fast.hpp>
+#include <DisRegRep/Splatting/OccupancyConvolution/Full/Vanilla.hpp>
+#include <DisRegRep/Splatting/OccupancyConvolution/Base.hpp>
 #include <DisRegRep/Splatting/Base.hpp>
 
 #include <yaml-cpp/yaml.h>
@@ -69,32 +69,32 @@ namespace {
 template<std::size_t Value>
 using IndexConstant = integral_constant<std::size_t, Value>;
 
-template<derived_from<Splt::Convolution::Base> Conv>
+template<derived_from<Splt::OccupancyConvolution::Base> OccuConv>
 [[nodiscard]] constexpr auto getRadiusSweepSplatting(const auto& variable_radius) {
 	return apply(View::Arithmetic::LinSpace, variable_radius) | transform([](const auto radius) static constexpr noexcept {
-		Conv convolution_splatting;
-		convolution_splatting.Radius = radius;
-		return convolution_splatting;
+		OccuConv oc_splatting;
+		oc_splatting.Radius = radius;
+		return oc_splatting;
 	}) | to<vector>();
 }
 
-template<typename... Conv>
-requires(derived_from<Conv, Splt::Convolution::Base> && ...)
+template<typename... OccuConv>
+requires(derived_from<OccuConv, Splt::OccupancyConvolution::Base> && ...)
 [[nodiscard]] constexpr auto getAllRadiusSweepSplatting(const auto& variable_radius) {
-	return apply([&variable_radius]<typename... CurrentConv>(type_identity<CurrentConv>...) constexpr {
-		return tuple(getRadiusSweepSplatting<CurrentConv>(variable_radius)...);
-	}, tuple<type_identity<Conv>...> {});
+	return apply([&variable_radius]<typename... CurrentOccuConv>(type_identity<CurrentOccuConv>...) constexpr {
+		return tuple(getRadiusSweepSplatting<CurrentOccuConv>(variable_radius)...);
+	}, tuple<type_identity<OccuConv>...> {});
 }
 
-template<typename... Conv>
-requires(derived_from<Conv, Splt::Convolution::Base> && ...)
-[[nodiscard]] constexpr auto viewConvolution(const tuple<vector<Conv>...>& convolution) {
-	return apply([](const auto&... conv) static constexpr {
-		vector<const Splt::Convolution::Base*> conv_view;
-		conv_view.reserve((conv.size() + ...));
-		(conv_view.append_range(conv | View::Functional::AddressOf), ...);
-		return conv_view;
-	}, convolution);
+template<typename... OccuConv>
+requires(derived_from<OccuConv, Splt::OccupancyConvolution::Base> && ...)
+[[nodiscard]] constexpr auto viewOccupancyConvolution(const tuple<vector<OccuConv>...>& occupancy_convolution) {
+	return apply([](const auto&... occu_conv) static constexpr {
+		vector<const Splt::OccupancyConvolution::Base*> occu_conv_view;
+		occu_conv_view.reserve((occu_conv.size() + ...));
+		(occu_conv_view.append_range(occu_conv | View::Functional::AddressOf), ...);
+		return occu_conv_view;
+	}, occupancy_convolution);
 }
 
 template<typename Dst, typename... Src>
@@ -121,14 +121,14 @@ void Drv::splatting(const SplattingInfo& info) {
 	using Container::Regionfield,
 		RegionfieldGenerator::Uniform,
 		RegionfieldGenerator::VoronoiDiagram,
-		Splt::Convolution::Full::FastOccupancy,
-		Splt::Convolution::Full::VanillaOccupancy;
+		Splt::OccupancyConvolution::Full::Fast,
+		Splt::OccupancyConvolution::Full::Vanilla;
 
 	const tuple default_variable_radius = [&default_variable] {
 		const auto& [variable_radius, _1, _2] = default_variable;
-		return getAllRadiusSweepSplatting<VanillaOccupancy, FastOccupancy>(variable_radius);
+		return getAllRadiusSweepSplatting<Vanilla, Fast>(variable_radius);
 	}();
-	const vector default_variable_radius_ptr = viewConvolution(default_variable_radius);
+	const vector default_variable_radius_ptr = viewOccupancyConvolution(default_variable_radius);
 	const auto [default_variable_region_count, default_variable_centroid_count] = [&default_variable] {
 		const auto& [_, variable_region_count, variable_centroid_count] = default_variable;
 		return apply([](const auto&... variable) static constexpr {
@@ -137,9 +137,9 @@ void Drv::splatting(const SplattingInfo& info) {
 	}();
 	const tuple stress_variable_radius = [&stress_variable] {
 		const auto& [variable_radius] = stress_variable;
-		return getAllRadiusSweepSplatting<FastOccupancy>(variable_radius);
+		return getAllRadiusSweepSplatting<Fast>(variable_radius);
 	}();
-	const vector stress_variable_radius_ptr = viewConvolution(stress_variable_radius);
+	const vector stress_variable_radius_ptr = viewOccupancyConvolution(stress_variable_radius);
 
 	const tuple default_rf_gen = [centroid_count = default_fixed.CentroidCount] constexpr noexcept {
 		tuple<Uniform, VoronoiDiagram> rf_gen;
@@ -165,7 +165,7 @@ void Drv::splatting(const SplattingInfo& info) {
 	const array stress_rf_ptr = viewArray(stress_rf);
 
 	const tuple default_fixed_radius = [radius = default_fixed.Radius] constexpr noexcept {
-		tuple<VanillaOccupancy, FastOccupancy> splatting;
+		tuple<Vanilla, Fast> splatting;
 		apply([radius](auto&... current_splatting) constexpr noexcept { ((current_splatting.Radius = radius), ...); }, splatting);
 		return splatting;
 	}();

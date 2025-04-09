@@ -1,5 +1,1 @@
-drrTargetSource(
-SOURCE
-	Full/FastOccupancy
-	Full/VanillaOccupancy
-)
+add_subdirectory(Full)

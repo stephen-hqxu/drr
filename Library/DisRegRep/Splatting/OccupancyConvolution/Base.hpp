@@ -6,12 +6,12 @@
 
 #include <cstdint>
 
-namespace DisRegRep::Splatting::Convolution {
+namespace DisRegRep::Splatting::OccupancyConvolution {
 
 /**
- * @brief A specialised way of computing region feature splatting coefficient is by utilisation of 2D convolution (because regionfield
- * in this project is defined as a 2D matrix). Implementations shall use different criterion to compute region importance, which is one
- * of the most importance coefficient.
+ * @brief In this category of region feature splatting, the coefficient is defined as the region occupancy within a 2D convolution
+ * kernel (because regionfield in this project is defined as a 2D matrix). The region occupancy indicates the proportion of the kernel
+ * area that is occupied by each region.
  */
 class Base : public Splatting::Base {
 public:

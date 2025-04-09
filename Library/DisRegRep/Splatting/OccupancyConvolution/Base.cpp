@@ -1,9 +1,9 @@
-#include <DisRegRep/Splatting/Convolution/Base.hpp>
+#include <DisRegRep/Splatting/OccupancyConvolution/Base.hpp>
 #include <DisRegRep/Splatting/Base.hpp>
 
 #include <DisRegRep/Container/Regionfield.hpp>
 
-using DisRegRep::Splatting::Convolution::Base,
+using DisRegRep::Splatting::OccupancyConvolution::Base,
 	DisRegRep::Container::Regionfield;
 
 Base::DimensionType Base::minimumRegionfieldDimension(const InvokeInfo& info) const noexcept {

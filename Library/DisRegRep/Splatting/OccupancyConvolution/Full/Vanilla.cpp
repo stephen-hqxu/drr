@@ -1,5 +1,5 @@
-#include <DisRegRep/Splatting/Convolution/Full/VanillaOccupancy.hpp>
-#include <DisRegRep/Splatting/Convolution/Base.hpp>
+#include <DisRegRep/Splatting/OccupancyConvolution/Full/Vanilla.hpp>
+#include <DisRegRep/Splatting/OccupancyConvolution/Base.hpp>
 #include <DisRegRep/Splatting/ImplementationHelper.hpp>
 
 #include <DisRegRep/Container/SplatKernel.hpp>
@@ -14,7 +14,7 @@
 
 #include <utility>
 
-using DisRegRep::Splatting::Convolution::Full::VanillaOccupancy;
+using DisRegRep::Splatting::OccupancyConvolution::Full::Vanilla;
 
 using std::tie, std::apply;
 using std::views::cartesian_product, std::views::iota, std::views::transform, std::views::join;
@@ -38,7 +38,7 @@ public:
 		this->Output.resize(extent);
 	}
 
-	[[nodiscard]] VanillaOccupancy::SizeType sizeByte() const noexcept {
+	[[nodiscard]] Vanilla::SizeType sizeByte() const noexcept {
 		return apply([](const auto&... member) static noexcept { return (member.sizeByte() + ...); }, tie(this->Kernel, this->Output));
 	}
 
@@ -46,7 +46,7 @@ public:
 
 }
 
-DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(VanillaOccupancy) {
+DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(Vanilla) {
 	this->validate(regionfield, info);
 
 	using ScratchMemoryType = ScratchMemory<ContainerTrait>;
@@ -54,7 +54,7 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(VanillaOccupancy) {
 	auto& [kernel_memory, output_memory] = ImplementationHelper::allocate<ScratchMemory, ContainerTrait>(
 		memory, typename ScratchMemoryType::ExtentType(extent, regionfield.RegionCount));
 
-	const KernelSizeType d = Convolution::Base::diametre(this->Radius);
+	const KernelSizeType d = OccupancyConvolution::Base::diametre(this->Radius);
 
 	using LengthType = DimensionType::length_type;
 	const auto element_rg = [r = this->Radius, &offset, &extent]<LengthType... I>(
@@ -83,5 +83,5 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(VanillaOccupancy) {
 	return output_memory;
 }
 
-DRR_SPLATTING_DEFINE_SIZE_BYTE(VanillaOccupancy)
-DRR_SPLATTING_DEFINE_FUNCTOR_ALL(VanillaOccupancy)
+DRR_SPLATTING_DEFINE_SIZE_BYTE(Vanilla)
+DRR_SPLATTING_DEFINE_FUNCTOR_ALL(Vanilla)

@@ -12,7 +12,7 @@
 #include <DisRegRep/RegionfieldGenerator/ExecutionPolicy.hpp>
 #include <DisRegRep/RegionfieldGenerator/VoronoiDiagram.hpp>
 
-#include <DisRegRep/Splatting/Convolution/Base.hpp>
+#include <DisRegRep/Splatting/OccupancyConvolution/Base.hpp>
 #include <DisRegRep/Splatting/Base.hpp>
 #include <DisRegRep/Splatting/Container.hpp>
 
@@ -577,11 +577,11 @@ void Splatting::synchronise(ostream* const progress_log) const {
 }
 
 void Splatting::sweepRadius(
-	const span<const Splt::Convolution::Base* const> splat_conv, const SizeType splat_size, const RadiusSweepInfo& info) const {
+	const span<const Splt::OccupancyConvolution::Base* const> splat_oc, const SizeType splat_size, const RadiusSweepInfo& info) const {
 	const auto& [common_info, input] = info;
 	const auto& [tag, rf_gen_info, extent] = *common_info;
 
-	for (const auto maximin_regionfield_extent = maximinRegionfieldDimension(splat_conv, extent);
+	for (const auto maximin_regionfield_extent = maximinRegionfieldDimension(splat_oc, extent);
 		const auto [rf_gen, rf] : apply(zip, input)) [[likely]] {
 		rf->resize(maximin_regionfield_extent);
 		this->Impl_->generateRegionfield(*rf_gen, *rf, *rf_gen_info);
@@ -590,8 +590,8 @@ void Splatting::sweepRadius(
 	const auto& [rf_gen, rf] = input;
 	this->Impl_->submit([
 		&impl = *this->Impl_,
-		invoke_info = Splt::Convolution::Base::InvokeInfo {
-			.Offset = maximinOffset(splat_conv),
+		invoke_info = Splt::OccupancyConvolution::Base::InvokeInfo {
+			.Offset = maximinOffset(splat_oc),
 			.Extent = extent
 		}
 	](const auto container_trait, const auto&& profile_info) {
@@ -611,7 +611,7 @@ void Splatting::sweepRadius(
 	}, Impl::SubmitInfo {
 		.RegionfieldGenerator_ = rf_gen,
 		.Regionfield = rf | transform([](const auto* const rf_ptr) static constexpr noexcept { return rf_ptr; }),
-		.Splatting_ = splat_conv | chunk(splat_size),
+		.Splatting_ = splat_oc | chunk(splat_size),
 		.Tag = tag
 	}, Splt::Container::Combination);
 }

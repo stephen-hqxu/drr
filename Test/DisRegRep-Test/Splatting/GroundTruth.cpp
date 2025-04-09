@@ -9,7 +9,7 @@
 #include <DisRegRep/Core/MdSpan.hpp>
 #include <DisRegRep/Core/Type.hpp>
 
-#include <DisRegRep/Splatting/Convolution/Full/Base.hpp>
+#include <DisRegRep/Splatting/OccupancyConvolution/Full/Base.hpp>
 #include <DisRegRep/Splatting/Container.hpp>
 
 #include <DisRegRep-Test/StringMaker.hpp>
@@ -90,9 +90,9 @@ constexpr auto RegionCount = std::ranges::max(Value) + 1U;
 
 }
 
-namespace Convolution::Full {
+namespace OccupancyConvolution::Full {
 
-using Splt::Convolution::Full::Base;
+using Splt::OccupancyConvolution::Full::Base;
 
 constexpr Base::KernelSizeType Radius = 2U;
 constexpr auto Offset = Base::DimensionType(Radius, Radius + 1U),
@@ -162,10 +162,10 @@ void compare(Matrix& matrix) {
 
 }
 
-void GndTth::checkMinimumRequirement(BaseConvolution& splatting) {
+void GndTth::checkMinimumRequirement(BaseOccupancyConvolution& splatting) {
 	THEN("It has the correct minimum requirements") {
 		const auto size = GENERATE(take(3U, chunk(5U, random<std::uint_least8_t>(16U, 128U))));
-		const BaseConvolution::InvokeInfo invoke_info {
+		const BaseOccupancyConvolution::InvokeInfo invoke_info {
 			.Offset = make_vec2(size.data()),
 			.Extent = make_vec2(size.data() + 2U)
 		};
@@ -173,18 +173,18 @@ void GndTth::checkMinimumRequirement(BaseConvolution& splatting) {
 		splatting.Radius = size.back();
 
 		REQUIRE(splatting.minimumRegionfieldDimension(invoke_info) == extent + offset + splatting.Radius);
-		REQUIRE(splatting.minimumOffset() == BaseConvolution::DimensionType(splatting.Radius));
+		REQUIRE(splatting.minimumOffset() == BaseOccupancyConvolution::DimensionType(splatting.Radius));
 	}
 }
 
 //NOLINTNEXTLINE(readability-function-cognitive-complexity)
-void GndTth::checkSplattingCoefficient(BaseFullConvolution& splatting) {
+void GndTth::checkSplattingCoefficient(BaseFullOccupancyConvolution& splatting) {
 	AND_GIVEN("An invoke specification that does not satisfy the minimum requirements") {
-		const auto size = GENERATE(take(3U, chunk(4U, random<BaseFullConvolution::KernelSizeType>(4U, 8U))));
+		const auto size = GENERATE(take(3U, chunk(4U, random<BaseFullOccupancyConvolution::KernelSizeType>(4U, 8U))));
 		const auto extent = make_vec2(size.data());
 		splatting.Radius = size[2U];
 
-		BaseFullConvolution::InvokeInfo optimal_invoke_info {
+		BaseFullOccupancyConvolution::InvokeInfo optimal_invoke_info {
 			.Offset = splatting.minimumOffset(),
 			.Extent = extent
 		};
@@ -218,7 +218,7 @@ void GndTth::checkSplattingCoefficient(BaseFullConvolution& splatting) {
 	}
 
 	WHEN("It is invoked with ground truth data") {
-		namespace CurrentRef = Reference::Convolution::Full;
+		namespace CurrentRef = Reference::OccupancyConvolution::Full;
 		array<any, tuple_size_v<Splt::Container::CombinationType>> memory;
 
 		splatting.Radius = CurrentRef::Radius;
@@ -227,7 +227,7 @@ void GndTth::checkSplattingCoefficient(BaseFullConvolution& splatting) {
 				const bool transposed = splatting.isTransposed();
 				const Regionfield rf = Reference::Regionfield::load(transposed);
 
-				const BaseFullConvolution::InvokeInfo invoke_info {
+				const BaseFullOccupancyConvolution::InvokeInfo invoke_info {
 					.Offset = transposed ? CurrentRef::OffsetTransposed : CurrentRef::Offset,
 					.Extent = transposed ? CurrentRef::ExtentTransposed : CurrentRef::Extent
 				};

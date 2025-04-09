@@ -8,7 +8,7 @@
 #include <DisRegRep/RegionfieldGenerator/Base.hpp>
 #include <DisRegRep/RegionfieldGenerator/VoronoiDiagram.hpp>
 
-#include <DisRegRep/Splatting/Convolution/Base.hpp>
+#include <DisRegRep/Splatting/OccupancyConvolution/Base.hpp>
 #include <DisRegRep/Splatting/Base.hpp>
 
 #include <span>
@@ -35,7 +35,7 @@ public:
 	using SeedType = RegionfieldGenerator::Base::SeedType;
 	using CentroidCountType = RegionfieldGenerator::VoronoiDiagram::SizeType;
 	using DimensionType = DisRegRep::Splatting::Base::DimensionType;
-	using KernelSizeType = DisRegRep::Splatting::Convolution::Base::KernelSizeType;
+	using KernelSizeType = DisRegRep::Splatting::OccupancyConvolution::Base::KernelSizeType;
 
 	using SizeType = std::uint_fast8_t;
 
@@ -136,16 +136,16 @@ public:
 	void synchronise(std::ostream* = nullptr) const;
 
 	/**
-	 * @brief Profile the impact of runtime by varying radius on a convolution-based splatting. Profiler will be executed by the order
-	 * of the cartesian product of $radius \times splat \times std::apply(std::views::zip, info.Input)$.
+	 * @brief Profile the impact of runtime by varying radius on an occupancy convolution splatting. Profiler will be executed by the
+	 * order of the cartesian product of $radius \times splat \times std::apply(std::views::zip, info.Input)$.
 	 *
-	 * @param splat_conv This is passed in as a flattened column-major 2D matrix of size (radius * splat), where *radius* is a sequence
-	 * of radii to be swept, and *splat* is each instance of convolution-based splatting to be profiled. As profiler is multithreaded,
-	 * the application is responsible for setting the profiling radii for each instance.
+	 * @param splat_oc This is passed in as a flattened column-major 2D matrix of size (radius * splat), where *radius* is a sequence
+	 * of radii to be swept, and *splat* is each instance of occupancy convolution splatting to be profiled. As profiler is
+	 * multithreaded, the application is responsible for setting the profiling radii for each instance.
 	 * @param splat_size Number of *splat* instances in `splat_conv`.
 	 * @param info @link RadiusSweepInfo.
 	 */
-	void sweepRadius(std::span<const DisRegRep::Splatting::Convolution::Base* const>, SizeType, const RadiusSweepInfo&) const;
+	void sweepRadius(std::span<const DisRegRep::Splatting::OccupancyConvolution::Base* const>, SizeType, const RadiusSweepInfo&) const;
 
 	/**
 	 * @brief Profile the impact of runtime by varying the number of regions on a regionfield, though it is not guaranteed that all

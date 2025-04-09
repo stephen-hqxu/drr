@@ -292,9 +292,9 @@ struct Splat {
 	string RegionfieldFilename, OutputFilename;
 
 	enum struct Splatting : std::uint_fast8_t {
-		FullConvolution
+		FullOC
 	} Splatting_;
-	Generator::Regionfield::Splatting::FullConvolutionOccupancy FullConvolutionOccupancy;
+	Generator::Regionfield::Splatting::FullOccupancyConvolution FullOccupancyConvolution;
 
 	constexpr Splat() noexcept = default;
 
@@ -310,7 +310,7 @@ struct Splat {
 
 	void bind(CLI::App& cmd) & {
 		using enum Splatting;
-		auto& [radius] = this->FullConvolutionOccupancy;
+		auto& [radius] = this->FullOccupancyConvolution;
 
 		cmd.add_option(
 			"regionfield-tif",
@@ -335,7 +335,7 @@ struct Splat {
 			->required()
 			->type_name("SPLAT")
 			->transform(CLI::CheckedTransformer(unordered_map<string_view, Splatting> {
-				{ "full-conv", FullConvolution }
+				{ "full-oc", FullOC }
 			}));
 		//It is not easy to pick a default radius, since it depends on the dimension of the regionfield matrix.
 		//It is an error if the convolution kernel is too large and goes over the matrix boundary.
@@ -354,7 +354,7 @@ struct Splat {
 		return Generator::Regionfield::splat([this] noexcept -> Splt::Option {
 			using enum Splatting;
 			switch (this->Splatting_) {
-			case FullConvolution: return this->FullConvolutionOccupancy;
+			case FullOC: return this->FullOccupancyConvolution;
 			default: std::unreachable();
 			}
 		}(), regionfield);

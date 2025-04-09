@@ -1,4 +1,4 @@
-add_subdirectory(Convolution)
+add_subdirectory(OccupancyConvolution)
 
 drrTargetSource(
 HEADER

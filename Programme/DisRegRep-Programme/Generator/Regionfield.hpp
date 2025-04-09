@@ -6,7 +6,7 @@
 #include <DisRegRep/RegionfieldGenerator/Base.hpp>
 #include <DisRegRep/RegionfieldGenerator/VoronoiDiagram.hpp>
 
-#include <DisRegRep/Splatting/Convolution/Full/Base.hpp>
+#include <DisRegRep/Splatting/OccupancyConvolution/Full/Base.hpp>
 
 #include <variant>
 
@@ -51,14 +51,15 @@ namespace Splatting {
  * @brief The splatting coefficient is defined as the number of times each region identifier appears on the convolution kernel in a
  * regionfield matrix. Every element in such a kernel is taken into account to derive the splatting coefficient.
  */
-struct FullConvolutionOccupancy {
+struct FullOccupancyConvolution {
 
-	DisRegRep::Splatting::Convolution::Full::Base::KernelSizeType Radius; /**< @link DisRegRep::Splatting::Convolution::Full::Base::Radius. */
+	DisRegRep::Splatting::OccupancyConvolution::Full::Base::KernelSizeType
+		Radius; /**< @link DisRegRep::Splatting::OccupancyConvolution::Full::Base::Radius. */
 
 };
 
 using Option = std::variant<
-	FullConvolutionOccupancy
+	FullOccupancyConvolution
 >; /**< Supply configurations to all supported region feature splatting coefficient computing algorithms. */
 
 }
