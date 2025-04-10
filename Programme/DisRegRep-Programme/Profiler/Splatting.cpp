@@ -603,7 +603,7 @@ void Splatting::sweepRadius(
 		for (any memory;
 			const auto& current_splat : splat | Core::View::Functional::Dereference) [[likely]] {
 			bench.run(toString(current_splat.Radius).data(), [&invoke_info, container_trait, rf, &memory, &current_splat] {
-				nb::doNotOptimizeAway(current_splat(container_trait, *rf, memory, invoke_info));
+				nb::doNotOptimizeAway(current_splat(container_trait, invoke_info, *rf, memory));
 			});
 			extra_result->record(current_splat, memory);
 		}
@@ -643,7 +643,7 @@ void Splatting::sweepRegionCount(const span<const Splt::Base* const> splat, cons
 			impl.generateRegionfield(*rf_gen, *rf, *rf_gen_info);
 
 			bench.run(toString(current_region_count).data(), [&invoke_info, container_trait, rf, &splat, &memory] {
-				nb::doNotOptimizeAway(splat(container_trait, *rf, memory, invoke_info));
+				nb::doNotOptimizeAway(splat(container_trait, invoke_info, *rf, memory));
 			});
 			extra_result->record(splat, memory);
 		}
@@ -687,7 +687,7 @@ void Splatting::sweepCentroidCount(const span<const Splt::Base* const> splat, co
 			impl.generateRegionfield(voronoi_rf_gen, *rf, *rf_gen_info);
 
 			bench.run(toString(current_centroid_count).data(), [&invoke_info, container_trait, rf, &splat, &memory] {
-				nb::doNotOptimizeAway(splat(container_trait, *rf, memory, invoke_info));
+				nb::doNotOptimizeAway(splat(container_trait, invoke_info, *rf, memory));
 			});
 			extra_result->record(splat, memory);
 		}

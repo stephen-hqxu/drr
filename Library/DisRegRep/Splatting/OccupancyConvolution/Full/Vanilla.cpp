@@ -5,49 +5,21 @@
 
 #include <DisRegRep/Core/View/Trait.hpp>
 
-#include <tuple>
-
 #include <algorithm>
 #include <ranges>
 
 #include <utility>
 
-using DisRegRep::Splatting::OccupancyConvolution::Full::Vanilla;
+using DisRegRep::Splatting::OccupancyConvolution::Full::Vanilla,
+	DisRegRep::Splatting::ImplementationHelper::PredefinedScratchMemory::Simple;
 
-using std::tie, std::apply;
-
-namespace {
-
-DRR_SPLATTING_DEFINE_SCRATCH_MEMORY {
-public:
-
-	DRR_SPLATTING_SCRATCH_MEMORY_CONTAINER_TRAIT;
-
-	using ExtentType = typename ContainerTrait::MaskOutputType::Dimension3Type;
-
-	typename ContainerTrait::KernelType Kernel;
-	typename ContainerTrait::MaskOutputType Output;
-
-	//(width, height, region count)
-	void resize(const ExtentType extent) {
-		this->Kernel.resize(extent.z);
-		this->Output.resize(extent);
-	}
-
-	[[nodiscard]] Vanilla::SizeType sizeByte() const noexcept {
-		return apply([](const auto&... member) static noexcept { return (member.sizeByte() + ...); }, tie(this->Kernel, this->Output));
-	}
-
-};
-
-}
+using std::ranges::transform, std::ranges::for_each;
 
 DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(Vanilla) {
-	this->validate(regionfield, invoke_info);
-	auto& [kernel_memory, output_memory] = ImplementationHelper::allocate<ScratchMemory, ContainerTrait>(
-		memory, typename ScratchMemory<ContainerTrait>::ExtentType(invoke_info.Extent, regionfield.RegionCount));
+	this->validate(invoke_info, regionfield);
+	auto& [kernel_memory, output_memory] =
+		ImplementationHelper::PredefinedScratchMemory::allocateSimple<ContainerTrait>(invoke_info, regionfield, memory);
 
-	using std::ranges::transform, std::ranges::for_each;
 	transform(this->convolve(invoke_info, regionfield), output_memory.range().begin(),
 		[&kernel_memory, norm_factor = this->kernelNormalisationFactor()]<typename Kernel>(Kernel&& kernel) noexcept(
 			Core::View::Trait::IsNothrowViewable<Kernel>) {
@@ -60,5 +32,5 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(Vanilla) {
 	return output_memory;
 }
 
-DRR_SPLATTING_DEFINE_SIZE_BYTE(Vanilla)
+DRR_SPLATTING_DEFINE_SIZE_BYTE(Vanilla, Simple)
 DRR_SPLATTING_DEFINE_FUNCTOR_ALL(Vanilla)

@@ -56,11 +56,10 @@ using PreparedSplattingInfo = tuple<const Regionfield&>;
 	const auto invoke_splat = [&splatting](const Regionfield& regionfield) -> DenseMask {
 		any memory;
 		const StockSplt::Base::DimensionType offset = splatting.minimumOffset();
-		return std::move(splatting(StockSplt::Container::DenseKernelDenseOutputTrait, regionfield, memory,
-			StockSplt::Base::InvokeInfo {
-				.Offset = offset,
-				.Extent = splatting.maximumExtent(regionfield, offset)
-			}));
+		return std::move(splatting(StockSplt::Container::DenseKernelDenseOutputTrait, StockSplt::Base::InvokeInfo {
+			.Offset = offset,
+			.Extent = splatting.maximumExtent(regionfield, offset)
+		}, regionfield, memory));
 	};
 
 	//Remember to transpose the input to maintain the same axes order if the splatting algorithm would do so.

@@ -5,6 +5,7 @@
 
 #include <glm/vec2.hpp>
 
+#include <functional>
 #include <ranges>
 
 #include <utility>
@@ -83,18 +84,12 @@ inline constexpr auto Slice2d = RangeAdaptorClosure([]<
 (OuterR&& outer_r, const glm::vec<2U, OffsetSize> offset, const glm::vec<2U, ExtentSize> extent) static constexpr noexcept(
 	Trait::IsNothrowViewable<OuterR>
 ) -> std::ranges::view auto {
-	using std::views::drop, std::views::take, std::views::transform;
+	using std::bind_back, std::bit_or,
+		std::views::drop, std::views::take, std::views::transform;
 	return std::forward<OuterR>(outer_r)
 		| drop(offset.x)
 		| take(extent.x)
-		| transform(
-			[offset_y = offset.y, extent_y = extent.y]<typename R>(R&& inner_r) constexpr noexcept(
-				Trait::IsNothrowViewable<R>
-			) {
-				return std::forward<R>(inner_r)
-					| drop(offset_y)
-					| take(extent_y);
-			});
+		| transform(bind_back(bit_or {}, drop(offset.y) | take(extent.y)));
 });
 
 }

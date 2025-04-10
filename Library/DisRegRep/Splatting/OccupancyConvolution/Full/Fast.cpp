@@ -28,15 +28,14 @@ using std::tuple, std::tie, std::apply;
 using std::ranges::for_each,
 	std::bind_back, std::bit_or, std::invoke,
 	std::views::take, std::views::drop, std::views::zip, std::views::transform;
-
-using std::output_iterator;
-using std::ranges::forward_range, std::ranges::view,
+using std::output_iterator,
+	std::ranges::forward_range, std::ranges::view,
 	std::ranges::range_difference_t, std::ranges::range_value_t, std::ranges::range_const_reference_t;
 using std::invocable, std::invoke_result_t, std::common_type_t;
 
 namespace {
 
-DRR_SPLATTING_DEFINE_SCRATCH_MEMORY {
+DRR_SPLATTING_DEFINE_SCRATCH_MEMORY(ScratchMemory) {
 public:
 
 	DRR_SPLATTING_SCRATCH_MEMORY_CONTAINER_TRAIT;
@@ -117,7 +116,7 @@ void conv1d(
 }
 
 DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(Fast) {
-	this->validate(regionfield, invoke_info);
+	this->validate(invoke_info, regionfield);
 	const auto [offset, extent] = invoke_info;
 	const KernelSizeType d = this->diametre(),
 		//Padding does not include the centre element (only the halo), so minus one from the diametre.
@@ -149,5 +148,5 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(Fast) {
 	return horizontal_memory;
 }
 
-DRR_SPLATTING_DEFINE_SIZE_BYTE(Fast)
+DRR_SPLATTING_DEFINE_SIZE_BYTE(Fast, ScratchMemory)
 DRR_SPLATTING_DEFINE_FUNCTOR_ALL(Fast)

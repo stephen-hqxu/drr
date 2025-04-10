@@ -22,9 +22,9 @@
 #define DRR_SPLATTING_DECLARE_FUNCTOR(QUAL, KERNEL, OUTPUT) \
 	DRR_SPLATTING_CONTAINER_TRAIT(KERNEL, OUTPUT)::MaskOutputType& QUAL operator()( \
 		const DRR_SPLATTING_CONTAINER_TRAIT(KERNEL, OUTPUT) container_trait, \
+		const DisRegRep::Splatting::Base::InvokeInfo& invoke_info, \
 		const DisRegRep::Container::Regionfield& regionfield, \
-		std::any& memory, \
-		const DisRegRep::Splatting::Base::InvokeInfo& invoke_info \
+		std::any& memory \
 	) const
 //Do `DRR_SPLATTING_DECLARE_FUNCTOR` for every valid combination of container implementations.
 #define DRR_SPLATTING_DECLARE_FUNCTOR_ALL(PREFIX, SUFFIX) \
@@ -39,9 +39,9 @@
 #define DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR(FUNC_QUAL, QUAL) \
 	template<DisRegRep::Splatting::Container::IsTrait ContainerTrait> \
 	FUNC_QUAL ContainerTrait::MaskOutputType& QUAL invokeImpl( \
+		const DisRegRep::Splatting::Base::InvokeInfo& invoke_info, \
 		const DisRegRep::Container::Regionfield& regionfield, \
-		std::any& memory, \
-		const DisRegRep::Splatting::Base::InvokeInfo& invoke_info \
+		std::any& memory \
 	) const
 //Do `DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR` with the correct qualifier for splatting implementations.
 #define DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR_IMPL DRR_SPLATTING_DECLARE_DELEGATING_FUNCTOR(,)
@@ -83,10 +83,10 @@ protected:
 	/**
 	 * @brief Check if given parameters are valid to be used for the selected splatting method.
 	 *
-	 * @param regionfield Regionfield used for splatting.
 	 * @param invoke_info @link InvokeInfo.
+	 * @param regionfield Regionfield used for splatting.
 	 */
-	virtual void validate(const DisRegRep::Container::Regionfield&, const InvokeInfo&) const;
+	virtual void validate(const InvokeInfo&, const DisRegRep::Container::Regionfield&) const;
 
 public:
 
@@ -161,12 +161,12 @@ public:
 	 * perform boundary checking, and the application should adjust offset to handle potential out-of-bound access.
 	 *
 	 * @param container_trait Specify the container trait.
+	 * @param invoke_info @link InvokeInfo.
 	 * @param regionfield Splatting coefficients are computed for this regionfield.
 	 * @param memory The scratch memory to be used in this invocation. The type is erased to allow implementation-defined behaviours.
 	 * It is recommended to use the same memory instance across different invocation with the same `container_trait` to enable memory
 	 * reuse. Otherwise, existing contents captured in `memory` will be destroyed if it does not contain a valid type used by the
 	 * specific implementation.
-	 * @param invoke_info @link InvokeInfo.
 	 *
 	 * @return The generated region mask for this regionfield whose memory is sourced from `memory`. It is safe to modify its contents
 	 * should the application wish to.

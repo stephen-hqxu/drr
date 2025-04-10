@@ -200,7 +200,7 @@ void GndTth::checkSplattingCoefficient(BaseFullOccupancyConvolution& splatting) 
 			memory = any()
 		]() mutable -> void {
 			apply(
-				[&](const auto... trait) { (splatting(trait, rf, memory, invoke_info), ...); }, Splt::Container::Combination);
+				[&](const auto... trait) { (splatting(trait, invoke_info, rf, memory), ...); }, Splt::Container::Combination);
 		};
 
 		WHEN("Regionfield is too small") {
@@ -231,7 +231,7 @@ void GndTth::checkSplattingCoefficient(BaseFullOccupancyConvolution& splatting) 
 					.Offset = transposed ? CurrentRef::OffsetTransposed : CurrentRef::Offset,
 					.Extent = transposed ? CurrentRef::ExtentTransposed : CurrentRef::Extent
 				};
-				return tie(splatting(trait, rf, memory, invoke_info)...);
+				return tie(splatting(trait, invoke_info, rf, memory)...);
 			}, memory);
 		}, Splt::Container::Combination);
 
