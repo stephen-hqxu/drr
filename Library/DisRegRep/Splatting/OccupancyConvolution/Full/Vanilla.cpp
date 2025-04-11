@@ -3,8 +3,6 @@
 
 #include <DisRegRep/Container/SplatKernel.hpp>
 
-#include <DisRegRep/Core/View/Trait.hpp>
-
 #include <algorithm>
 #include <ranges>
 
@@ -21,14 +19,12 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(Vanilla) {
 		ImplementationHelper::PredefinedScratchMemory::allocateSimple<ContainerTrait>(invoke_info, regionfield, memory);
 
 	transform(this->convolve(invoke_info, regionfield), output_memory.range().begin(),
-		[&kernel_memory, norm_factor = this->kernelNormalisationFactor()]<typename Kernel>(Kernel&& kernel) noexcept(
-			Core::View::Trait::IsNothrowViewable<Kernel>) {
+		[&kernel_memory, norm_factor = this->area()]<typename Kernel>(Kernel&& kernel) noexcept {
 			kernel_memory.clear();
 			for_each(std::forward<Kernel>(kernel) | std::views::join,
 				[&kernel_memory](const auto region_id) noexcept { kernel_memory.increment(region_id); });
 			return DisRegRep::Container::SplatKernel::toMask(kernel_memory, norm_factor);
 		});
-
 	return output_memory;
 }
 

@@ -5,8 +5,8 @@
 
 #include <DisRegRep/Core/View/Functional.hpp>
 #include <DisRegRep/Core/View/Generate.hpp>
+#include <DisRegRep/Core/View/IrregularTransform.hpp>
 #include <DisRegRep/Core/Exception.hpp>
-#include <DisRegRep/Core/Type.hpp>
 #include <DisRegRep/Core/XXHash.hpp>
 
 #include <glm/fwd.hpp>
@@ -26,7 +26,7 @@
 #include <utility>
 
 using DisRegRep::RegionfieldGenerator::VoronoiDiagram;
-using DisRegRep::Container::Regionfield;
+using DisRegRep::Container::Regionfield, DisRegRep::Core::XXHash::RandomEngine;
 
 using glm::u16vec2, glm::f32vec2;
 
@@ -43,18 +43,24 @@ DRR_REGIONFIELD_GENERATOR_DEFINE_DELEGATING_FUNCTOR(VoronoiDiagram) {
 	const span rf_span = regionfield.span();
 	const Regionfield::DimensionType rf_extent = regionfield.extent();
 
-	auto rng = Core::XXHash::RandomEngine(Base::generateSecret(gen_info));
 	array<UniformDistributionType, 2U> dist;
 	std::ranges::transform(iota(RankType {}, static_cast<RankType>(dist.size())), dist.begin(),
 		[&rf_extent](const auto ext) { return UniformDistributionType(0U, rf_extent[ext] - 1U); });
 
-	const auto region_centroid =
-		Core::View::Generate(
-			[&rng, &dist] { return apply([&rng](auto&... dist_n) { return u16vec2(dist_n(rng)...); }, dist); }, this->CentroidCount)
-		| to<vector>();
-	const auto region_assignment =
-		Core::View::Generate([dist = Base::createDistribution(regionfield), &rng]() mutable { return dist(rng); }, this->CentroidCount)
-		| to<vector<Core::Type::RegionIdentifier>>();
+	const Core::XXHash::Secret secret = VoronoiDiagram::generateSecret(gen_info);
+	const auto region_centroid = Core::View::Generate(
+			[&dist, rng = RandomEngine(secret)] mutable {
+				return apply([&rng](auto&... dist_n) { return u16vec2(dist_n(rng)...); }, dist);
+			},
+			this->CentroidCount
+		) | to<vector>();
+	const auto region_assignment = region_centroid
+		| Core::View::IrregularTransform(
+			[dist = VoronoiDiagram::createDistribution(regionfield), &secret](const auto& centroid) mutable {
+				auto rng = RandomEngine(secret, centroid);
+				return dist(rng);
+			})
+		| to<vector<Regionfield::ValueType>>();
 
 	//Find the nearest centroid for every point in the regionfield.
 	//This is a pretty Naive algorithm, in practice it is better to use a quad tree or KD tree to find K-NN;

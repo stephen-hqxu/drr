@@ -5,7 +5,6 @@
 #include <DisRegRep/Container/Regionfield.hpp>
 #include <DisRegRep/Container/SplatKernel.hpp>
 
-#include <DisRegRep/Core/View/Trait.hpp>
 #include <DisRegRep/Core/Exception.hpp>
 
 #include <glm/vector_relational.hpp>
@@ -18,9 +17,9 @@
 
 #include <cassert>
 
-using DisRegRep::Container::Regionfield,
-	DisRegRep::Splatting::OccupancyConvolution::Sampled::Systematic,
-	DisRegRep::Splatting::ImplementationHelper::PredefinedScratchMemory::Simple;
+using DisRegRep::Splatting::OccupancyConvolution::Sampled::Systematic,
+	DisRegRep::Splatting::ImplementationHelper::PredefinedScratchMemory::Simple,
+	DisRegRep::Container::Regionfield;
 
 using std::ranges::for_each, std::ranges::fold_left_first,
 	std::bind_back, std::bit_or, std::plus,
@@ -34,13 +33,13 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(Systematic) {
 	const KernelSizeType d = this->diametre();
 	const DimensionType remained_size = d - this->FirstSample,
 		sample_size = (remained_size + this->Interval - 1U) / this->Interval;
+
 	std::ranges::transform(this->convolve(invoke_info, regionfield), output_memory.range().begin(),
 		[
 			this,
 			&kernel_memory,
 			norm_factor = static_cast<typename decltype(output_memory)::ValueType>(sample_size.x * sample_size.y)
-		]<typename Kernel>(Kernel&& kernel) noexcept(Core::View::Trait::IsNothrowViewable<Kernel>) {
-			kernel_memory.clear();
+		]<typename Kernel>(Kernel&& kernel) noexcept {
 			auto kernel_uniform = std::forward<Kernel>(kernel)
 				| drop(this->FirstSample.x)
 				| stride(this->Interval.x)
@@ -48,11 +47,12 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(Systematic) {
 			//It is also possible calculate normalisation factor here with the following method, which is more intuitive.
 			//Doing it manually outside the loop to avoid making repetitive calculations.
 			assert(fold_left_first(kernel_uniform | transform(std::ranges::size), plus {}) == norm_factor);
+
+			kernel_memory.clear();
 			for_each(std::move(kernel_uniform) | join,
 				[&kernel_memory](const auto region_id) noexcept { kernel_memory.increment(region_id); });
 			return DisRegRep::Container::SplatKernel::toMask(kernel_memory, norm_factor);
 		});
-
 	return output_memory;
 }
 

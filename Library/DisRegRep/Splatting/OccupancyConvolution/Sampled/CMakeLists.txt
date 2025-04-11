@@ -1,7 +1,11 @@
 drrTargetSource(
 HEADER
 	Base
+	Stochastic
+	Stratified
 	Systematic
 SOURCE
+	Stochastic
+	Stratified
 	Systematic
 )

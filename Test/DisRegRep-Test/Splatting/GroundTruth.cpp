@@ -108,7 +108,7 @@ constexpr auto SplattingCoefficientMatrixDense = [] static consteval noexcept {
 		{ 3, 5, 8, 9 }, { 5, 6, 6, 8 }, { 5, 5, 7, 8 },
 		{ 3, 5, 7, 10 }, { 5, 6, 5, 9 }, { 5, 6, 6, 8 }
 	}};
-	static constexpr Type::RegionMask NormFactor = Base::kernelNormalisationFactor(Base::diametre(Radius));
+	static constexpr Type::RegionMask NormFactor = Base::area(Base::diametre(Radius));
 
 	SplattingCoefficientMatrixType<Type::RegionMask> mask {};
 	auto mask_join = mask | join;

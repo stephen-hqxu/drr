@@ -1,9 +1,7 @@
 #include <DisRegRep/Splatting/OccupancyConvolution/Full/Fast.hpp>
-#include <DisRegRep/Splatting/OccupancyConvolution/Base.hpp>
 #include <DisRegRep/Splatting/ImplementationHelper.hpp>
 
 #include <DisRegRep/Container/SplatKernel.hpp>
-#include <DisRegRep/Container/SplattingCoefficient.hpp>
 
 #include <DisRegRep/Core/View/Functional.hpp>
 #include <DisRegRep/Core/View/Matrix.hpp>
@@ -21,7 +19,6 @@
 #include <concepts>
 #include <type_traits>
 
-namespace SpltKn = DisRegRep::Container::SplatKernel;
 using DisRegRep::Splatting::OccupancyConvolution::Full::Fast;
 
 using std::tuple, std::tie, std::apply;
@@ -70,7 +67,7 @@ public:
 
 template<
 	forward_range ScanlineRange,
-	SpltKn::Is KernelMemory,
+	DisRegRep::Container::SplatKernel::Is KernelMemory,
 	typename KernelMemoryProj,
 	forward_range Scanline = range_value_t<ScanlineRange>
 >
@@ -118,6 +115,7 @@ void conv1d(
 DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(Fast) {
 	this->validate(invoke_info, regionfield);
 	const auto [offset, extent] = invoke_info;
+
 	const KernelSizeType d = this->diametre(),
 		//Padding does not include the centre element (only the halo), so minus one from the diametre.
 		d_halo = d - 1U;
@@ -141,10 +139,9 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(Fast) {
 		kernel_memory,
 		horizontal_memory.range().begin(),
 		d,
-		[norm_factor = Base::kernelNormalisationFactor(d)](
-			const auto& km) constexpr noexcept { return SpltKn::toMask(km, norm_factor); }
+		[norm_factor = Fast::area(d)](
+			const auto& km) constexpr noexcept { return DisRegRep::Container::SplatKernel::toMask(km, norm_factor); }
 	);
-
 	return horizontal_memory;
 }
 

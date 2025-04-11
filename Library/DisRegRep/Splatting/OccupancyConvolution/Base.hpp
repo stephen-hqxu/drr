@@ -22,7 +22,7 @@ namespace DisRegRep::Splatting::OccupancyConvolution {
 class Base : public Splatting::Base {
 public:
 
-	using KernelSizeType = std::uint_fast16_t;
+	using KernelSizeType = std::uint_fast32_t;
 
 	KernelSizeType Radius {}; /**< Radius of the convolution kernel. No convolution is performed if radius is zero. */
 
@@ -82,6 +82,25 @@ public:
 	 */
 	[[nodiscard]] constexpr KernelSizeType diametre() const noexcept {
 		return Base::diametre(this->Radius);
+	}
+
+	/**
+	 * @brief Calculate the kernel area given the kernel diametre.
+	 *
+	 * @param d The kernel diametre.
+	 *
+	 * @return Kernel area of the specified kernel.
+	 */
+	[[nodiscard]] static constexpr KernelSizeType area(const KernelSizeType d) noexcept {
+		return d * d;
+	}
+	/**
+	 * @brief Calculate the area of the current kernel.
+	 *
+	 * @return The area of the current kernel.
+	 */
+	[[nodiscard]] constexpr KernelSizeType area() const noexcept {
+		return Base::area(this->diametre());
 	}
 
 };

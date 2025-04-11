@@ -13,8 +13,8 @@ namespace DisRegRep::Splatting::OccupancyConvolution::Sampled {
 class Systematic final : public Base {
 public:
 
-	DimensionType FirstSample, /**< Coordinate of the first sample in the convolution kernel. */
-		Interval; /**< The number of elements to skip before taking the next sample. */
+	DimensionType FirstSample = DimensionType(0U), /**< Coordinate of the first sample in the convolution kernel. */
+		Interval = DimensionType(1U); /**< The number of elements to skip before taking the next sample. */
 
 private:
 

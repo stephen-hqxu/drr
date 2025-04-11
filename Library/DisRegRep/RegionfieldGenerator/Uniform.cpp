@@ -19,8 +19,8 @@ DRR_REGIONFIELD_GENERATOR_DEFINE_DELEGATING_FUNCTOR(Uniform) {
 	using IndexType = Container::Regionfield::IndexType;
 	const auto idx_rg = iota(IndexType {}, static_cast<IndexType>(span.size()));
 	transform(EpTrait::Unsequenced, idx_rg.begin(), idx_rg.end(), span.begin(),
-		[&rf = as_const(regionfield), secret = Base::generateSecret(gen_info)](const auto idx) {
-			auto dist = Base::createDistribution(rf);
+		[&rf = as_const(regionfield), secret = Uniform::generateSecret(gen_info)](const auto idx) {
+			auto dist = Uniform::createDistribution(rf);
 			auto rng = Core::XXHash::RandomEngine(secret, idx);
 			return dist(rng);
 		});

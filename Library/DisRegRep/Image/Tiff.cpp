@@ -82,8 +82,7 @@ void Tiff::setColourPalette(const ConstColourPalette& palette) const {
 void Tiff::setColourPalette(const ColourPaletteRandomEngineSeed seed) const {
 	using Limit = numeric_limits<ColourPaletteElement>;
 	static_assert(ColourPaletteRandomEngine::min() == 0U && std::countr_one(ColourPaletteRandomEngine::max()) == Limit::digits * 3U,
-		"Choose a random number generator whose range can cover exactly the size of three colour palette channels to ensure maximum instruction level parallelism."
-	);
+		"Choose a random number generator whose range can cover exactly the size of three colour palette channels to ensure maximum instruction level parallelism.");
 
 	const auto palette_size = this->getColourPaletteSize(),
 		rgb_palette_size = palette_size * 3U;

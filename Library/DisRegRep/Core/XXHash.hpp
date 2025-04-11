@@ -137,7 +137,7 @@ public:
 	using ResultType = HashType;
 	using ResultLimit = std::numeric_limits<ResultType>;
 
-	using CounterType = std::uint_fast16_t;
+	using CounterType = std::uint_fast32_t;
 	using CounterReference = std::add_lvalue_reference_t<CounterType>;
 	using ObjectType = std::tuple<CounterType, Obj...>;
 
