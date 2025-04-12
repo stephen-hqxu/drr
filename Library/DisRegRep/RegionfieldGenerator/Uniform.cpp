@@ -21,7 +21,7 @@ DRR_REGIONFIELD_GENERATOR_DEFINE_DELEGATING_FUNCTOR(Uniform) {
 	transform(EpTrait::Unsequenced, idx_rg.begin(), idx_rg.end(), span.begin(),
 		[&rf = as_const(regionfield), secret = Uniform::generateSecret(gen_info)](const auto idx) {
 			auto dist = Uniform::createDistribution(rf);
-			auto rng = Core::XXHash::RandomEngine(secret, idx);
+			auto rng = Core::XXHash::RandomEngine(secret, auto(idx));
 			return dist(rng);
 		});
 }

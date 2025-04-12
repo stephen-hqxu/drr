@@ -6,9 +6,13 @@
 #include <DisRegRep/Core/View/Functional.hpp>
 #include <DisRegRep/Core/View/Matrix.hpp>
 
+#include <tuple>
+
 #include <ranges>
 
 #include <utility>
+
+#include <type_traits>
 
 #include <cstdint>
 
@@ -28,17 +32,27 @@ public:
 
 protected:
 
+	//Deduce if kernel offset should be enumerated when convolving a regionfield.
+	static constexpr std::bool_constant<true> IncludeOffsetEnumeration;
+	static constexpr std::bool_constant<false> ExcludeOffsetEnumeration;
+
 	/**
 	 * @brief Create a range that iterates through every element in the regionfield. For each element, constructs a 2D convolution
 	 * kernel around the element.
+	 *
+	 * @tparam EnumOffset Specify if the innermost range value should enumerate kernel offset like @link std::views::enumerate.
 	 *
 	 * @param invoke_info @link InvokeInfo.
 	 * @param regionfield Input whose region occupancies are convolved.
 	 *
 	 * @return A range of 2D convolution kernel.
 	 */
+	template<bool EnumOffset>
 	[[nodiscard]] constexpr std::ranges::view auto convolve(
-		const InvokeInfo& invoke_info, const DisRegRep::Container::Regionfield& regionfield) const noexcept {
+		std::bool_constant<EnumOffset>,
+		const InvokeInfo& invoke_info,
+		const DisRegRep::Container::Regionfield& regionfield
+	) const noexcept {
 		using std::views::cartesian_product, std::views::iota, std::views::transform,
 			std::integer_sequence, std::make_integer_sequence;
 
@@ -49,12 +63,20 @@ protected:
 			return cartesian_product([&, r] constexpr noexcept {
 				const DimensionType::value_type start = offset[I] - r;
 				return iota(start, start + extent[I]);
-			}()...) | Core::View::Functional::MakeFromTuple<DimensionType>;
+			}()...);
 		}(make_integer_sequence<LengthType, DimensionType::length()> {})
-			| transform([kernel_extent = DimensionType(this->diametre()), rf_2d = regionfield.range2d()](
-							const auto kernel_offset) constexpr noexcept {
-				  return rf_2d | Core::View::Matrix::Slice2d(kernel_offset, kernel_extent);
-			  });
+			| Core::View::Functional::MakeFromTuple<DimensionType>
+			| transform([
+				kernel_extent = DimensionType(this->diametre()),
+				rf_2d = regionfield.range2d()
+			](const auto kernel_offset) constexpr noexcept {
+				if constexpr (auto sliced_rf = rf_2d | Core::View::Matrix::Slice2d(kernel_offset, kernel_extent);
+					EnumOffset) {
+					return std::tuple(kernel_offset, std::move(sliced_rf));
+				} else {
+					return sliced_rf;
+				}
+			});
 	}
 
 public:

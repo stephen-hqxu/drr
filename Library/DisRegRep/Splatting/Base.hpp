@@ -5,6 +5,8 @@
 #include <DisRegRep/Container/Regionfield.hpp>
 #include <DisRegRep/Container/SplattingCoefficient.hpp>
 
+#include <DisRegRep/Core/XXHash.hpp>
+
 #include <any>
 #include <string_view>
 
@@ -69,6 +71,7 @@ public:
 		DisRegRep::Container::Regionfield::DimensionType,
 		DisRegRep::Container::SplattingCoefficient::Type::Dimension2Type
 	>;
+	using SeedType = Core::XXHash::SeedType;
 	using SizeType = std::size_t;
 
 	struct InvokeInfo {
@@ -87,6 +90,15 @@ protected:
 	 * @param regionfield Regionfield used for splatting.
 	 */
 	virtual void validate(const InvokeInfo&, const DisRegRep::Container::Regionfield&) const;
+
+	/**
+	 * @brief Generate a secret sequence from a seed to be used by derived splatting for random number generation.
+	 *
+	 * @param seed Seed to initialise the secret sequence state.
+	 *
+	 * @return Secret sequence generated from `seed`.
+	 */
+	[[nodiscard]] static Core::XXHash::Secret generateSecret(SeedType);
 
 public:
 

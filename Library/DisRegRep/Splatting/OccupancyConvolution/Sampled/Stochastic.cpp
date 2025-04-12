@@ -8,6 +8,7 @@
 #include <DisRegRep/Core/View/Functional.hpp>
 #include <DisRegRep/Core/Exception.hpp>
 #include <DisRegRep/Core/UninitialisedAllocator.hpp>
+#include <DisRegRep/Core/XXHash.hpp>
 
 #include <vector>
 
@@ -60,9 +61,8 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(Stochastic) {
 	this->validate(invoke_info, regionfield);
 	const auto [offset, extent] = invoke_info;
 
-	const KernelSizeType a = this->area();
 	auto& [simple_memory, index_memory] = ImplementationHelper::allocate<ScratchMemory, ContainerTrait>(
-		memory, tuple(typename TraitedScratchMemory::ExtentType(extent, regionfield.RegionCount), a));
+		memory, tuple(typename TraitedScratchMemory::ExtentType(extent, regionfield.RegionCount), this->area()));
 	auto& [kernel_memory, output_memory] = simple_memory;
 
 	using IndexType = typename TraitedScratchMemory::IndexType;
@@ -70,21 +70,24 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(Stochastic) {
 	copy(
 		[radius_iota = iota(KernelSizeType {}, this->Radius)]<LengthType... I>(integer_sequence<LengthType, I...>) constexpr noexcept {
 			return cartesian_product(((void)I, radius_iota)...);
-		}(make_integer_sequence<LengthType, IndexType::length()> {}) | Core::View::Functional::MakeFromTuple<IndexType>,
+		}(make_integer_sequence<LengthType, IndexType::length()> {})
+			| Core::View::Functional::MakeFromTuple<IndexType>,
 		index_memory.begin()
 	);
 
-	transform(this->convolve(invoke_info, regionfield), output_memory.range().begin(),
+	const auto index_sample = index_memory | as_const | take(this->Sample);
+	transform(this->convolve(Stochastic::IncludeOffsetEnumeration, invoke_info, regionfield), output_memory.range().begin(),
 		[
 			&index_memory,
 			&kernel_memory,
-			norm_factor = a,
-			sampler = Sampler(this->Seed),
-			index_sample = index_memory | as_const | take(this->Sample)
-		](auto kernel) mutable {
+			&index_sample,
+			secret = Stochastic::generateSecret(this->Seed),
+			norm_factor = index_sample.size()
+		](auto offset_kernel) noexcept {
+			auto [offset, kernel] = std::move(offset_kernel);
 			//It is more expensive to shuffle an index sequence than just taking some random samples from the kernel,
 			//	but can avoid taking duplicate samples.
-			shuffle(index_memory, sampler);
+			shuffle(index_memory, Core::XXHash::RandomEngine(secret, auto(offset)));
 
 			kernel_memory.clear();
 			for_each(index_sample, [&kernel_memory, kernel = std::move(kernel)](const auto idx) noexcept {
@@ -99,7 +102,6 @@ void Stochastic::validate(const InvokeInfo& invoke_info, const Regionfield& regi
 	this->Base::validate(invoke_info, regionfield);
 
 	DRR_ASSERT(this->Sample > 0U);
-	DRR_ASSERT(this->Sample < Sampler::max());
 }
 
 DRR_SPLATTING_DEFINE_SIZE_BYTE(Stochastic, ScratchMemory)

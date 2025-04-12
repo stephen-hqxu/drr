@@ -18,10 +18,10 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(Vanilla) {
 	auto& [kernel_memory, output_memory] =
 		ImplementationHelper::PredefinedScratchMemory::allocateSimple<ContainerTrait>(invoke_info, regionfield, memory);
 
-	transform(this->convolve(invoke_info, regionfield), output_memory.range().begin(),
-		[&kernel_memory, norm_factor = this->area()]<typename Kernel>(Kernel&& kernel) noexcept {
+	transform(this->convolve(Vanilla::ExcludeOffsetEnumeration, invoke_info, regionfield), output_memory.range().begin(),
+		[&kernel_memory, norm_factor = this->area()](auto kernel) noexcept {
 			kernel_memory.clear();
-			for_each(std::forward<Kernel>(kernel) | std::views::join,
+			for_each(std::move(kernel) | std::views::join,
 				[&kernel_memory](const auto region_id) noexcept { kernel_memory.increment(region_id); });
 			return DisRegRep::Container::SplatKernel::toMask(kernel_memory, norm_factor);
 		});

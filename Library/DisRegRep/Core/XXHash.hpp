@@ -27,6 +27,12 @@
  */
 namespace DisRegRep::Core::XXHash {
 
+/**
+ * @brief Check if `T` can be hashed by the XXHash algorithm.
+ */
+template<typename T>
+concept Hashable = std::is_trivially_copyable_v<std::remove_cvref_t<T>>;
+
 inline constexpr std::uint_fast8_t ApplicationSecretSize = 80U, /**< Size in byte of the secret specified by the end application. */
 	TotalSecretSize = ApplicationSecretSize * 2U; /**< Size in byte of the total secret sequence. */
 
@@ -99,7 +105,7 @@ using Input = std::span<const std::byte>;
  * @return 64-bit XXH3 hash of all `obj`s with `secret`.
  */
 template<typename... Obj>
-requires(sizeof...(Obj) > 0U && std::conjunction_v<std::is_trivially_copyable<Obj>...>)
+requires(sizeof...(Obj) > 0U && (Hashable<Obj> && ...))
 [[nodiscard]] HashType hash(const SecretView secret, const std::tuple<Obj...>& obj) noexcept {
 	using std::array, std::apply, std::ranges::copy_n;
 	using std::addressof, std::remove_reference_t;
@@ -126,7 +132,7 @@ requires(sizeof...(Obj) > 0U && std::conjunction_v<std::is_trivially_copyable<Ob
  * @tparam Obj Object types.
  */
 template<std::ranges::view Sec, typename... Obj>
-requires std::is_constructible_v<SecretView, Sec> && std::conjunction_v<std::is_trivially_copyable<Obj>...>
+requires std::is_constructible_v<SecretView, Sec> && (Hashable<Obj> && ...)
 class RandomEngine {
 public:
 
@@ -159,7 +165,7 @@ public:
 	 */
 	template<std::ranges::viewable_range AnotherSec, typename... AnotherObj>
 	requires(sizeof...(AnotherObj) == ObjectSize && std::conjunction_v<std::is_constructible<Obj, AnotherObj>...>)
-	RandomEngine(AnotherSec&& secret, AnotherObj&&... object)
+	explicit RandomEngine(AnotherSec&& secret, AnotherObj&&... object)
 		noexcept(View::Trait::IsNothrowViewable<AnotherSec> && std::conjunction_v<std::is_nothrow_constructible<Obj, AnotherObj>...>) :
 		Secret_(std::forward<AnotherSec>(secret) | std::views::all), Object(CounterType {}, std::forward<AnotherObj>(object)...) { }
 
@@ -195,6 +201,6 @@ public:
 
 //Takes ownership of `Sec` whenever necessary.
 template<typename Sec, typename... Obj>
-RandomEngine(Sec&&, Obj...) -> RandomEngine<std::views::all_t<Sec>, Obj...>;
+RandomEngine(Sec&&, Obj&&...) -> RandomEngine<std::views::all_t<Sec>, Obj...>;
 
 }

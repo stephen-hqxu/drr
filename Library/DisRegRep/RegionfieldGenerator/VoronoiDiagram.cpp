@@ -56,8 +56,8 @@ DRR_REGIONFIELD_GENERATOR_DEFINE_DELEGATING_FUNCTOR(VoronoiDiagram) {
 		) | to<vector>();
 	const auto region_assignment = region_centroid
 		| Core::View::IrregularTransform(
-			[dist = VoronoiDiagram::createDistribution(regionfield), &secret](const auto& centroid) mutable {
-				auto rng = RandomEngine(secret, centroid);
+			[dist = VoronoiDiagram::createDistribution(regionfield), &secret](const auto centroid) mutable {
+				auto rng = RandomEngine(secret, auto(centroid));
 				return dist(rng);
 			})
 		| to<vector<Regionfield::ValueType>>();

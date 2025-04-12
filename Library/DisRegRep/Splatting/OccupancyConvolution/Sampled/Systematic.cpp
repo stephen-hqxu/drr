@@ -34,13 +34,14 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(Systematic) {
 	const DimensionType remained_size = d - this->FirstSample,
 		sample_size = (remained_size + this->Interval - 1U) / this->Interval;
 
-	std::ranges::transform(this->convolve(invoke_info, regionfield), output_memory.range().begin(),
+	std::ranges::transform(this->convolve(Systematic::ExcludeOffsetEnumeration, invoke_info, regionfield),
+		output_memory.range().begin(),
 		[
 			this,
 			&kernel_memory,
 			norm_factor = static_cast<typename decltype(output_memory)::ValueType>(sample_size.x * sample_size.y)
-		]<typename Kernel>(Kernel&& kernel) noexcept {
-			auto kernel_uniform = std::forward<Kernel>(kernel)
+		](auto kernel) noexcept {
+			auto kernel_uniform = std::move(kernel)
 				| drop(this->FirstSample.x)
 				| stride(this->Interval.x)
 				| transform(bind_back(bit_or {}, drop(this->FirstSample.y) | stride(this->Interval.y)));

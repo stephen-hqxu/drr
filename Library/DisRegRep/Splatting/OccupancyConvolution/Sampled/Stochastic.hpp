@@ -4,8 +4,6 @@
 
 #include <DisRegRep/Container/Regionfield.hpp>
 
-#include <random>
-
 namespace DisRegRep::Splatting::OccupancyConvolution::Sampled {
 
 /**
@@ -15,18 +13,8 @@ namespace DisRegRep::Splatting::OccupancyConvolution::Sampled {
 class Stochastic final : public Base {
 public:
 
-	/**
-	 * @brief Stochastic sampling requires scrambling all elements in the kernel, and repeat this process for every element on the
-	 * regionfield. This mandates a random bit generator with a gargantuan period, where Mersenne-Twister becomes a perfect fit for
-	 * this role.
-	 *
-	 * @note State space is associated with kernel size; Period is associated with regionfield and kernel size.
-	 */
-	using Sampler = std::mt19937;
-	using SeedType = Sampler::result_type;
-
 	KernelSizeType Sample = 1U; /**< Number of samples to be taken from the convolution kernel. */
-	SeedType Seed = Sampler::default_seed; /**< Seed the initial state of the region sampler. */
+	SeedType Seed {}; /**< Seed the initial state of the stochastic region sampler. */
 
 private:
 
