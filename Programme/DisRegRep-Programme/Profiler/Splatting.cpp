@@ -128,8 +128,8 @@ inline constexpr auto VectorMax = [](const auto dim_a, const auto dim_b) static 
 
 template<SplattingRange SplattingBase>
 [[nodiscard]] Splt::Base::DimensionType maximinRegionfieldDimension(
-	SplattingBase&& splatting_base, const Splt::Base::DimensionType& extent) noexcept {
-	return *fold_left_first(std::forward<SplattingBase>(splatting_base) | transform([&extent](const auto* const splat) noexcept {
+	SplattingBase&& splatting_base, const Splt::Base::DimensionType& extent) {
+	return *fold_left_first(std::forward<SplattingBase>(splatting_base) | transform([&extent](const auto* const splat) {
 		return splat->minimumRegionfieldDimension({
 			.Offset = splat->minimumOffset(),
 			.Extent = extent
@@ -138,10 +138,10 @@ template<SplattingRange SplattingBase>
 }
 
 template<SplattingRange SplattingBase>
-[[nodiscard]] Splt::Base::DimensionType maximinOffset(SplattingBase&& splatting_base) noexcept {
+[[nodiscard]] Splt::Base::DimensionType maximinOffset(SplattingBase&& splatting_base) {
 	return *fold_left_first(
 		std::forward<SplattingBase>(splatting_base)
-			| transform([](const auto* const splat) static noexcept { return splat->minimumOffset(); }),
+			| transform([](const auto* const splat) static { return splat->minimumOffset(); }),
 		VectorMax
 	);
 }

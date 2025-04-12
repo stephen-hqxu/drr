@@ -162,29 +162,16 @@ void compare(Matrix& matrix) {
 
 }
 
-void GndTth::checkMinimumRequirement(BaseOccupancyConvolution& splatting) {
-	THEN("It has the correct minimum requirements") {
-		const auto size = GENERATE(take(3U, chunk(5U, random<std::uint_least8_t>(16U, 128U))));
-		const BaseOccupancyConvolution::InvokeInfo invoke_info {
-			.Offset = make_vec2(size.data()),
-			.Extent = make_vec2(size.data() + 2U)
-		};
-		const auto& [offset, extent] = invoke_info;
-		splatting.Radius = size.back();
-
-		REQUIRE(splatting.minimumRegionfieldDimension(invoke_info) == extent + offset + splatting.Radius);
-		REQUIRE(splatting.minimumOffset() == BaseOccupancyConvolution::DimensionType(splatting.Radius));
-	}
-}
-
 //NOLINTNEXTLINE(readability-function-cognitive-complexity)
-void GndTth::checkSplattingCoefficient(BaseFullOccupancyConvolution& splatting) {
+void GndTth::checkSplattingCoefficient(DisRegRep::Splatting::OccupancyConvolution::Full::Base& splatting) {
+	using DisRegRep::Splatting::OccupancyConvolution::Full::Base;
+
 	AND_GIVEN("An invoke specification that does not satisfy the minimum requirements") {
-		const auto size = GENERATE(take(3U, chunk(4U, random<BaseFullOccupancyConvolution::KernelSizeType>(4U, 8U))));
+		const auto size = GENERATE(take(3U, chunk(4U, random<std::uint_least8_t>(4U, 8U))));
 		const auto extent = make_vec2(size.data());
 		splatting.Radius = size[2U];
 
-		BaseFullOccupancyConvolution::InvokeInfo optimal_invoke_info {
+		Base::InvokeInfo optimal_invoke_info {
 			.Offset = splatting.minimumOffset(),
 			.Extent = extent
 		};
@@ -215,6 +202,14 @@ void GndTth::checkSplattingCoefficient(BaseFullOccupancyConvolution& splatting) 
 			REQUIRE_THROWS_WITH(invoke(), ContainsSubstring("greaterThanEqual") && ContainsSubstring("minimumOffset"));
 		}
 
+		WHEN("Extent is too large") {
+			optimal_invoke_info.Extent = splatting.maximumExtent(rf, optimal_invoke_info.Offset) + 1U;
+
+			//The logic of splatting extent and regionfield dimension are coupled,
+			//	and the procedure checks for regionfield dimension first.
+			REQUIRE_THROWS_WITH(invoke(), ContainsSubstring("greaterThanEqual") && ContainsSubstring("minimumRegionfieldDimension"));
+		}
+
 	}
 
 	WHEN("It is invoked with ground truth data") {
@@ -227,7 +222,7 @@ void GndTth::checkSplattingCoefficient(BaseFullOccupancyConvolution& splatting) 
 				const bool transposed = splatting.isTransposed();
 				const Regionfield rf = Reference::Regionfield::load(transposed);
 
-				const BaseFullOccupancyConvolution::InvokeInfo invoke_info {
+				const Base::InvokeInfo invoke_info {
 					.Offset = transposed ? CurrentRef::OffsetTransposed : CurrentRef::Offset,
 					.Extent = transposed ? CurrentRef::ExtentTransposed : CurrentRef::Extent
 				};

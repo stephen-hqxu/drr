@@ -9,6 +9,10 @@
 #include <DisRegRep/RegionfieldGenerator/VoronoiDiagram.hpp>
 
 #include <DisRegRep/Splatting/OccupancyConvolution/Full/Fast.hpp>
+#include <DisRegRep/Splatting/OccupancyConvolution/Sampled/Stochastic.hpp>
+#include <DisRegRep/Splatting/OccupancyConvolution/Sampled/Stratified.hpp>
+#include <DisRegRep/Splatting/OccupancyConvolution/Sampled/Systematic.hpp>
+#include <DisRegRep/Splatting/OccupancyConvolution/Base.hpp>
 #include <DisRegRep/Splatting/Base.hpp>
 #include <DisRegRep/Splatting/Container.hpp>
 
@@ -27,13 +31,14 @@ using std::any, std::tuple, std::visit;
 
 namespace {
 
-using PreparedGenerationInfo = tuple<Regionfield, const StockGen::Base::GenerateInfo>;
-using PreparedSplattingInfo = tuple<const Regionfield&>;
+using PreparedGenerationInfo = tuple<const StockGen::Base::GenerateInfo, Regionfield>;
+using PreparedSplatInfo = tuple<const Regionfield&>;
+using PreparedOccupancyConvolutionSplatInfo = tuple<const RfGen::Splatting::OccupancyConvolution::SplatInfo, PreparedSplatInfo>;
 
 [[nodiscard]] Regionfield generate(
 	//NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
 	const StockGen::Base& generator, PreparedGenerationInfo&& prepared_gen_info) {
-	auto& [regionfield, stock_gen_info] = prepared_gen_info;
+	auto& [stock_gen_info, regionfield] = prepared_gen_info;
 
 	generator(StockGen::ExecutionPolicy::MultiThreadingTrait, regionfield, stock_gen_info);
 	return std::move(regionfield);
@@ -50,9 +55,8 @@ using PreparedSplattingInfo = tuple<const Regionfield&>;
 	return generate(voronoi_diagram, std::move(prepared_gen_info));
 }
 
-[[nodiscard]] DenseMask splat(
-	//NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
-	const StockSplt::Base& splatting, PreparedSplattingInfo&& prepared_splat_info) {
+//NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
+[[nodiscard]] DenseMask splat(const StockSplt::Base& splatting, PreparedSplatInfo&& prepared_splat_info) {
 	const auto invoke_splat = [&splatting](const Regionfield& regionfield) -> DenseMask {
 		any memory;
 		const StockSplt::Base::DimensionType offset = splatting.minimumOffset();
@@ -71,11 +75,42 @@ using PreparedSplattingInfo = tuple<const Regionfield&>;
 	}
 }
 
-[[nodiscard]] DenseMask splat(PreparedSplattingInfo&& prepared_splat_info, const RfGen::Splatting::FullOccupancyConvolution option) {
-	const auto [radius] = option;
-	StockSplt::OccupancyConvolution::Full::Fast fast_occupancy;
-	fast_occupancy.Radius = radius;
-	return splat(fast_occupancy, std::move(prepared_splat_info));
+[[nodiscard]] DenseMask splat(
+	StockSplt::OccupancyConvolution::Base& splatting, PreparedOccupancyConvolutionSplatInfo&& prepared_oc_splat_info) {
+	auto [splat_info, prepared_splat_info] = std::move(prepared_oc_splat_info);
+	const auto [radius] = splat_info;
+	splatting.Radius = radius;
+	return splat(splatting, std::move(prepared_splat_info));
+}
+
+[[nodiscard]] DenseMask splat(
+	PreparedOccupancyConvolutionSplatInfo&& prepared_oc_splat_info, RfGen::Splatting::OccupancyConvolution::Full) {
+	StockSplt::OccupancyConvolution::Full::Fast full;
+	return splat(full, std::move(prepared_oc_splat_info));
+}
+[[nodiscard]] DenseMask splat(PreparedOccupancyConvolutionSplatInfo&& prepared_oc_splat_info,
+	const RfGen::Splatting::OccupancyConvolution::Sampled::Stochastic* const option) {
+	const auto [sample, seed] = *option;
+	StockSplt::OccupancyConvolution::Sampled::Stochastic stochastic;
+	stochastic.Sample = sample;
+	stochastic.Seed = seed;
+	return splat(stochastic, std::move(prepared_oc_splat_info));
+}
+[[nodiscard]] DenseMask splat(PreparedOccupancyConvolutionSplatInfo&& prepared_oc_splat_info,
+	const RfGen::Splatting::OccupancyConvolution::Sampled::Stratified* const option) {
+	const auto [stratum_count, seed] = *option;
+	StockSplt::OccupancyConvolution::Sampled::Stratified stratified;
+	stratified.StratumCount = stratum_count;
+	stratified.Seed = seed;
+	return splat(stratified, std::move(prepared_oc_splat_info));
+}
+[[nodiscard]] DenseMask splat(PreparedOccupancyConvolutionSplatInfo&& prepared_oc_splat_info,
+	const RfGen::Splatting::OccupancyConvolution::Sampled::Systematic* const option) {
+	const auto [first_sample, interval] = *option;
+	StockSplt::OccupancyConvolution::Sampled::Systematic systematic;
+	systematic.FirstSample = first_sample;
+	systematic.Interval = interval;
+	return splat(systematic, std::move(prepared_oc_splat_info));
 }
 
 }
@@ -88,13 +123,27 @@ Regionfield RfGen::generate(const GenerateInfo& gen_info, const Generator::Optio
 
 	return visit(
 		[&](const auto& generator) { return ::generate(PreparedGenerationInfo(
-			std::move(regionfield),
-			stock_gen_info
+			stock_gen_info,
+			std::move(regionfield)
 		), generator); },
 		option
 	);
 }
 
 DenseMask RfGen::splat(const Splatting::Option& option, const Container::Regionfield& regionfield) {
-	return visit([&](const auto& splatting) { return ::splat(PreparedSplattingInfo(regionfield), splatting); }, option);
+	return visit(
+		[&](const auto& splatting_group) {
+			const auto& [splat_info, option] = splatting_group;
+			return visit(
+				[&](const auto& splatting) {
+					return ::splat(PreparedOccupancyConvolutionSplatInfo(
+						*splat_info,
+						PreparedSplatInfo(regionfield)
+					), splatting);
+				},
+				option
+			);
+		},
+		option
+	);
 }

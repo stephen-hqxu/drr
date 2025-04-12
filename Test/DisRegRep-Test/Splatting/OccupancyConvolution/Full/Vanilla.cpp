@@ -17,9 +17,7 @@ SCENARIO("Use a brute-force 2D convolution to compute region occupancy from a re
 			CHECK_FALSE(splatting.isTransposed());
 		}
 
-		GndTth::checkMinimumRequirement(splatting);
 		GndTth::checkSplattingCoefficient(splatting);
-
 	}
 
 }

@@ -14,7 +14,7 @@ using glm::all, glm::greaterThanEqual, glm::lessThanEqual;
 
 void Base::validate(const InvokeInfo& invoke_info, const Regionfield& regionfield) const {
 	const auto [offset, extent] = invoke_info;
-	const auto rf_extent = regionfield.extent();
+	const Regionfield::DimensionType rf_extent = regionfield.extent();
 
 	DRR_ASSERT(regionfield.RegionCount > 0U);
 	DRR_ASSERT(all(greaterThanEqual(rf_extent, this->minimumRegionfieldDimension(invoke_info))));
@@ -29,15 +29,17 @@ XXHash::Secret Base::generateSecret(const SeedType seed) {
 	);
 }
 
-Base::DimensionType Base::minimumRegionfieldDimension(const InvokeInfo& invoke_info) const noexcept {
+Base::DimensionType Base::minimumRegionfieldDimension(const InvokeInfo& invoke_info) const {
 	const auto [offset, extent] = invoke_info;
 	return offset + extent;
 }
 
-Base::DimensionType Base::minimumOffset() const noexcept {
+Base::DimensionType Base::minimumOffset() const {
 	return DimensionType(0U);
 }
 
-Base::DimensionType Base::maximumExtent(const Regionfield& regionfield, const DimensionType offset) const noexcept {
-	return regionfield.extent() - offset;
+Base::DimensionType Base::maximumExtent(const Regionfield& regionfield, const DimensionType offset) const {
+	const Regionfield::DimensionType rf_extent = regionfield.extent();
+	DRR_ASSERT(all(greaterThanEqual(rf_extent, offset)));
+	return rf_extent - offset;
 }

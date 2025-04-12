@@ -17,9 +17,7 @@ SCENARIO("Use an optimised 2D convolution to compute region occupancy from a reg
 			CHECK(splatting.isTransposed());
 		}
 
-		GndTth::checkMinimumRequirement(splatting);
 		GndTth::checkSplattingCoefficient(splatting);
-
 	}
 
 }

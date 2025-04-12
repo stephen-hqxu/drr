@@ -138,14 +138,14 @@ public:
 	 *
 	 * @return Minimum regionfield dimension to be allocated by @link DisRegRep::Container::Regionfield::resize.
 	 */
-	[[nodiscard]] virtual DimensionType minimumRegionfieldDimension(const InvokeInfo&) const noexcept;
+	[[nodiscard]] virtual DimensionType minimumRegionfieldDimension(const InvokeInfo&) const;
 
 	/**
 	 * @brief Minimum regionfield matrix coordinate offset required by the given parameters.
 	 *
 	 * @return Minimum offset for @link InvokeInfo::Offset.
 	 */
-	[[nodiscard]] virtual DimensionType minimumOffset() const noexcept;
+	[[nodiscard]] virtual DimensionType minimumOffset() const;
 
 	/**
 	 * @brief Maximum splatting extent that can cover the specified regionfield matrix.
@@ -155,7 +155,7 @@ public:
 	 *
 	 * @return Maximum splatting extent for @link InvokeInfo::Extent.
 	 */
-	[[nodiscard]] virtual DimensionType maximumExtent(const DisRegRep::Container::Regionfield&, DimensionType) const noexcept;
+	[[nodiscard]] virtual DimensionType maximumExtent(const DisRegRep::Container::Regionfield&, DimensionType) const;
 
 	/**
 	 * @brief Query the usage of scratch memory.

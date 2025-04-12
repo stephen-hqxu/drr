@@ -7,7 +7,12 @@
 #include <DisRegRep/RegionfieldGenerator/VoronoiDiagram.hpp>
 
 #include <DisRegRep/Splatting/OccupancyConvolution/Full/Base.hpp>
+#include <DisRegRep/Splatting/OccupancyConvolution/Sampled/Stochastic.hpp>
+#include <DisRegRep/Splatting/OccupancyConvolution/Sampled/Stratified.hpp>
+#include <DisRegRep/Splatting/OccupancyConvolution/Sampled/Systematic.hpp>
+#include <DisRegRep/Splatting/OccupancyConvolution/Base.hpp>
 
+#include <tuple>
 #include <variant>
 
 /**
@@ -49,17 +54,77 @@ namespace Splatting {
 
 /**
  * @brief The splatting coefficient is defined as the number of times each region identifier appears on the convolution kernel in a
- * regionfield matrix. Every element in such a kernel is taken into account to derive the splatting coefficient.
+ * regionfield matrix.
  */
-struct FullOccupancyConvolution {
+namespace OccupancyConvolution {
 
-	DisRegRep::Splatting::OccupancyConvolution::Full::Base::KernelSizeType
-		Radius; /**< @link DisRegRep::Splatting::OccupancyConvolution::Full::Base::Radius. */
+/**
+ * @brief Common settings shared by all occupancy convolution-based splatting.
+ */
+struct SplatInfo {
+
+	DisRegRep::Splatting::OccupancyConvolution::Base::KernelSizeType
+		Radius; /**< @link DisRegRep::Splatting::OccupancyConvolution::Base::Radius. */
 
 };
 
+/**
+ * @brief Every element in such a kernel is taken into account to derive the splatting coefficient.
+ */
+struct Full { };
+
+/**
+ * @brief Elements in such a kernel are sampled with different strategies to derive the splatting coefficient.
+ */
+namespace Sampled {
+
+/**
+ * @brief Simple random sampling.
+ */
+struct Stochastic {
+
+	using Splatting = DisRegRep::Splatting::OccupancyConvolution::Sampled::Stochastic;
+
+	Splatting::KernelSizeType Sample; /**< @link Splatting::Sample. */
+	Splatting::SeedType Seed; /**< @link Splatting::Seed. */
+
+};
+/**
+ * @brief Stratified sampling.
+ */
+struct Stratified {
+
+	using Splatting = DisRegRep::Splatting::OccupancyConvolution::Sampled::Stratified;
+
+	Splatting::KernelSizeType StratumCount; /**< @link Splatting::StratumCount. */
+	Splatting::SeedType Seed; /**< @link Splatting::Seed. */
+
+};
+/**
+ * @brief Systematic sampling.
+ */
+struct Systematic {
+
+	using Splatting = DisRegRep::Splatting::OccupancyConvolution::Sampled::Systematic;
+
+	Splatting::DimensionType FirstSample, /**< @link Splatting::FirstSample. */
+		Interval; /**< @link Splatting::Interval. */
+
+};
+
+}
+
 using Option = std::variant<
-	FullOccupancyConvolution
+	Full,
+	const Sampled::Stochastic*,
+	const Sampled::Stratified*,
+	const Sampled::Systematic*
+>; /**< All occupancy convolution-based splatting algorithms. */
+
+}
+
+using Option = std::variant<
+	std::tuple<const OccupancyConvolution::SplatInfo*, OccupancyConvolution::Option>
 >; /**< Supply configurations to all supported region feature splatting coefficient computing algorithms. */
 
 }
@@ -89,7 +154,6 @@ struct GenerateInfo {
 /**
  * @brief Compute region feature splatting coefficients for the whole domain of a given regionfield matrix.
  *
- * @param splat_info @link SplattingInfo.
  * @param option Choose a region feature splatting coefficient algorithm.
  * @param regionfield Regionfield input that provides region identifiers whose splatting coefficients are to be computed.
  *

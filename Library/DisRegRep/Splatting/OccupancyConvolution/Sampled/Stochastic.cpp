@@ -10,10 +10,8 @@
 #include <DisRegRep/Core/UninitialisedAllocator.hpp>
 #include <DisRegRep/Core/XXHash.hpp>
 
-#include <vector>
-
 #include <span>
-#include <tuple>
+#include <vector>
 
 #include <algorithm>
 #include <ranges>
@@ -23,8 +21,8 @@
 using DisRegRep::Splatting::OccupancyConvolution::Sampled::Stochastic,
 	DisRegRep::Container::Regionfield;
 
-using std::vector, std::span, std::tuple;
-using std::ranges::copy, std::ranges::transform, std::ranges::shuffle, std::ranges::for_each,
+using std::vector, std::span;
+using std::ranges::transform, std::ranges::shuffle, std::ranges::for_each,
 	std::views::cartesian_product, std::views::iota, std::views::take, std::views::as_const;
 using std::integer_sequence, std::make_integer_sequence;
 
@@ -41,10 +39,8 @@ public:
 	SimpleScratchMemory Simple;
 	vector<IndexType, DisRegRep::Core::UninitialisedAllocator<IndexType>> Index;
 
-	void resize(const tuple<ExtentType, Stochastic::KernelSizeType> arg) {
-		const auto [extent, area] = arg;
+	void resize(const ExtentType extent) {
 		this->Simple.resize(extent);
-		this->Index.resize(area);
 	}
 
 	[[nodiscard]] Stochastic::SizeType sizeByte() const noexcept {
@@ -62,18 +58,16 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(Stochastic) {
 	const auto [offset, extent] = invoke_info;
 
 	auto& [simple_memory, index_memory] = ImplementationHelper::allocate<ScratchMemory, ContainerTrait>(
-		memory, tuple(typename TraitedScratchMemory::ExtentType(extent, regionfield.RegionCount), this->area()));
+		memory, typename TraitedScratchMemory::ExtentType(extent, regionfield.RegionCount));
 	auto& [kernel_memory, output_memory] = simple_memory;
 
 	using IndexType = typename TraitedScratchMemory::IndexType;
 	using LengthType = typename IndexType::length_type;
-	copy(
-		[radius_iota = iota(KernelSizeType {}, this->Radius)]<LengthType... I>(integer_sequence<LengthType, I...>) constexpr noexcept {
-			return cartesian_product(((void)I, radius_iota)...);
-		}(make_integer_sequence<LengthType, IndexType::length()> {})
-			| Core::View::Functional::MakeFromTuple<IndexType>,
-		index_memory.begin()
-	);
+	index_memory.assign_range([diametre_iota = iota(KernelSizeType {}, this->diametre())]<LengthType... I>(
+		integer_sequence<LengthType, I...>) constexpr noexcept {
+		return cartesian_product(((void)I, diametre_iota)...);
+	}(make_integer_sequence<LengthType, IndexType::length()> {})
+		| Core::View::Functional::MakeFromTuple<IndexType>);
 
 	const auto index_sample = index_memory | as_const | take(this->Sample);
 	transform(this->convolve(Stochastic::IncludeOffsetEnumeration, invoke_info, regionfield), output_memory.range().begin(),

@@ -81,11 +81,11 @@ protected:
 
 public:
 
-	[[nodiscard]] DimensionType minimumRegionfieldDimension(const InvokeInfo&) const noexcept override;
+	[[nodiscard]] DimensionType minimumRegionfieldDimension(const InvokeInfo&) const override;
 
-	[[nodiscard]] DimensionType minimumOffset() const noexcept override;
+	[[nodiscard]] DimensionType minimumOffset() const override;
 
-	[[nodiscard]] DimensionType maximumExtent(const DisRegRep::Container::Regionfield&, DimensionType) const noexcept override;
+	[[nodiscard]] DimensionType maximumExtent(const DisRegRep::Container::Regionfield&, DimensionType) const override;
 
 	/**
 	 * @brief Calculate the kernel diametre given a radius.

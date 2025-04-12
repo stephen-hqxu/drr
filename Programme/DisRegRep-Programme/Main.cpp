@@ -26,6 +26,7 @@
 #include <string>
 #include <string_view>
 #include <tuple>
+#include <variant>
 
 #include <algorithm>
 #include <functional>
@@ -41,7 +42,9 @@
 
 #include <exception>
 
+#include <concepts>
 #include <limits>
+#include <type_traits>
 
 #include <cstdint>
 #include <cstdlib>
@@ -55,16 +58,32 @@ using DenseMaskProtocol = Image::Serialisation::Protocol<Container::SplattingCoe
 
 namespace fs = std::filesystem;
 using std::array, std::unordered_map,
-	std::string, std::string_view, std::make_from_tuple;
+	std::string, std::string_view,
+	std::make_from_tuple, std::variant_alternative_t;
 using std::ranges::generate;
 using std::chrono::system_clock, std::chrono::sys_seconds, std::chrono::duration_cast,
 	std::format,
 	std::random_device;
 using std::cout, std::println;
 using std::exception;
-using std::numeric_limits;
+using std::unsigned_integral, std::numeric_limits, std::common_type_t;
 
 namespace {
+
+template<typename Vec>
+using VectorArray = array<typename Vec::value_type, Vec::length()>;
+
+template<unsigned_integral Seed>
+[[nodiscard]] Seed defaultSeed() {
+	namespace Bit = DisRegRep::Core::Bit;
+	static constexpr auto SeedSequencePacking =
+		Bit::BitPerSampleResult(Bit::BitPerSampleResult::DataTypeTag<Seed>, numeric_limits<random_device::result_type>::digits);
+
+	array<Seed, SeedSequencePacking.PackingFactor> seed_seq;
+	random_device seed_gen;
+	generate(seed_seq, std::ref(seed_gen));
+	return Bit::pack(seed_seq, SeedSequencePacking);
+}
 
 //NOLINTBEGIN(cppcoreguidelines-pro-type-member-init)
 namespace Argument {
@@ -197,7 +216,6 @@ struct Regionfield {
 	constexpr ~Regionfield() = default;
 
 	void bind(CLI::App& cmd) & {
-		namespace Bit = DisRegRep::Core::Bit;
 		using enum Generator;
 
 		auto& [resolution, region_count, rf_gen_info] = this->GenerateInfo;
@@ -205,17 +223,8 @@ struct Regionfield {
 		auto& [centroid_count] = this->VoronoiDiagram;
 
 		using ResolutionType = decltype(resolution);
-		using ResolutionArray = array<ResolutionType::value_type, ResolutionType::length()>;
+		using ResolutionArray = VectorArray<ResolutionType>;
 		using SeedType = decltype(seed);
-
-		static constexpr auto SeedSequencePacking = Bit::BitPerSampleResult(
-			Bit::BitPerSampleResult::DataTypeTag<SeedType>, numeric_limits<random_device::result_type>::digits);
-		const auto seed_seq = [] static {
-			array<SeedType, 2U> seed_seq;
-			random_device seed_gen;
-			generate(seed_seq, std::ref(seed_gen));
-			return seed_seq;
-		}();
 
 		cmd.add_option(
 			"regionfield-tif",
@@ -257,8 +266,7 @@ struct Regionfield {
 			"Initialise the state of the random number generator employed for the generation of a regionfield."
 		)	->type_name("SEED")
 			->check(CLI::NonNegativeNumber)
-			->run_callback_for_default()
-			->default_val(Bit::pack(seed_seq, SeedSequencePacking));
+			->default_val(defaultSeed<SeedType>());
 		cmd.add_option(
 			"--centroid",
 			centroid_count,
@@ -291,9 +299,15 @@ struct Splat {
 	string RegionfieldFilename, OutputFilename;
 
 	enum struct Splatting : std::uint_fast8_t {
-		Full
+		Full,
+		Stochastic = 10U,
+		Stratified,
+		Systematic
 	} Splatting_;
-	Generator::Regionfield::Splatting::FullOccupancyConvolution FullOccupancyConvolution;
+	Generator::Regionfield::Splatting::OccupancyConvolution::SplatInfo OCSplatInfo;
+	Generator::Regionfield::Splatting::OccupancyConvolution::Sampled::Stochastic StochasticSampled;
+	Generator::Regionfield::Splatting::OccupancyConvolution::Sampled::Stratified StratifiedSampled;
+	Generator::Regionfield::Splatting::OccupancyConvolution::Sampled::Systematic SystematicSampled;
 
 	constexpr Splat() noexcept = default;
 
@@ -309,7 +323,20 @@ struct Splat {
 
 	void bind(CLI::App& cmd) & {
 		using enum Splatting;
-		auto& [radius] = this->FullOccupancyConvolution;
+		auto& [radius] = this->OCSplatInfo;
+		auto& [sample, seed_stochastic] = this->StochasticSampled;
+		auto& [stratum_count, seed_stratified] = this->StratifiedSampled;
+		auto& [first_sample, interval] = this->SystematicSampled;
+
+		using SeedType = common_type_t<
+			decltype(seed_stochastic),
+			decltype(seed_stratified)
+		>;
+		using ExtentType = common_type_t<
+			decltype(first_sample),
+			decltype(interval)
+		>;
+		using ExtentArray = VectorArray<ExtentType>;
 
 		cmd.add_option(
 			"regionfield-tif",
@@ -334,7 +361,10 @@ struct Splat {
 			->required()
 			->type_name("SPLAT")
 			->transform(CLI::CheckedTransformer(unordered_map<string_view, Splatting> {
-				{ "full", Full }
+				{ "full", Full },
+				{ "stochastic", Stochastic },
+				{ "stratified", Stratified },
+				{ "systematic", Systematic }
 			}));
 		//It is not easy to pick a default radius, since it depends on the dimension of the regionfield matrix.
 		//It is an error if the convolution kernel is too large and goes over the matrix boundary.
@@ -346,14 +376,71 @@ struct Splat {
 			->required()
 			->type_name("RADIUS")
 			->check(CLI::NonNegativeNumber);
+		cmd.add_option_function<SeedType>(
+			   "--seed",
+			   [&seed_stochastic, &seed_stratified](const SeedType seed) constexpr noexcept {
+				   seed_stochastic = seed;
+				   seed_stratified = seed;
+			   },
+			   "The initial state of the random sampler employed in certain sampled convolution-based splatting processes may be seeded."
+		)
+			->type_name("SEED")
+			->check(CLI::NonNegativeNumber)
+			->default_val(defaultSeed<SeedType>());
+		//The number **5** is a magic number here,
+		//	which is the typical kernel diametre where the fast convolution starts to out-performs the vanilla convolution.
+		cmd.add_option(
+			"--sample",
+			sample,
+			"In the context of stochastic sampling, specify the number of random elements to be extracted from the convolution kernel in order to compute the region splatting coefficient."
+		)
+			->type_name("SAMPLE")
+			->check(CLI::PositiveNumber)
+			->default_val(25U);
+		cmd.add_option(
+			"--stratum",
+			stratum_count,
+			"In the context of stratified sampling, specify the number of strata that the convolution kernel will be divided into along each axis."
+		)
+			->type_name("COUNT")
+			->check(CLI::PositiveNumber)
+			->default_val(5U);
+		cmd.add_option_function<ExtentArray>(
+			"--first",
+			[&first_sample](const ExtentArray first) constexpr noexcept { first_sample = make_from_tuple<ExtentType>(first); },
+			"In the context of systematic sampling, the coordinate of the first element on the convolution kernel must be specified."
+		)
+			->type_name("COORD")
+			->delimiter(',')
+			->check(CLI::NonNegativeNumber)
+			->default_str("0,0")
+			->force_callback();
+		cmd.add_option_function<ExtentArray>(
+			"--interval",
+			[&interval](const ExtentArray spacing) constexpr noexcept { interval = make_from_tuple<ExtentType>(spacing); },
+			"In the context of systematic sampling, the number of elements to skip before taking the next one."
+		)
+			->type_name("SKIP")
+			->delimiter(',')
+			->check(CLI::PositiveNumber)
+			->default_str("5,5")
+			->force_callback();
 	}
 
 	[[nodiscard]] Container::SplattingCoefficient::DenseMask splatRegionfield(const Container::Regionfield& regionfield) const {
 		namespace Splt = Generator::Regionfield::Splatting;
 		return Generator::Regionfield::splat([this] noexcept -> Splt::Option {
+			const auto option_oc = [splat_info = &this->OCSplatInfo](
+				const auto option) constexpr noexcept -> variant_alternative_t<0U, Splt::Option> {
+				return { splat_info, option };
+			};
+
 			using enum Splatting;
 			switch (this->Splatting_) {
-			case Full: return this->FullOccupancyConvolution;
+			case Full: return option_oc(Splt::OccupancyConvolution::Full {});
+			case Stochastic: return option_oc(&this->StochasticSampled);
+			case Stratified: return option_oc(&this->StratifiedSampled);
+			case Systematic: return option_oc(&this->SystematicSampled);
 			default: std::unreachable();
 			}
 		}(), regionfield);
@@ -402,7 +489,7 @@ void generateRegionfield(const Argument::Regionfield& arg_regionfield, const Arg
 }
 
 void splatRegionfield(const Argument::Splat& arg_splat, const Argument::TiffCompression& arg_tiff_compression) {
-	const auto& [regionfield_file, output_file, _1, _2] = arg_splat;
+	const auto& [regionfield_file, output_file, _1, _2, _3, _4, _5] = arg_splat;
 
 	RegionfieldProtocol::initialise();
 	const auto regionfield_tif = Image::Tiff(regionfield_file, "r");
