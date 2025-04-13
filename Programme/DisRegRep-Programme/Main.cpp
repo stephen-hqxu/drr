@@ -138,8 +138,11 @@ struct TiffCompression {
 		None,
 		Lzw,
 		ZStd
-	} Compression_;
-	Generator::Tiff::Compression::ZStandard ZStandard;
+	} Compression_ = Compression::None;
+	Generator::Tiff::Compression::ZStandard ZStandard {
+		//This is the default compression level used by the official zstd command line.
+		.CompressionLevel = 3
+	};
 
 	constexpr TiffCompression() noexcept = default;
 
@@ -155,26 +158,27 @@ struct TiffCompression {
 
 	void bind(CLI::App& cmd) & {
 		using enum Compression;
-		auto& [compression_level] = this->ZStandard;
+		auto& [zstd_compression_level] = this->ZStandard;
 
-		cmd.add_option(
-			"--compression,-c",
-			this->Compression_,
-			"Specify the compression algorithm to be employed for data being written to the TIFF image."
-		)	->type_name("COMPRESS")
-			->transform(CLI::CheckedTransformer(unordered_map<string_view, Compression> {
-				{ "none", None },
-				{ "lzw", Lzw },
-				{ "zstd", ZStd }
-			}))
-			->default_val(None);
-		cmd.add_option(
-			"-l",
-			compression_level,
-			"Exercise control over the compression level for a specific compression algorithm. At present, it should be noted that only ZStandard is configurable."
-		)	->type_name("LEVEL")
+		using ZStdCompressionLevel = decltype(zstd_compression_level);
+
+		cmd.add_flag_callback(
+			"--lzw",
+			[this] constexpr noexcept { this->Compression_ = Lzw; },
+			"Use the Lempel-Ziv & Welch compression algorithm."
+		);
+		cmd.add_option_function<ZStdCompressionLevel>(
+			"--zstd",
+			[this, &zstd_compression_level](const ZStdCompressionLevel level) constexpr noexcept {
+				this->Compression_ = ZStd;
+				zstd_compression_level = level;
+			},
+			"Use the Z-Standard compression algorithm, with the option of exercising control over its compression level."
+		)
+			->expected(0, 1)
+			->type_name("LEVEL")
 			->check(CLI::Number)
-			->default_val(3);//This is the default compression level used by the official zstd command line.
+			->default_val(zstd_compression_level);
 	}
 
 	void setCompression(const Image::Tiff& tif) const {
@@ -522,7 +526,8 @@ int main(const int argc, const char* const* const argv) try {
 	CLI::App& group_tiff_compression = *parser.add_option_group(
 		"tiff-compression",
 		"Exercise control over the compression of generated data for the TIFF writer."
-	)	->disabled_by_default();
+	)	->disabled_by_default()
+		->require_option(-1);
 	Argument::TiffCompression arg_tiff_compression;
 	arg_tiff_compression.bind(group_tiff_compression);
 
