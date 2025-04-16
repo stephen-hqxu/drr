@@ -41,16 +41,16 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(Systematic) {
 			&kernel_memory,
 			norm_factor = static_cast<typename decltype(output_memory)::ValueType>(sample_size.x * sample_size.y)
 		](auto kernel) noexcept {
-			auto kernel_uniform = std::move(kernel)
+			auto kernel_pattern = std::move(kernel)
 				| drop(this->FirstSample.x)
 				| stride(this->Interval.x)
 				| transform(bind_back(bit_or {}, drop(this->FirstSample.y) | stride(this->Interval.y)));
 			//It is also possible calculate normalisation factor here with the following method, which is more intuitive.
 			//Doing it manually outside the loop to avoid making repetitive calculations.
-			assert(fold_left_first(kernel_uniform | transform(std::ranges::size), plus {}) == norm_factor);
+			assert(fold_left_first(kernel_pattern | transform(std::ranges::size), plus {}) == norm_factor);
 
 			kernel_memory.clear();
-			for_each(std::move(kernel_uniform) | join,
+			for_each(std::move(kernel_pattern) | join,
 				[&kernel_memory](const auto region_id) noexcept { kernel_memory.increment(region_id); });
 			return DisRegRep::Container::SplatKernel::toMask(kernel_memory, norm_factor);
 		});

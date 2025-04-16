@@ -12,8 +12,6 @@
 
 #include <ranges>
 
-#include <utility>
-
 #include <cstdint>
 
 namespace DisRegRep::Container {
@@ -72,6 +70,14 @@ public:
 	 * @return A transpose of the current regionfield matrix.
 	 */
 	[[nodiscard]] Regionfield transpose() const;
+
+	/**
+	 * @brief Reserve memory for the regionfield matrix so that it can hold at least as many number of elements as specified by the
+	 * dimension.
+	 *
+	 * @param dim The width and height of the matrix.
+	 */
+	void reserve(DimensionType);
 
 	/**
 	 * @brief Resize the regionfield matrix. After this call returns, all existing contents become undefined regardless of whether

@@ -59,8 +59,7 @@ public:
 
 protected:
 
-	using RandomIntType = std::uint_fast16_t;
-	using UniformDistributionType = std::uniform_int_distribution<RandomIntType>;
+	using UniformDistributionType = std::uniform_int_distribution<std::uint_fast16_t>;
 
 	/**
 	 * @brief Generate a secret sequence using the currently set seed.

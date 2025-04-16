@@ -1,6 +1,5 @@
 #include <DisRegRep/Container/Regionfield.hpp>
 
-#include <DisRegRep/Core/View/Matrix.hpp>
 #include <DisRegRep/Core/Exception.hpp>
 #include <DisRegRep/Core/MdSpan.hpp>
 
@@ -11,6 +10,8 @@
 #include <ranges>
 
 using DisRegRep::Container::Regionfield;
+
+using glm::greaterThanEqual;
 
 using std::for_each, std::ranges::copy,
 	std::execution::par_unseq,
@@ -38,8 +39,15 @@ Regionfield Regionfield::transpose() const {
 	return transposed;
 }
 
+void Regionfield::reserve(const DimensionType dim) {
+	DRR_ASSERT(glm::all(greaterThan(dim, DimensionType(0U))));
+
+	const MappingType reservation_mapping = Core::MdSpan::toExtent(dim);
+	this->Data.reserve(reservation_mapping.required_span_size());
+}
+
 void Regionfield::resize(const DimensionType dim) {
-	DRR_ASSERT(glm::all(glm::greaterThan(dim, DimensionType(0U))));
+	DRR_ASSERT(glm::all(greaterThan(dim, DimensionType(0U))));
 
 	this->Mapping = Core::MdSpan::toExtent(dim);
 	this->Data.resize(this->Mapping.required_span_size());

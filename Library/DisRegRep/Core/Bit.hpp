@@ -32,6 +32,8 @@ struct BitPerSampleResult {
 	template<typename T>
 	static constexpr std::type_identity<T> DataTypeTag; /**< A convenient way of specifying data type when constructing a bit per sample result. */
 
+	static constexpr BitType MaxBitPerSample = std::numeric_limits<MaskType>::digits; /**< Maximum number of bits per sample supported without causing overflow. */
+
 	BitType Bit, /**< Minimum number of bits per sample for storing some data. */
 		PackingFactor, /**< How many elements can be packed into an unsigned integer whose width is the same as the original data representation. */
 		PackingFactorLog2; /**< Base 2 log of the packing factor. */
@@ -50,7 +52,8 @@ struct BitPerSampleResult {
 		Bit(bps),
 		PackingFactor(std::numeric_limits<DataType>::digits >> std::countr_zero(bps)),
 		PackingFactorLog2(std::countr_zero(this->PackingFactor)),
-		SampleMask((MaskType { 1 } << bps) - MaskType { 1 }) {
+		SampleMask(~MaskType {} >> (BitPerSampleResult::MaxBitPerSample - bps)) {
+		assert(bps <= BitPerSampleResult::MaxBitPerSample);
 		assert(std::has_single_bit(bps));
 		assert(this->PackingFactor > 0U);
 	}

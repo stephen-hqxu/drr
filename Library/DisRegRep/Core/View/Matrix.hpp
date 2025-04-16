@@ -28,12 +28,7 @@ namespace DisRegRep::Core::View::Matrix {
  *
  * @return `r` with a new axis added to the left.
  */
-inline constexpr auto NewAxisLeft = RangeAdaptorClosure([]<typename R, typename Stride>
-	requires std::is_invocable_v<decltype(std::views::chunk), R, Stride>
-	(R&& r, const Stride stride) static constexpr noexcept(std::is_nothrow_invocable_v<decltype(std::views::chunk), R, Stride>)
-		-> std::ranges::view auto {
-			return std::forward<R>(r) | std::views::chunk(stride);
-		});
+inline constexpr auto NewAxisLeft = std::views::chunk;
 
 /**
  * @brief Add an axis to the right of a range, such that the new right axis has a stride less than that of the original axis.

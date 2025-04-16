@@ -51,11 +51,11 @@ DRR_SPLATTING_DEFINE_DELEGATING_FUNCTOR(Stochastic) {
 					using LengthType = DimensionType::length_type;
 					//It is too expensive to shuffle an index sequence than just taking some random samples from the kernel,
 					//	although that can avoid taking duplicate samples.
-					const DimensionType idx = [&]<LengthType... I>(integer_sequence<LengthType, I...>) {
+					const DimensionType sample = [&]<LengthType... I>(integer_sequence<LengthType, I...>) {
 						return DimensionType(((void)I, sample_dist(rng))...);
 					}(make_integer_sequence<LengthType, DimensionType::length()> {});
 
-					kernel_memory.increment(kernel[idx.x][idx.y]);
+					kernel_memory.increment(kernel[sample.x][sample.y]);
 				});
 			return DisRegRep::Container::SplatKernel::toMask(kernel_memory, norm_factor);
 		});
