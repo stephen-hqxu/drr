@@ -1,12 +1,14 @@
 drrTargetSource(
 HEADER
 	Base
+	DiamondSquare
 	ExecutionPolicy
 	ImplementationHelper
 	Uniform
 	VoronoiDiagram
 SOURCE
 	Base
+	DiamondSquare
 	Uniform
 	VoronoiDiagram
 )

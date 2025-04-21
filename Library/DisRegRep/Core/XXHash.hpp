@@ -45,23 +45,50 @@ using Secret = std::array<std::byte, TotalSecretSize>;
 using SecretView = std::span<const std::byte, TotalSecretSize>;
 using Input = std::span<const std::byte>;
 
+namespace Internal_ {
+
+template<Hashable Obj>
+inline constexpr std::size_t ObjectSize = sizeof(std::remove_reference_t<Obj>); /**< Get byte size of a hashable object. */
+template<Hashable T, std::size_t Size>
+inline constexpr std::size_t ObjectSize<std::array<T, Size>> = ObjectSize<T> * Size;
+
 /**
- * @brief Create an application secret array from a string of space-separated base-16 bytes.
+ * @brief Get address to a hashable object.
+ *
+ * @param obj A hashable object.
+ *
+ * @return Address of `obj`.
+ */
+[[nodiscard]] constexpr const std::byte* objectAddress(const Hashable auto& obj) noexcept {
+	return reinterpret_cast<const std::byte*>(std::addressof(obj));
+}
+template<Hashable T, std::size_t Size>
+[[nodiscard]] constexpr const std::byte* objectAddress(const std::array<T, Size>& obj) noexcept {
+	return std::as_bytes(std::span(obj)).data();
+}
+
+}
+
+/**
+ * @brief Create a secret array from a string of space-separated base-16 bytes.
+ *
+ * @tparam Size Secret size in bytes.
  *
  * @param str String that contains the secret bytes.
  *
- * @return An array of application secret.
+ * @return An array of secrets.
  */
-[[nodiscard]] consteval ApplicationSecret makeApplicationSecret(const std::string_view str) {
+template<std::size_t Size>
+[[nodiscard]] consteval std::array<std::byte, Size> makeSecret(const std::string_view str) {
 	using std::ranges::transform,
 		std::views::split, std::ranges::data, std::ranges::size,
 		std::from_chars, std::errc;
 
 	//Each byte has two hex characters plus a space separator, hence there are three characters per token;
 	//	the final token does not have a separator, hence minus one.
-	DRR_ASSERT(str.length() == ApplicationSecretSize * 3UZ - 1UZ);
+	DRR_ASSERT(str.length() == Size * 3UZ - 1UZ);
 
-	ApplicationSecret secret {};
+	std::array<std::byte, Size> secret {};
 	transform(str | split(' '), secret.begin(), [](const auto token) static consteval {
 		std::uint8_t byte {};
 		const auto first = data(token);
@@ -69,6 +96,12 @@ using Input = std::span<const std::byte>;
 		return std::byte { byte };
 	});
 	return secret;
+}
+/**
+ * @brief Create an application secret array with @link makeSecret.
+ */
+[[nodiscard]] consteval ApplicationSecret makeApplicationSecret(const std::string_view str) {
+	return makeSecret<ApplicationSecretSize>(str);
 }
 
 /**
@@ -108,16 +141,14 @@ template<typename... Obj>
 requires(sizeof...(Obj) > 0U && (Hashable<Obj> && ...))
 [[nodiscard]] HashType hash(const SecretView secret, const std::tuple<Obj...>& obj) noexcept {
 	using std::array, std::apply, std::ranges::copy_n;
-	using std::addressof, std::remove_reference_t;
-
 	//Do not find the tuple size directly as it may contain implementation-specific padding.
-	static constexpr std::size_t ObjectSize = (sizeof(remove_reference_t<Obj>) + ...);
+	static constexpr std::size_t ObjectSize = (Internal_::ObjectSize<Obj> + ...);
 
 	return hash(
 		apply([]<typename... O>(const O&... o) static noexcept {
 			array<std::byte, ObjectSize> input_binary;
 			auto begin = input_binary.begin();
-			((begin = copy_n(reinterpret_cast<const std::byte*>(addressof(o)), sizeof(O), begin).out), ...);
+			((begin = copy_n(Internal_::objectAddress(o), Internal_::ObjectSize<O>, begin).out), ...);
 			return input_binary;
 		}, obj),
 		secret
