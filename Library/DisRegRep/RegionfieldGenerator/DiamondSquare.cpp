@@ -43,13 +43,13 @@ using glm::greaterThanEqual;
 
 using std::array, std::bitset,
 	std::tuple, std::tie, std::apply;
-using std::ranges::fold_left, std::ranges::copy_n,
+using std::ranges::fold_left,
 	std::execution::unseq, std::is_execution_policy_v,
-	std::bind_front, std::bind_back, std::plus, std::bit_or,
+	std::bind_front, std::bind_back, std::plus,
 	std::views::repeat, std::views::iota, std::views::cartesian_product,
 	std::views::stride, std::views::transform, std::views::chunk, std::views::zip,
 	std::ranges::input_range, std::ranges::forward_range,
-	std::ranges::common_range, std::ranges::viewable_range, std::ranges::view, std::ranges::sized_range,
+	std::ranges::common_range, std::ranges::viewable_range, std::ranges::view,
 	std::ranges::range_value_t;
 using std::integer_sequence, std::make_integer_sequence;
 using std::convertible_to,
@@ -82,7 +82,7 @@ constexpr auto FirstPassSalt = makeSecret<SaltSize>("fe ab 32 d2 af 0d c2 e9 9c 
 			   SmoothPassSalt = makeSecret<SaltSize>("26 ce a9 63 d3 74 48 b8 30 65 58 a8 76 b5 6f 9a 9e 71 78 b2 43 2f 0f 32 bc 44 4e c2 3c d9 7a 9b");
 
 [[nodiscard]] constexpr DiamondSquare::DimensionType upscale(const DiamondSquare::DimensionType dim) noexcept {
-	return (dim << 2U) + 1U;
+	return dim * 2U - 1U;
 }
 
 constexpr auto MakeOffsetRange = [](
@@ -94,7 +94,8 @@ constexpr auto MakeOffsetRange = [](
 	using DimensionType = DiamondSquare::DimensionType;
 	return [initial, extent = extent - extent_deduction, grid_skip = stride(skip)]<LengthType... I>(
 			   integer_sequence<LengthType, I...>) constexpr noexcept {
-		return cartesian_product(iota(initial[I], extent[I]) | grid_skip...);
+		//Equivalent to creating an unbounded iota then piping into a take, but we want to keep a sized and common range.
+		return cartesian_product(iota(initial[I], initial[I] + extent[I]) | grid_skip...);
 	}(make_integer_sequence<LengthType, DimensionType::length()> {})
 		| DisRegRep::Core::View::Functional::MakeFromTuple<DimensionType>;
 };
@@ -106,15 +107,22 @@ constexpr auto MakeGridRange = []<OffsetRangeMaker Mk>(
 	Mk&& offset_range_maker,
 	const BitPerSampleResult::BitType group_size
 ) static constexpr noexcept -> view auto {
-	return std::invoke(std::forward<Mk>(offset_range_maker), rf->extent(), skip)
+	using DimensionType = DiamondSquare::DimensionType;
+	//This is a little tick to modify regionfield extent to mimic the effect of dropping the last grids in each rank,
+	//	whose sizes are smaller than the specified grid size.
+	//To be specific, those grids are clipped by the regionfield matrix border,
+	//	leaving only the first row and column, or the top-left corner element for the bottom-right corner of the regionfield.
+	//And this is where the **1** in `grid size - 1` comes from, to manually remove the clipped rows and columns.
+	const DimensionType clipped_extent = rf->extent() - (grid_size - ScalarType { 1 });
+	return std::invoke(std::forward<Mk>(offset_range_maker), clipped_extent, skip)
 		| chunk(group_size)
-		| transform([rf_2d = rf->range2d(), grid_extent = DiamondSquare::DimensionType(grid_size)](
+		| transform([rf_2d = rf->range2d(), grid_extent = DimensionType(grid_size)](
 			const auto group_offset) constexpr noexcept {
 			return tuple(
 				group_offset.front(),
-				group_offset
-					| transform(bind_front(DisRegRep::Core::View::Matrix::Slice2d, grid_extent))
-					| transform(bind_front(bit_or {}, rf_2d))
+				group_offset | transform([&](const auto offset) constexpr noexcept {
+					return rf_2d | DisRegRep::Core::View::Matrix::Slice2d(offset, grid_extent);
+				})
 			);
 		});
 };
@@ -140,12 +148,12 @@ void step(const ExecutionPolicy policy, GridInputOutputRange auto&& grid_io, con
 
 	std::for_each(policy, cbegin(grid_io), cend(grid_io), [secret, &f, &salt](auto grid) {
 		auto [grid_in_enum, grid_out_enum] = std::move(grid);
-		const auto [_, grid_in] = std::move(grid_in_enum);
+		const auto [grid_in_offset, grid_in] = std::move(grid_in_enum);
 		const auto [grid_out_offset, grid_out] = std::move(grid_out_enum);
-		assert(size(grid_in) == PassBps.PackingFactor);
-		assert(size(grid_out) == PassBps.PackingFactor);
+		assert(size(grid_in) <= PassBps.PackingFactor);
+		assert(size(grid_out) <= PassBps.PackingFactor);
 
-		for (const HashType hash = DisRegRep::Core::XXHash::hash(secret, tuple(std::cref(salt), grid_out_offset));
+		for (const HashType hash = DisRegRep::Core::XXHash::hash(secret, tuple(std::cref(salt), grid_in_offset, grid_out_offset));
 			auto zipped : zip(
 				DisRegRep::Core::Bit::unpack(hash, PassBps.PackingFactor, PassBps)
 					| transform([](const auto sample) static constexpr noexcept { return bitset<PassBps.Bit>(sample); }),
@@ -179,21 +187,22 @@ constexpr void copyHalo(const Regionfield& input, Regionfield& output) noexcept 
 	 * |       |
 	 * v ----> v
 	 */
-	using std::ranges::cbegin, std::ranges::begin, std::ranges::size, std::ranges::range_size_t;
-	static constexpr auto copy_size = []<sized_range In>(const In& r_in,
-										  const sized_range auto& r_out) static constexpr noexcept -> range_size_t<In> {
+	using std::copy_n,
+		std::ranges::cbegin, std::ranges::begin, std::ranges::size, std::ranges::range_size_t;
+	static constexpr auto copy_size = []<typename In>(
+										  const In& r_in, const auto& r_out) static constexpr noexcept -> range_size_t<In> {
 		const auto n = size(r_in);
 		assert(n == size(r_out));
 		return n;
 	};
 	static constexpr auto copy_vertical = []<typename In, typename Out>(In&& r_in, Out&& r_out) static constexpr noexcept -> void {
 		const auto n = copy_size(r_in, r_out);
-		copy_n(cbegin(std::forward<In>(r_in)), n, begin(std::forward<Out>(r_out)));
+		copy_n(unseq, cbegin(std::forward<In>(r_in)), n, begin(std::forward<Out>(r_out)));
 	};
 	static constexpr auto copy_horizontal = []<typename In, typename Out>(In&& r_in, Out&& r_out) static constexpr noexcept -> void {
 		const auto n = copy_size(r_in, r_out);
 		assert(n >= 2U);
-		copy_n(++cbegin(std::forward<In>(r_in)), n - 2U, ++begin(std::forward<Out>(r_out)));
+		copy_n(unseq, ++cbegin(std::forward<In>(r_in)), n - 2U, ++begin(std::forward<Out>(r_out)));
 	};
 	//Left
 	copy_vertical(input_2d.front(), output_2d.front());
@@ -357,16 +366,13 @@ void resize(const ExecutionPolicy policy, const Regionfield& input, Regionfield&
 }
 
 DRR_REGIONFIELD_GENERATOR_DEFINE_DELEGATING_FUNCTOR(DiamondSquare) {
-	static constexpr Uniform InitialGridGenerator;
-
 	const auto iteration_count = this->Iteration.size();
 	DRR_ASSERT(glm::all(greaterThanEqual(this->InitialExtent, DimensionType(2U))));
 	DRR_ASSERT(iteration_count > 0U);
 
 	const DimensionType final_extent = fold_left(repeat(std::uint_least8_t {}, iteration_count), this->InitialExtent,
-		[](const auto dim, auto) static constexpr noexcept { return upscale(dim); });
-	const DimensionType output_extent = regionfield.extent();
-	const bool need_resize_output = final_extent != output_extent;
+		[](const auto dim, auto) static constexpr noexcept { return upscale(dim); }),
+		output_extent = regionfield.extent();
 
 	this->PingPong.RegionCount = regionfield.RegionCount;
 	this->PingPong.reserve(final_extent);
@@ -376,13 +382,14 @@ DRR_REGIONFIELD_GENERATOR_DEFINE_DELEGATING_FUNCTOR(DiamondSquare) {
 	const auto swap_buffer = [&] constexpr noexcept {
 		std::swap(const_cast<Regionfield*&>(input), output);//NOLINT(cppcoreguidelines-pro-type-const-cast)
 	};
-	if (!(fold_left(this->Iteration, iteration_count, plus {}) & 1U) != need_resize_output) {
+	if (!(fold_left(this->Iteration, iteration_count, plus {}) & 1U)) {
 		//This is to correct the initial regionfield buffer order
 		//	to ensure the user-provided regionfield is the output after the last iteration.
 		//If the output needs to be resized, an extra iteration is required after stepping through every iteration.
 		swap_buffer();
 	}
 	{
+		static constexpr Uniform InitialGridGenerator;
 		auto& init_input = const_cast<Regionfield&>(*input);//NOLINT(cppcoreguidelines-pro-type-const-cast)
 		init_input.resize(this->InitialExtent);
 		InitialGridGenerator(ExecutionPolicy::SingleThreadingTrait, init_input, gen_info);
@@ -404,9 +411,11 @@ DRR_REGIONFIELD_GENERATOR_DEFINE_DELEGATING_FUNCTOR(DiamondSquare) {
 			swap_buffer();
 		}
 	}
+	//Undo the last buffer swap since the output already points us to the user-provided regionfield.
+	swap_buffer();
 	assert(output == &regionfield);
 
-	if (need_resize_output) {
+	if (final_extent != output_extent) {
 		output->resize(output_extent);
 		resize(EpTrait::Unsequenced, *input, *output);
 	}

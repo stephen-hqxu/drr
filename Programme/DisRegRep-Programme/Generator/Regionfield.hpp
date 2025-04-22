@@ -4,13 +4,15 @@
 #include <DisRegRep/Container/SplattingCoefficient.hpp>
 
 #include <DisRegRep/RegionfieldGenerator/Base.hpp>
+#include <DisRegRep/RegionfieldGenerator/DiamondSquare.hpp>
 #include <DisRegRep/RegionfieldGenerator/VoronoiDiagram.hpp>
 
-#include <DisRegRep/Splatting/OccupancyConvolution/Full/Base.hpp>
 #include <DisRegRep/Splatting/OccupancyConvolution/Sampled/Stochastic.hpp>
 #include <DisRegRep/Splatting/OccupancyConvolution/Sampled/Stratified.hpp>
 #include <DisRegRep/Splatting/OccupancyConvolution/Sampled/Systematic.hpp>
 #include <DisRegRep/Splatting/OccupancyConvolution/Base.hpp>
+
+#include <vector>
 
 #include <tuple>
 #include <variant>
@@ -27,6 +29,19 @@ namespace DisRegRep::Programme::Generator::Regionfield {
 namespace Generator {
 
 /**
+ * @brief The Diamond-Square algorithm, originally developed for procedural terrain generation, is employed to subdivide a 2D domain
+ * into regions. In contradistinction to the configuration of Voronoi Diagram, the delineation of the region is not accomplished by
+ * linear incisions, a methodology that is employed to engender a more natural aesthetic.
+ */
+struct DiamondSquare {
+
+	using Generator = RegionfieldGenerator::DiamondSquare;
+
+	Generator::DimensionType InitialExtent; /**< @link Generator::InitialExtent. */
+	std::vector<Generator::SizeType> Iteration; /**< @link Generator::Iteration. */
+
+};
+/**
  * @brief Region identifiers are distributed in a 2D space uniformly random.
  */
 struct Uniform { };
@@ -36,11 +51,14 @@ struct Uniform { };
  */
 struct VoronoiDiagram {
 
-	RegionfieldGenerator::VoronoiDiagram::SizeType CentroidCount; /**< @link RegionfieldGenerator::VoronoiDiagram::CentroidCount. */
+	using Generator = RegionfieldGenerator::VoronoiDiagram;
+
+	Generator::SizeType CentroidCount; /**< @link Generator::CentroidCount. */
 
 };
 
 using Option = std::variant<
+	const DiamondSquare*,
 	Uniform,
 	VoronoiDiagram
 >; /**< Supply configurations to all supported regionfield generators. */

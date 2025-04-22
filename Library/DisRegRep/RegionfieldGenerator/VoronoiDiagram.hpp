@@ -39,11 +39,11 @@ public:
 
 	VoronoiDiagram(const VoronoiDiagram&) = delete;
 
-	VoronoiDiagram(VoronoiDiagram&&) = delete;
+	constexpr VoronoiDiagram(VoronoiDiagram&&) noexcept = default;
 
 	VoronoiDiagram& operator=(const VoronoiDiagram&) = delete;
 
-	VoronoiDiagram& operator=(VoronoiDiagram&&) = delete;
+	constexpr VoronoiDiagram& operator=(VoronoiDiagram&&) noexcept = default;
 
 	constexpr ~VoronoiDiagram() override = default;
 

@@ -17,7 +17,7 @@ class DiamondSquare final : public Base {
 public:
 
 	using DimensionType = Container::Regionfield::DimensionType;
-	using SizeType = std::uint_fast8_t;
+	using SizeType = std::uint_least8_t;
 
 	DimensionType InitialExtent = DimensionType(2U); /**< Initial extent of regionfield generated with @link Uniform. */
 	/**

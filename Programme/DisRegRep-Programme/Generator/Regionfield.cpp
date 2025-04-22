@@ -4,6 +4,7 @@
 #include <DisRegRep/Container/SplattingCoefficient.hpp>
 
 #include <DisRegRep/RegionfieldGenerator/Base.hpp>
+#include <DisRegRep/RegionfieldGenerator/DiamondSquare.hpp>
 #include <DisRegRep/RegionfieldGenerator/ExecutionPolicy.hpp>
 #include <DisRegRep/RegionfieldGenerator/Uniform.hpp>
 #include <DisRegRep/RegionfieldGenerator/VoronoiDiagram.hpp>
@@ -44,6 +45,13 @@ using PreparedOccupancyConvolutionSplatInfo = tuple<const RfGen::Splatting::Occu
 	return std::move(regionfield);
 }
 
+[[nodiscard]] Regionfield generate(PreparedGenerationInfo&& prepared_gen_info, const RfGen::Generator::DiamondSquare* const option) {
+	const auto& [initial_extent, iteration] = *option;
+	StockGen::DiamondSquare diamond_square;
+	diamond_square.InitialExtent = initial_extent;
+	diamond_square.Iteration = iteration;
+	return generate(diamond_square, std::move(prepared_gen_info));
+}
 [[nodiscard]] Regionfield generate(PreparedGenerationInfo&& prepared_gen_info, RfGen::Generator::Uniform) {
 	static constexpr StockGen::Uniform Uniform;
 	return generate(Uniform, std::move(prepared_gen_info));

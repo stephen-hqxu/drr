@@ -201,10 +201,12 @@ struct Regionfield {
 	string OutputFilename;
 
 	enum struct Generator : std::uint_fast8_t {
+		DiamondSquare,
 		Uniform,
 		Voronoi
 	} Generator_;
 	::Generator::Regionfield::GenerateInfo GenerateInfo;
+	::Generator::Regionfield::Generator::DiamondSquare DiamondSquare;
 	::Generator::Regionfield::Generator::VoronoiDiagram VoronoiDiagram;
 
 	constexpr Regionfield() noexcept = default;
@@ -221,13 +223,15 @@ struct Regionfield {
 
 	void bind(CLI::App& cmd) & {
 		using enum Generator;
-
 		auto& [resolution, region_count, rf_gen_info] = this->GenerateInfo;
 		auto& [seed] = rf_gen_info;
+		auto& [initial_extent, iteration] = this->DiamondSquare;
 		auto& [centroid_count] = this->VoronoiDiagram;
 
 		using ResolutionType = decltype(resolution);
 		using ResolutionArray = VectorArray<ResolutionType>;
+		using InitialExtentType = decltype(initial_extent);
+		using InitialExtentArray = VectorArray<InitialExtentType>;
 		using SeedType = decltype(seed);
 
 		cmd.add_option(
@@ -243,6 +247,7 @@ struct Regionfield {
 		)	->required()
 			->type_name("GEN")
 			->transform(CLI::CheckedTransformer(unordered_map<string_view, Generator> {
+				{ "dm-sq", DiamondSquare },
 				{ "uniform", Uniform },
 				{ "voronoi", Voronoi }
 			}));
@@ -271,10 +276,33 @@ struct Regionfield {
 		)	->type_name("SEED")
 			->check(CLI::NonNegativeNumber)
 			->default_val(defaultSeed<SeedType>());
+
+		cmd.add_option_function<InitialExtentArray>(
+			"--init-dim",
+			[&initial_extent](const InitialExtentArray ext) constexpr noexcept { initial_extent = make_from_tuple<InitialExtentType>(ext); },
+			"[Diamond Square] The dimension of the regionfield matrix is specified as an input prior to execution of the initial iteration."
+		)
+			->type_name("DIM")
+			->delimiter('x')
+			->check(CLI::Range(2U, numeric_limits<InitialExtentType::value_type>::max(), ">=2"))
+			->default_str("5x5")
+			->force_callback();
+		cmd.add_option(
+			"--iter",
+			iteration,
+			"[Diamond Square] Exercise meticulous control over the number of auxiliary smoothing iterations that are to be executed at the conclusion of each primary iteration."
+		)
+			->expected(-1)
+			->type_name("IT")
+			->delimiter('-')
+			->check(CLI::NonNegativeNumber)
+			->default_str("0-0-0-2-2-2")
+			->force_callback();
+
 		cmd.add_option(
 			"--centroid",
 			centroid_count,
-			"Control the number of centroids or cells on a Voronoi Diagram."
+			"[Voronoi Diagram] Control the number of Voronoi centroids or cells."
 		)	->type_name("COUNT")
 			->check(CLI::PositiveNumber)
 			->default_val(12U);
@@ -289,6 +317,7 @@ struct Regionfield {
 		return ::Generator::Regionfield::generate(this->GenerateInfo, [this] noexcept -> Gnrt::Option {
 			using enum Generator;
 			switch (this->Generator_) {
+			case DiamondSquare: return &this->DiamondSquare;
 			case Uniform: return Gnrt::Uniform {};
 			case Voronoi: return this->VoronoiDiagram;
 			default: std::unreachable();
@@ -356,7 +385,6 @@ struct Splat {
 		)
 			->required()
 			->type_name("TIF");
-
 		cmd.add_option(
 			"-S",
 			this->Splatting_,
@@ -370,12 +398,13 @@ struct Splat {
 				{ "stratified", Stratified },
 				{ "systematic", Systematic }
 			}));
+
 		//It is not easy to pick a default radius, since it depends on the dimension of the regionfield matrix.
 		//It is an error if the convolution kernel is too large and goes over the matrix boundary.
 		cmd.add_option(
 			"--radius,-r",
 			radius,
-			"In the context of convolution-based region feature splatting, it is imperative to specify the radius of the convolution kernel."
+			"[Occupancy Convolution] It is imperative to specify the radius of the convolution kernel."
 		)
 			->required()
 			->type_name("RADIUS")
@@ -386,33 +415,36 @@ struct Splat {
 				   seed_stochastic = seed;
 				   seed_stratified = seed;
 			   },
-			   "The initial state of the random sampler employed in certain sampled convolution-based splatting processes may be seeded."
+			   "[Sampled Occupancy Convolution] The initial state of the random sampler may be seeded."
 		)
 			->type_name("SEED")
 			->check(CLI::NonNegativeNumber)
 			->default_val(defaultSeed<SeedType>());
+
 		//The number **5** is a magic number here,
 		//	which is the typical kernel diametre where the fast convolution starts to out-performs the vanilla convolution.
 		cmd.add_option(
 			"--sample",
 			sample,
-			"In the context of stochastic sampling, specify the number of random elements to be extracted from the convolution kernel in order to compute the region splatting coefficient."
+			"[Stochastic Sampling] Specify the number of random elements to be extracted from the convolution kernel."
 		)
 			->type_name("SAMPLE")
 			->check(CLI::PositiveNumber)
 			->default_val(25U);
+
 		cmd.add_option(
 			"--stratum",
 			stratum_count,
-			"In the context of stratified sampling, specify the number of strata that the convolution kernel will be divided into along each axis."
+			"[Stratified Sampling] Specify the number of strata that the convolution kernel will be divided into along each axis."
 		)
 			->type_name("COUNT")
 			->check(CLI::PositiveNumber)
 			->default_val(5U);
+
 		cmd.add_option_function<ExtentArray>(
 			"--first",
 			[&first_sample](const ExtentArray first) constexpr noexcept { first_sample = make_from_tuple<ExtentType>(first); },
-			"In the context of systematic sampling, the coordinate of the first element on the convolution kernel must be specified."
+			"[Systematic Sampling] The coordinate of the first element on the convolution kernel must be specified."
 		)
 			->type_name("COORD")
 			->delimiter(',')
@@ -422,7 +454,7 @@ struct Splat {
 		cmd.add_option_function<ExtentArray>(
 			"--interval",
 			[&interval](const ExtentArray spacing) constexpr noexcept { interval = make_from_tuple<ExtentType>(spacing); },
-			"In the context of systematic sampling, the number of elements to skip before taking the next one."
+			"[Systematic Sampling] The number of elements to skip before taking the next one."
 		)
 			->type_name("SKIP")
 			->delimiter(',')
@@ -484,23 +516,19 @@ void runProfiler(const Argument::Profile& arg_profile) {
 }
 
 void generateRegionfield(const Argument::Regionfield& arg_regionfield, const Argument::TiffCompression& arg_tiff_compression) {
-	const auto& [output_file, _1, _2, _3] = arg_regionfield;
-
 	RegionfieldProtocol::initialise();
-	const auto regionfield_tif = Image::Tiff(output_file, "w");
+	const auto regionfield_tif = Image::Tiff(arg_regionfield.OutputFilename, "w");
 	arg_tiff_compression.setCompression(regionfield_tif);
 	RegionfieldProtocol::write(regionfield_tif, arg_regionfield.generateRegionfield(), arg_regionfield.seed());
 }
 
 void splatRegionfield(const Argument::Splat& arg_splat, const Argument::TiffCompression& arg_tiff_compression) {
-	const auto& [regionfield_file, output_file, _1, _2, _3, _4, _5] = arg_splat;
-
 	RegionfieldProtocol::initialise();
-	const auto regionfield_tif = Image::Tiff(regionfield_file, "r");
+	const auto regionfield_tif = Image::Tiff(arg_splat.RegionfieldFilename, "r");
 	Container::Regionfield regionfield;
 	RegionfieldProtocol::read(regionfield_tif, regionfield);
 
-	const auto dense_mask_tif = Image::Tiff(output_file, "w");
+	const auto dense_mask_tif = Image::Tiff(arg_splat.OutputFilename, "w");
 	arg_tiff_compression.setCompression(dense_mask_tif);
 	DenseMaskProtocol::write(dense_mask_tif, arg_splat.splatRegionfield(regionfield));
 }
