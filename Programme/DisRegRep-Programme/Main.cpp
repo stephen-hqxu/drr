@@ -7,6 +7,7 @@
 #include <DisRegRep/Container/Regionfield.hpp>
 #include <DisRegRep/Container/SplattingCoefficient.hpp>
 
+#include <DisRegRep/Core/View/Functional.hpp>
 #include <DisRegRep/Core/Bit.hpp>
 #include <DisRegRep/Core/Exception.hpp>
 #include <DisRegRep/Core/ThreadPool.hpp>
@@ -22,6 +23,7 @@
 
 #include <array>
 #include <unordered_map>
+#include <vector>
 
 #include <string>
 #include <string_view>
@@ -29,7 +31,9 @@
 #include <variant>
 
 #include <algorithm>
+#include <execution>
 #include <functional>
+#include <ranges>
 
 #include <chrono>
 #include <format>
@@ -57,10 +61,11 @@ using RegionfieldProtocol = Image::Serialisation::Protocol<Container::Regionfiel
 using DenseMaskProtocol = Image::Serialisation::Protocol<Container::SplattingCoefficient::DenseMask>;
 
 namespace fs = std::filesystem;
-using std::array, std::unordered_map,
+using std::array, std::unordered_map, std::vector,
 	std::string, std::string_view,
 	std::make_from_tuple, std::variant_alternative_t;
-using std::ranges::generate;
+using std::ranges::generate,
+	std::execution::par_unseq;
 using std::chrono::system_clock, std::chrono::sys_seconds, std::chrono::duration_cast,
 	std::format,
 	std::random_device;
@@ -333,10 +338,12 @@ struct Splat {
 
 	enum struct Splatting : std::uint_fast8_t {
 		Full,
-		Stochastic = 10U,
+		Stochastic,
 		Stratified,
 		Systematic
-	} Splatting_;
+	};
+	vector<Splatting> Splatting_;
+
 	Generator::Regionfield::Splatting::OccupancyConvolution::SplatInfo OCSplatInfo;
 	Generator::Regionfield::Splatting::OccupancyConvolution::Sampled::Stochastic StochasticSampled;
 	Generator::Regionfield::Splatting::OccupancyConvolution::Sampled::Stratified StratifiedSampled;
@@ -388,9 +395,10 @@ struct Splat {
 		cmd.add_option(
 			"-S",
 			this->Splatting_,
-			"Select an algorithm for the calculation of the region feature splatting coefficient."
+			"Selection of at least one algorithm for the calculation of the region feature splatting coefficient is required, with these algorithms being placed in different directories in the same image."
 		)
 			->required()
+			->expected(-1)
 			->type_name("SPLAT")
 			->transform(CLI::CheckedTransformer(unordered_map<string_view, Splatting> {
 				{ "full", Full },
@@ -410,12 +418,12 @@ struct Splat {
 			->type_name("RADIUS")
 			->check(CLI::NonNegativeNumber);
 		cmd.add_option_function<SeedType>(
-			   "--seed",
-			   [&seed_stochastic, &seed_stratified](const SeedType seed) constexpr noexcept {
-				   seed_stochastic = seed;
-				   seed_stratified = seed;
-			   },
-			   "[Sampled Occupancy Convolution] The initial state of the random sampler may be seeded."
+			"--seed",
+			[&seed_stochastic, &seed_stratified](const SeedType seed) constexpr noexcept {
+				seed_stochastic = seed;
+				seed_stratified = seed;
+			},
+			"[Sampled Occupancy Convolution] The initial state of the random sampler may be seeded."
 		)
 			->type_name("SEED")
 			->check(CLI::NonNegativeNumber)
@@ -463,16 +471,17 @@ struct Splat {
 			->force_callback();
 	}
 
-	[[nodiscard]] Container::SplattingCoefficient::DenseMask splatRegionfield(const Container::Regionfield& regionfield) const {
+	[[nodiscard]] Container::SplattingCoefficient::DenseMask splatRegionfield(
+		const Container::Regionfield& regionfield, const Splatting splatting) const {
 		namespace Splt = Generator::Regionfield::Splatting;
-		return Generator::Regionfield::splat([this] noexcept -> Splt::Option {
+		return Generator::Regionfield::splat([this, splatting] noexcept -> Splt::Option {
 			const auto option_oc = [splat_info = &this->OCSplatInfo](
 				const auto option) constexpr noexcept -> variant_alternative_t<0U, Splt::Option> {
 				return { splat_info, option };
 			};
 
 			using enum Splatting;
-			switch (this->Splatting_) {
+			switch (splatting) {
 			case Full: return option_oc(Splt::OccupancyConvolution::Full {});
 			case Stochastic: return option_oc(&this->StochasticSampled);
 			case Stratified: return option_oc(&this->StratifiedSampled);
@@ -528,9 +537,35 @@ void splatRegionfield(const Argument::Splat& arg_splat, const Argument::TiffComp
 	Container::Regionfield regionfield;
 	RegionfieldProtocol::read(regionfield_tif, regionfield);
 
+	DenseMaskProtocol::initialise();
 	const auto dense_mask_tif = Image::Tiff(arg_splat.OutputFilename, "w");
 	arg_tiff_compression.setCompression(dense_mask_tif);
-	DenseMaskProtocol::write(dense_mask_tif, arg_splat.splatRegionfield(regionfield));
+
+	const auto& splatting = arg_splat.Splatting_;
+	if (const auto splatting_count = splatting.size();
+		splatting_count == 1U) {
+		const Argument::Splat::Splatting splatting_only_one = splatting.front();
+		DenseMaskProtocol::write(
+			dense_mask_tif, arg_splat.splatRegionfield(regionfield, splatting_only_one), std::to_underlying(splatting_only_one));
+	} else {
+		namespace F = DisRegRep::Core::View::Functional;
+		using std::ranges::to, std::views::transform, std::views::as_const;
+
+		auto dense_mask = vector<DenseMaskProtocol::Serialisable>(splatting_count);
+		std::transform(par_unseq, splatting.cbegin(), splatting.cend(), dense_mask.begin(),
+			[&arg_splat, &regionfield](const auto splatting) { return arg_splat.splatRegionfield(regionfield, splatting); });
+		const auto dense_mask_ptr = dense_mask
+			| as_const
+			| F::AddressOf
+			| to<vector>();
+		//Cannot use functional cast, a.k.a. F::Cast, because it is not strictly a convertible type.
+		const auto identifier = splatting
+			| transform([](const auto s) static constexpr noexcept { return static_cast<DenseMaskProtocol::IdentifierType>(s); })
+			| to<vector>();
+
+		DenseMaskProtocol::write(dense_mask_tif, dense_mask_ptr, identifier);
+	}
+
 }
 
 }

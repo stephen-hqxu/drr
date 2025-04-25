@@ -266,6 +266,13 @@ public:
 		defined = true;
 	}
 
+	/**
+	 * @brief Write the contents of the current directory to the file and setup to create a new directory.
+	 *
+	 * @exception Core::Exception If an error was encountered when writing the directory contents.
+	 */
+	void writeDirectory() const;
+
 };
 
 }

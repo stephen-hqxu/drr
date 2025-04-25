@@ -170,3 +170,8 @@ void Tiff::writeTile(const BinaryBuffer buffer, const u32vec3 coordinate, const 
 	assert(*this);
 	DRR_ASSERT(TIFFWriteTile(**this, buffer.data(), coordinate.x, coordinate.y, coordinate.z, sample) != -1);
 }
+
+void Tiff::writeDirectory() const {
+	assert(*this);
+	DRR_ASSERT(TIFFWriteDirectory(**this) == 1);
+}
