@@ -35,6 +35,7 @@
 #include <functional>
 #include <ranges>
 
+#include <charconv>
 #include <chrono>
 #include <format>
 #include <random>
@@ -45,6 +46,7 @@
 #include <print>
 
 #include <exception>
+#include <system_error>
 
 #include <concepts>
 #include <limits>
@@ -64,13 +66,11 @@ namespace fs = std::filesystem;
 using std::array, std::unordered_map, std::vector,
 	std::string, std::string_view,
 	std::make_from_tuple, std::variant_alternative_t;
-using std::ranges::generate,
-	std::execution::par_unseq;
 using std::chrono::system_clock, std::chrono::sys_seconds, std::chrono::duration_cast,
 	std::format,
 	std::random_device;
 using std::cout, std::println;
-using std::exception;
+using std::exception, std::errc;
 using std::unsigned_integral, std::numeric_limits, std::common_type_t;
 
 namespace {
@@ -86,7 +86,7 @@ template<unsigned_integral Seed>
 
 	array<Seed, SeedSequencePacking.PackingFactor> seed_seq;
 	random_device seed_gen;
-	generate(seed_seq, std::ref(seed_gen));
+	std::ranges::generate(seed_seq, std::ref(seed_gen));
 	return Bit::pack(seed_seq, SeedSequencePacking);
 }
 
@@ -292,16 +292,38 @@ struct Regionfield {
 			->check(CLI::Range(2U, numeric_limits<InitialExtentType::value_type>::max(), ">=2"))
 			->default_str("5x5")
 			->force_callback();
-		cmd.add_option(
+		cmd.add_option_function<vector<string>>(
 			"--iter",
-			iteration,
+			[&iteration](const vector<string>& iter) {
+				using std::from_chars, std::views::repeat;
+				for (using IterationType = decltype(iteration)::value_type;
+					const string_view smooth_iter : iter) [[likely]] {
+					if (const string_view::size_type x_pos = smooth_iter.find('x');
+						x_pos == string_view::npos) {
+						const string_view::const_pointer data_value = smooth_iter.data();
+
+						IterationType cvt_value;
+						DRR_ASSERT(from_chars(data_value, data_value + smooth_iter.size(), cvt_value).ec == errc {});
+						iteration.push_back(cvt_value);
+					} else {
+						const string_view multiple = smooth_iter.substr(0U, x_pos),
+							value = smooth_iter.substr(x_pos + 1U);
+						const string_view::const_pointer data_multiple = multiple.data(),
+							data_value = value.data();
+
+						IterationType cvt_multiple, cvt_value;
+						DRR_ASSERT(from_chars(data_multiple, data_multiple + multiple.size(), cvt_multiple).ec == errc {});
+						DRR_ASSERT(from_chars(data_value, data_value + value.size(), cvt_value).ec == errc {});
+						iteration.append_range(repeat(cvt_value, cvt_multiple));
+					}
+				}
+			},
 			"[Diamond Square] Exercise meticulous control over the number of auxiliary smoothing iterations that are to be executed at the conclusion of each primary iteration."
 		)
 			->expected(-1)
 			->type_name("IT")
 			->delimiter('-')
-			->check(CLI::NonNegativeNumber)
-			->default_str("0-0-0-2-2-2")
+			->default_str("3x0-3x2")
 			->force_callback();
 
 		cmd.add_option(
@@ -322,7 +344,9 @@ struct Regionfield {
 		return ::Generator::Regionfield::generate(this->GenerateInfo, [this] noexcept -> Gnrt::Option {
 			using enum Generator;
 			switch (this->Generator_) {
-			case DiamondSquare: return &this->DiamondSquare;
+			case DiamondSquare:
+				println("[Diamond Square] Auxiliary Smoothing Iteration: {}", this->DiamondSquare.Iteration);
+				return &this->DiamondSquare;
 			case Uniform: return Gnrt::Uniform {};
 			case Voronoi: return this->VoronoiDiagram;
 			default: std::unreachable();
@@ -549,7 +573,8 @@ void splatRegionfield(const Argument::Splat& arg_splat, const Argument::TiffComp
 			dense_mask_tif, arg_splat.splatRegionfield(regionfield, splatting_only_one), std::to_underlying(splatting_only_one));
 	} else {
 		namespace F = DisRegRep::Core::View::Functional;
-		using std::ranges::to, std::views::transform, std::views::as_const;
+		using std::execution::par_unseq,
+			std::ranges::to, std::views::transform, std::views::as_const;
 
 		auto dense_mask = vector<DenseMaskProtocol::Serialisable>(splatting_count);
 		std::transform(par_unseq, splatting.cbegin(), splatting.cend(), dense_mask.begin(),
