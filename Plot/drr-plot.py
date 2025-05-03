@@ -2,15 +2,12 @@
 Furnish a compendium of instrumental applications that facilitate the generation of plots for the purpose of data visualisation, as rendered by the Discrete Region Representation application.
 """
 from argparse import ArgumentParser, Namespace
+from importlib import import_module
 
-from typing import assert_never, Final
-
-import ProfilerResult
+from typing import Final
 
 def _main(arg: Namespace) -> None:
-	match arg.plot_engine:
-		case "profiler": ProfilerResult.main(arg)
-		case _: assert_never(arg.plot_engine)
+	import_module(arg.plot_engine.title()).main(arg)
 
 if __name__ == "__main__":
 	parser: Final = ArgumentParser(
@@ -25,8 +22,9 @@ if __name__ == "__main__":
 		required = True
 	)
 
-	for engine in (ProfilerResult,):
-		engine.addArgument(group_plot_engine.add_parser("profiler",
+	for module in ("Masked", "Profiler"):
+		engine = import_module(module)
+		engine.addArgument(group_plot_engine.add_parser(module.lower(),
 			description = engine.__doc__
 		))
 

@@ -97,14 +97,14 @@ def addArgument(cmd: ArgumentParser) -> None:
 		help = "Directory that contains results created and written by the splatting profiler.",
 		metavar = "RESULT-DIR"
 	)
-	cmd.add_argument("profiler_tar_filename",
-		help = "Filename of the tarball where all generated plots are packed.",
-		metavar = "TAR-FILENAME"
+	cmd.add_argument("profiler_plot_output",
+		help = "The tarball where all generated plots are packed.",
+		metavar = "PLOT-OUTPUT"
 	)
 
 def main(arg: Namespace) -> None:
 	result_dir: Final = Path(arg.profiler_result_dir)
-	tar_filename: Final = Path(arg.profiler_tar_filename)
+	plot_output: Final = Path(arg.profiler_plot_output)
 
 	content: Final = pd.read_csv(result_dir / "Content.csv", index_col = "job id", dtype = {
 		"job id" : np.uint32
@@ -117,19 +117,19 @@ def main(arg: Namespace) -> None:
 	result: Final[_Result] = {_ResultKey(*others) : pd.read_csv(result_dir / f"{job_id}.csv", dtype = result_dtype)
 		for job_id, *others in content.itertuples(index = True)}
 
-	with tarfile.open(tar_filename.with_suffix(".tar.xz"), "w|xz", compresslevel = 9) as tar:
-		def archiveFile(title: str, custom: str, **kwarg) -> None:
+	with tarfile.open(plot_output.with_suffix(".tar.xz"), "w|xz", compresslevel = 9) as tar:
+		def archive(title: str, custom: str, **kwarg) -> None:
 			binary: Final[BytesIO] = _plotResult(result, title, custom, **kwarg)
 			binary.seek(0)
 
 			info: Final = tar.tarinfo()
-			info.name = str(Path(tar_filename.stem) / f"{title}-{custom}.pdf")
+			info.name = str(Path(plot_output.stem) / f"{title}-{custom}.pdf")
 			info.size = binary.getbuffer().nbytes
 			info.mtime = time()
 			info.type = tarfile.REGTYPE
 
 			tar.addfile(info, binary)
-		archiveFile("Radius", "Default", figsize = (10, 8))
-		archiveFile("GlobalRegionCount", "Default", figsize = (10, 4), generator = ("Voronoi",))
-		archiveFile("LocalRegionCount", "Default", figsize = (10, 4), generator = ("Voronoi",))
-		archiveFile("Radius", "Stress", figsize = (5, 4), generator = ("Uniform",), splatting = ("F+",))
+		archive("Radius", "Default", figsize = (10, 8))
+		archive("GlobalRegionCount", "Default", figsize = (10, 4), generator = ("Voronoi",))
+		archive("LocalRegionCount", "Default", figsize = (10, 4), generator = ("Voronoi",))
+		archive("Radius", "Stress", figsize = (5, 4), generator = ("Uniform",), splatting = ("F+",))
