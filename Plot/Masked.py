@@ -72,11 +72,22 @@ def addArgument(cmd: ArgumentParser) -> None:
 		help = "The masks are employed to splat each region feature, subsequently aggregating them to generate outputs which are packed into a tarball.",
 		metavar = "SPLAT-OUTPUT"
 	)
-	cmd.add_argument("-e",
+
+	cmd.add_argument("--extension",
 		default = "png",
 		help = "Filename extension is specified for each of the generated splat outputs.",
 		metavar = "EXTENSION",
 		dest = "masked_extension"
+	)
+	cmd.add_argument("--output-dtype",
+		help = "Specify the output element data type. The aforementioned conclusion is derived from the input feature in the absence of specification.",
+		metavar = "OUTPUT-DTYPE",
+		dest = "masked_output_dtype"
+	)
+	cmd.add_argument("--rescale",
+		action = "store_true",
+		help = "Rescale the output in such a manner that its values encompass the entire range of its data type.",
+		dest = "masked_rescaled"
 	)
 
 def main(arg: Namespace) -> None:
@@ -84,6 +95,8 @@ def main(arg: Namespace) -> None:
 	mask: Final = Path(arg.masked_mask)
 	splat_output: Final = Path(arg.masked_splat_output)
 	extension: Final[str] = arg.masked_extension
+	dtype: Final[np.dtype[Any] | None] = None if arg.masked_output_dtype is None else np.dtype(arg.masked_output_dtype)
+	rescale: Final[bool] = arg.masked_rescaled
 
 	feature_read: Final = tuple[_ImageReadResult, ...](map(_readImageFromFile, feature))
 	feature_array: Final[NDArray[_DEFAULT_COMPUTE_DTYPE]] = np.swapaxes(
@@ -94,17 +107,29 @@ def main(arg: Namespace) -> None:
 	mask_tif: Final[TiffFile] = _openTiff(mask)
 	mask_array: Final[NDArray[_DEFAULT_COMPUTE_DTYPE]] = _readImageFromTiff(mask_tif)[0]
 
-	splat_array: NDArray[Any] = Quantisation.unnormalise(
-		np.einsum("ij...,ij...->i...", feature_array, mask_array), feature_dtype)
+	splat_array: NDArray[_DEFAULT_COMPUTE_DTYPE] = np.einsum("ij...,ij...->i...", feature_array, mask_array)
+	del feature_array, mask_array
 
 	# Pillow is unhappy to have an axis with just one channel.
 	if splat_array.shape[-1] == 1:
 		splat_array = np.squeeze(splat_array, axis = -1)
+	if rescale:
+		Quantisation.scale(splat_array, float(np.max(splat_array)), float(np.min(splat_array)), True)
+	splat_array_quantised: Final[NDArray[Any]] = Quantisation.unnormalise(splat_array, feature_dtype if dtype is None else dtype)
+	del splat_array
+
 	# Images are already compressed, turn compression off to improve IO.
 	with tarfile.open(splat_output.with_suffix(".tar"), "w") as tar:
-		for mask_tag, splat in zip(map(attrgetter("tags"), mask_tif.pages), np.unstack(splat_array, axis = 0)):
-			identifier = int.from_bytes(mask_tag[_TIFF_TAG_IDENTIFIER].value)
-
+		for identifier, splat in zip(
+			map(int.from_bytes,
+	   			map(attrgetter("value"),
+		   			map(itemgetter(_TIFF_TAG_IDENTIFIER),
+						map(attrgetter("tags"), mask_tif.pages)
+					)
+				)
+			),
+			np.unstack(splat_array_quantised, axis = 0)
+		):
 			binary = BytesIO()
 			Image.fromarray(splat).save(binary, format = extension)
 			binary.seek(0)

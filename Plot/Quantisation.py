@@ -6,6 +6,25 @@ from typing import Final
 import numpy as np
 from numpy.typing import NDArray
 
+def scale[DType: np.floating](array: NDArray[DType], upper: float, lower: float, inplace: bool = False) -> NDArray[DType]:
+	"""
+	Scale numbers in an array.
+
+	:param array: Array to be scaled.
+	:param upper: The new upper bound.
+	:param lower: The new lower bound.
+	:param inplace: If scaling is performed directly to `array`, or a copy is made.
+
+	:return output: Array scaled from `array`.
+	"""
+	if not np.isdtype(array.dtype, "real floating"):
+		raise TypeError("It is only possible to scale an array of floats.")
+
+	output = array if inplace else array.copy()
+	output -= lower
+	output /= upper - lower
+	return output
+
 def normalise[Target: np.floating](array: NDArray[np.integer], target_dtype: type[Target]) -> NDArray[Target]:
 	"""
 	Normalise numbers in an array.
@@ -19,11 +38,8 @@ def normalise[Target: np.floating](array: NDArray[np.integer], target_dtype: typ
 	if not np.isdtype(dtype, "integral"):
 		raise TypeError("It is only possible to normalise an array of integers.")
 
-	upper, lower = np.max(array), np.min(array)
-	output: NDArray[Target] = array.astype(target_dtype)
-	output -= lower
-	output /= upper - lower
-	return output
+	limit: Final = np.iinfo(dtype)
+	return scale(array.astype(target_dtype), limit.max, limit.min, True)
 
 def unnormalise[Target: np.integer](array: NDArray[np.floating], target_dtype: type[Target]) -> NDArray[Target]:
 	"""
