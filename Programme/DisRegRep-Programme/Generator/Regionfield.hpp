@@ -14,6 +14,7 @@
 
 #include <vector>
 
+#include <optional>
 #include <tuple>
 #include <variant>
 
@@ -160,6 +161,19 @@ struct GenerateInfo {
 };
 
 /**
+ * @brief Common settings shared by different region feature splatting algorithms.
+ */
+struct SplatInfo {
+
+	/**
+	 * @brief Pass splatting invocation parameters to @link DisRegRep::Splatting::Base::InvokeInfo. Default to use the minimum
+	 * requirements if not provided.
+	 */
+	std::optional<DisRegRep::Splatting::Base::DimensionType> Offset, Extent;
+
+};
+
+/**
  * @brief Generate a regionfield with a specific regionfield generator.
  *
  * @param gen_info @link GenerateInfo.
@@ -172,11 +186,13 @@ struct GenerateInfo {
 /**
  * @brief Compute region feature splatting coefficients for the whole domain of a given regionfield matrix.
  *
+ * @param splat_info @link SplatInfo.
  * @param option Choose a region feature splatting coefficient algorithm.
  * @param regionfield Regionfield input that provides region identifiers whose splatting coefficients are to be computed.
  *
  * @return The computed dense region mask.
  */
-[[nodiscard]] Container::SplattingCoefficient::DenseMask splat(const Splatting::Option&, const Container::Regionfield&);
+[[nodiscard]] Container::SplattingCoefficient::DenseMask splat(
+	const SplatInfo&, const Splatting::Option&, const Container::Regionfield&);
 
 }

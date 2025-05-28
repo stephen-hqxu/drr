@@ -25,6 +25,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -65,7 +66,7 @@ using DenseMaskProtocol = Image::Serialisation::Protocol<Container::SplattingCoe
 namespace fs = std::filesystem;
 using std::array, std::unordered_map, std::vector,
 	std::string, std::string_view,
-	std::make_from_tuple, std::variant_alternative_t;
+	std::optional, std::make_from_tuple, std::variant_alternative_t;
 using std::chrono::system_clock, std::chrono::sys_seconds, std::chrono::duration_cast,
 	std::format,
 	std::random_device;
@@ -368,6 +369,9 @@ struct Splat {
 	};
 	vector<Splatting> Splatting_;
 
+	Generator::Regionfield::SplatInfo SplatInfo;
+	bool CentreSplattingArea;
+
 	Generator::Regionfield::Splatting::OccupancyConvolution::SplatInfo OCSplatInfo;
 	Generator::Regionfield::Splatting::OccupancyConvolution::Sampled::Stochastic StochasticSampled;
 	Generator::Regionfield::Splatting::OccupancyConvolution::Sampled::Stratified StratifiedSampled;
@@ -387,6 +391,7 @@ struct Splat {
 
 	void bind(CLI::App& cmd) & {
 		using enum Splatting;
+		auto& [offset, extent] = this->SplatInfo;
 		auto& [radius] = this->OCSplatInfo;
 		auto& [sample, seed_stochastic] = this->StochasticSampled;
 		auto& [stratum_count, seed_stratified] = this->StratifiedSampled;
@@ -397,6 +402,8 @@ struct Splat {
 			decltype(seed_stratified)
 		>;
 		using ExtentType = common_type_t<
+			decltype(offset)::value_type,
+			decltype(extent)::value_type,
 			decltype(first_sample),
 			decltype(interval)
 		>;
@@ -430,6 +437,34 @@ struct Splat {
 				{ "stratified", Stratified },
 				{ "systematic", Systematic }
 			}));
+
+		CLI::Option& opt_offset = *cmd.add_option_function<optional<ExtentArray>>(
+			"--offset",
+			[&offset](const optional<ExtentArray> off) constexpr {
+				offset = off.transform([](const auto o) static constexpr noexcept { return make_from_tuple<ExtentType>(o); });
+			},
+			"Coordinate of the first point on the regionfield included for splatting."
+		)
+			->type_name("COORD")
+			->delimiter(',')
+			->check(CLI::NonNegativeNumber);
+		CLI::Option& opt_extent = *cmd.add_option_function<optional<ExtentArray>>(
+			"--extent",
+			[&extent](const optional<ExtentArray> ext) constexpr {
+				extent = ext.transform([](const auto e) static constexpr noexcept { return make_from_tuple<ExtentType>(e); });
+			},
+			"Dimension of the area in question covering the regionfield, where the splatting operations are conducted."
+		)
+			->type_name("DIM")
+			->delimiter('x')
+			->check(CLI::PositiveNumber);
+		cmd.add_flag(
+			"--centre",
+			this->CentreSplattingArea,
+			"Offset is calculated automatically, with the result that the area of splatting is positioned at the centre of the regionfield."
+		)
+			->needs(&opt_extent)
+			->excludes(&opt_offset);
 
 		//It is not easy to pick a default radius, since it depends on the dimension of the regionfield matrix.
 		//It is an error if the convolution kernel is too large and goes over the matrix boundary.
@@ -495,10 +530,21 @@ struct Splat {
 			->force_callback();
 	}
 
+	[[nodiscard]] Generator::Regionfield::SplatInfo prepareSplatInfo(const Container::Regionfield& regionfield) const {
+		auto splat_info = this->SplatInfo;
+		auto& [offset, extent] = splat_info;
+
+		if (const Container::Regionfield::DimensionType rf_extent = regionfield.extent();
+			this->CentreSplattingArea) {
+			offset.emplace((rf_extent - *extent) / 2U);
+		}
+		return splat_info;
+	}
+
 	[[nodiscard]] Container::SplattingCoefficient::DenseMask splatRegionfield(
 		const Container::Regionfield& regionfield, const Splatting splatting) const {
 		namespace Splt = Generator::Regionfield::Splatting;
-		return Generator::Regionfield::splat([this, splatting] noexcept -> Splt::Option {
+		return Generator::Regionfield::splat(this->prepareSplatInfo(regionfield), [this, splatting] noexcept -> Splt::Option {
 			const auto option_oc = [splat_info = &this->OCSplatInfo](
 				const auto option) constexpr noexcept -> variant_alternative_t<0U, Splt::Option> {
 				return { splat_info, option };
@@ -612,7 +658,7 @@ int main(const int argc, const char* const* const argv) try {
 	arg_profile.bind(cmd_profile);
 
 	CLI::App& group_tiff_compression = *parser.add_option_group(
-		"tiff-compression",
+		"TIFF Compression",
 		"Exercise control over the compression of generated data for the TIFF writer."
 	)	->disabled_by_default()
 		->require_option(-1);
@@ -620,7 +666,7 @@ int main(const int argc, const char* const* const argv) try {
 	arg_tiff_compression.bind(group_tiff_compression);
 
 	CLI::App& group_generator = *parser.add_option_group(
-		"generator",
+		"Generator",
 		format("The generation and processing of region data is to be carried out in a procedural manner, with the purpose of visually demonstrating the functionality of {} in the context of region splatting.", Info::FullName)
 	)	->fallthrough();
 

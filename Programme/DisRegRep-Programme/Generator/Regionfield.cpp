@@ -18,6 +18,7 @@
 #include <DisRegRep/Splatting/Container.hpp>
 
 #include <any>
+#include <optional>
 #include <tuple>
 #include <variant>
 
@@ -28,12 +29,12 @@ namespace StockGen = DisRegRep::RegionfieldGenerator;
 namespace StockSplt = DisRegRep::Splatting;
 using DisRegRep::Container::Regionfield, DisRegRep::Container::SplattingCoefficient::DenseMask;
 
-using std::any, std::tuple, std::visit;
+using std::any, std::optional, std::tuple, std::visit;
 
 namespace {
 
 using PreparedGenerationInfo = tuple<const StockGen::Base::GenerateInfo, Regionfield>;
-using PreparedSplatInfo = tuple<const Regionfield&>;
+using PreparedSplatInfo = tuple<const RfGen::SplatInfo&, const Regionfield&>;
 using PreparedOccupancyConvolutionSplatInfo = tuple<const RfGen::Splatting::OccupancyConvolution::SplatInfo, PreparedSplatInfo>;
 
 [[nodiscard]] Regionfield generate(
@@ -65,18 +66,22 @@ using PreparedOccupancyConvolutionSplatInfo = tuple<const RfGen::Splatting::Occu
 
 //NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
 [[nodiscard]] DenseMask splat(const StockSplt::Base& splatting, PreparedSplatInfo&& prepared_splat_info) {
-	const auto invoke_splat = [&splatting](const Regionfield& regionfield) -> DenseMask {
+	const auto [splat_info, regionfield] = prepared_splat_info;
+	const auto [offset, extent] = splat_info;
+
+	const auto invoke_splat = [&splatting, &offset, &extent](const Regionfield& regionfield) -> DenseMask {
+		const StockSplt::Base::DimensionType
+			invoke_offset = *offset.or_else([&splatting] { return optional(splatting.minimumOffset()); }),
+			invoke_extent = *extent.or_else([&] { return optional(splatting.maximumExtent(regionfield, invoke_offset)); });
+
 		any memory;
-		const StockSplt::Base::DimensionType offset = splatting.minimumOffset();
 		return std::move(splatting(StockSplt::Container::DenseKernelDenseOutputTrait, StockSplt::Base::InvokeInfo {
-			.Offset = offset,
-			.Extent = splatting.maximumExtent(regionfield, offset)
+			.Offset = invoke_offset,
+			.Extent = invoke_extent
 		}, regionfield, memory));
 	};
-
 	//Remember to transpose the input to maintain the same axes order if the splatting algorithm would do so.
-	if (const auto& [regionfield] = prepared_splat_info;
-		splatting.isTransposed()) {
+	if (splatting.isTransposed()) {
 		return invoke_splat(regionfield.transpose());
 	} else {//NOLINT(readability-else-after-return)
 		return invoke_splat(regionfield);
@@ -138,15 +143,15 @@ Regionfield RfGen::generate(const GenerateInfo& gen_info, const Generator::Optio
 	);
 }
 
-DenseMask RfGen::splat(const Splatting::Option& option, const Container::Regionfield& regionfield) {
+DenseMask RfGen::splat(const SplatInfo& splat_info, const Splatting::Option& option, const ::Regionfield& regionfield) {
 	return visit(
 		[&](const auto& splatting_group) {
-			const auto& [splat_info, option] = splatting_group;
+			const auto& [group_splat_info, option] = splatting_group;
 			return visit(
 				[&](const auto& splatting) {
 					return ::splat(PreparedOccupancyConvolutionSplatInfo(
-						*splat_info,
-						PreparedSplatInfo(regionfield)
+						*group_splat_info,
+						PreparedSplatInfo(splat_info, regionfield)
 					), splatting);
 				},
 				option
