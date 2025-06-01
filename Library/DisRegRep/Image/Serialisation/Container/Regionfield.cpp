@@ -24,7 +24,7 @@
 
 #include <cstdint>
 
-using DisRegRep::Image::Serialisation::Protocol, DisRegRep::Container::Regionfield;
+using DisRegRep::Image::Serialisation::Protocol::Implementation, DisRegRep::Container::Regionfield;
 using DisRegRep::Core::Bit::BitPerSampleResult, DisRegRep::Core::MdSpan::reverse;
 
 using glm::f32vec2;
@@ -43,7 +43,7 @@ constexpr DisRegRep::Image::Tiff::Tag RegionCount = 18007U;
 
 }
 
-void Protocol<Regionfield>::initialise() {
+void Implementation<Regionfield>::initialise() {
 	static constexpr auto FieldInfo = to_array<TIFFFieldInfo>({
 		{
 			.field_tag = TiffTag::RegionCount,
@@ -58,7 +58,7 @@ void Protocol<Regionfield>::initialise() {
 	Tiff::defineApplicationTag<FieldInfo.size(), FieldInfo>();
 }
 
-void Protocol<Regionfield>::read(const Tiff& tif, Serialisable& regionfield) {
+void Implementation<Regionfield>::read(const Tiff& tif, Serialisable& regionfield) {
 	using ValueType = Serialisable::ValueType;
 	using DimensionType = Serialisable::DimensionType;
 
@@ -90,8 +90,9 @@ void Protocol<Regionfield>::read(const Tiff& tif, Serialisable& regionfield) {
 	}
 }
 
-void Protocol<Regionfield>::write(const Tiff& tif, const Serialisable& regionfield, const Tiff::ColourPaletteRandomEngineSeed seed) {
+void Implementation<Regionfield>::write(const Tiff& tif, const Serialisable& regionfield, const WriteInfo& write_info) {
 	using DimensionType = Serialisable::DimensionType;
+	const auto& [compression_scheme, palette_seed] = write_info;
 
 	//It does not make any sense to have only one region, because every element is the same.
 	DRR_ASSERT(regionfield.RegionCount > 1U);
@@ -99,6 +100,7 @@ void Protocol<Regionfield>::write(const Tiff& tif, const Serialisable& regionfie
 	DRR_ASSERT(glm::all(glm::greaterThan(rf_extent, DimensionType(0U))));
 	const BitPerSampleResult bps_result = Core::Bit::minimumBitPerSample(regionfield.span());
 
+	Protocol::setCompressionScheme(tif, compression_scheme);
 	tif.setField(TiffTag::RegionCount, regionfield.RegionCount);
 
 	tif.setDefaultMetadata("Regionfield Matrix");
@@ -113,7 +115,7 @@ void Protocol<Regionfield>::write(const Tiff& tif, const Serialisable& regionfie
 	tif.setField(TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
 
 	tif.setField(TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_PALETTE);
-	tif.setColourPalette(seed);
+	tif.setColourPalette(palette_seed);
 
 	tif.setImageExtent(Dimension3(reverse(rf_extent), 1U));
 	tif.setOptimalTileExtent();

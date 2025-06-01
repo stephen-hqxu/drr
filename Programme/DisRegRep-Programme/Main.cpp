@@ -1,5 +1,4 @@
 #include <DisRegRep-Programme/Generator/Regionfield.hpp>
-#include <DisRegRep-Programme/Generator/Tiff.hpp>
 
 #include <DisRegRep-Programme/Profiler/Driver.hpp>
 #include <DisRegRep-Programme/Profiler/Splatting.hpp>
@@ -14,6 +13,7 @@
 
 #include <DisRegRep/Image/Serialisation/Container/Regionfield.hpp>
 #include <DisRegRep/Image/Serialisation/Container/SplattingCoefficient.hpp>
+#include <DisRegRep/Image/Serialisation/Protocol.hpp>
 #include <DisRegRep/Image/Tiff.hpp>
 
 #include <DisRegRep/Info.hpp>
@@ -60,8 +60,8 @@ namespace Generator = DisRegRep::Programme::Generator;
 namespace Container = DisRegRep::Container;
 namespace Image = DisRegRep::Image;
 namespace Info = DisRegRep::Info;
-using RegionfieldProtocol = Image::Serialisation::Protocol<Container::Regionfield>;
-using DenseMaskProtocol = Image::Serialisation::Protocol<Container::SplattingCoefficient::DenseMask>;
+using RegionfieldProtocol = Image::Serialisation::Protocol::Implementation<Container::Regionfield>;
+using DenseMaskProtocol = Image::Serialisation::Protocol::Implementation<Container::SplattingCoefficient::DenseMask>;
 
 namespace fs = std::filesystem;
 using std::array, std::unordered_map, std::vector,
@@ -145,10 +145,7 @@ struct TiffCompression {
 		Lzw,
 		ZStd
 	} Compression_ = Compression::None;
-	Generator::Tiff::Compression::ZStandard ZStandard {
-		//This is the default compression level used by the official zstd command line.
-		.CompressionLevel = 3
-	};
+	Image::Serialisation::Protocol::CompressionScheme::ZStandard ZStandard {};
 
 	constexpr TiffCompression() noexcept = default;
 
@@ -187,17 +184,15 @@ struct TiffCompression {
 			->default_val(zstd_compression_level);
 	}
 
-	void setCompression(const Image::Tiff& tif) const {
-		namespace Cprs = Generator::Tiff::Compression;
-		Generator::Tiff::setCompression(tif, [this] noexcept -> Cprs::Option {
-			using enum Compression;
-			switch (this->Compression_) {
-			case None: return Cprs::None {};
-			case Lzw: return Cprs::LempelZivWelch {};
-			case ZStd: return this->ZStandard;
-			default: std::unreachable();
-			}
-		}());
+	[[nodiscard]] Image::Serialisation::Protocol::CompressionScheme::Option compressionSchemeOption() const noexcept {
+		namespace Cprs = Image::Serialisation::Protocol::CompressionScheme;
+		using enum Compression;
+		switch (this->Compression_) {
+		case None: return Cprs::None {};
+		case Lzw: return Cprs::LempelZivWelch {};
+		case ZStd: return this->ZStandard;
+		default: std::unreachable();
+		}
 	}
 
 };
@@ -597,8 +592,10 @@ void runProfiler(const Argument::Profile& arg_profile) {
 void generateRegionfield(const Argument::Regionfield& arg_regionfield, const Argument::TiffCompression& arg_tiff_compression) {
 	RegionfieldProtocol::initialise();
 	const auto regionfield_tif = Image::Tiff(arg_regionfield.OutputFilename, "w");
-	arg_tiff_compression.setCompression(regionfield_tif);
-	RegionfieldProtocol::write(regionfield_tif, arg_regionfield.generateRegionfield(), arg_regionfield.seed());
+	RegionfieldProtocol::write(regionfield_tif, arg_regionfield.generateRegionfield(), {
+		.Compression = arg_tiff_compression.compressionSchemeOption(),
+		.Seed = arg_regionfield.seed()
+	});
 }
 
 void splatRegionfield(const Argument::Splat& arg_splat, const Argument::TiffCompression& arg_tiff_compression) {
@@ -609,14 +606,16 @@ void splatRegionfield(const Argument::Splat& arg_splat, const Argument::TiffComp
 
 	DenseMaskProtocol::initialise();
 	const auto dense_mask_tif = Image::Tiff(arg_splat.OutputFilename, "w");
-	arg_tiff_compression.setCompression(dense_mask_tif);
 
 	const auto& splatting = arg_splat.Splatting_;
+	const auto write_info = DenseMaskProtocol::WriteInfo {
+		.Compression = arg_tiff_compression.compressionSchemeOption()
+	};
 	if (const auto splatting_count = splatting.size();
 		splatting_count == 1U) {
 		const Argument::Splat::Splatting splatting_only_one = splatting.front();
-		DenseMaskProtocol::write(
-			dense_mask_tif, arg_splat.splatRegionfield(regionfield, splatting_only_one), std::to_underlying(splatting_only_one));
+		DenseMaskProtocol::write(dense_mask_tif, arg_splat.splatRegionfield(regionfield, splatting_only_one),
+			std::to_underlying(splatting_only_one), write_info);
 	} else {
 		namespace F = DisRegRep::Core::View::Functional;
 		using std::execution::par_unseq,
@@ -634,7 +633,7 @@ void splatRegionfield(const Argument::Splat& arg_splat, const Argument::TiffComp
 			| transform([](const auto s) static constexpr noexcept { return static_cast<DenseMaskProtocol::IdentifierType>(s); })
 			| to<vector>();
 
-		DenseMaskProtocol::write(dense_mask_tif, dense_mask_ptr, identifier);
+		DenseMaskProtocol::write(dense_mask_tif, dense_mask_ptr, identifier, write_info);
 	}
 
 }

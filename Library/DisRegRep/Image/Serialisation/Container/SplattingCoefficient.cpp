@@ -30,7 +30,8 @@
 
 #include <cmath>
 
-using DisRegRep::Image::Serialisation::Protocol, DisRegRep::Container::SplattingCoefficient::DenseMask;
+namespace Ptc = DisRegRep::Image::Serialisation::Protocol;
+using Ptc::Implementation, DisRegRep::Container::SplattingCoefficient::DenseMask;
 using DisRegRep::Core::MdSpan::reverse;
 
 using glm::f32vec2;
@@ -50,15 +51,22 @@ constexpr DisRegRep::Image::Tiff::Tag Identifier = 29716U;
 }
 
 template<unsigned_integral PixelType>
-void write(const DisRegRep::Image::Tiff& tif, const DenseMask& dense_mask, const unsigned_integral auto identifier,
-	DisRegRep::Image::Serialisation::Buffer::Tile<PixelType>& tile_buffer) {
+void write(
+	const DisRegRep::Image::Tiff& tif,
+	DisRegRep::Image::Serialisation::Buffer::Tile<PixelType>& tile_buffer,
+	const DenseMask& dense_mask,
+	const unsigned_integral auto identifier,
+	const Implementation<DenseMask>::WriteInfo& write_info
+) {
 	using Dimension2Type = DenseMask::Dimension2Type;
 	using Dimension3Type = DenseMask::Dimension3Type;
 	using PixelLimit = std::numeric_limits<PixelType>;
+	const auto& [compression_scheme] = write_info;
 
 	const Dimension3Type mask_extent = dense_mask.extent();
 	DRR_ASSERT(glm::all(glm::greaterThan(mask_extent, Dimension3Type(0U))));
 
+	Ptc::setCompressionScheme(tif, compression_scheme);
 	tif.setField(TiffTag::Identifier, identifier);
 
 	tif.setDefaultMetadata("Dense Region Feature Splatting Mask");
@@ -101,7 +109,7 @@ void write(const DisRegRep::Image::Tiff& tif, const DenseMask& dense_mask, const
 
 }
 
-void Protocol<DenseMask>::initialise() {
+void Implementation<DenseMask>::initialise() {
 	static constexpr auto FieldInfo = to_array<TIFFFieldInfo>({
 		{
 			.field_tag = TiffTag::Identifier,
@@ -116,17 +124,26 @@ void Protocol<DenseMask>::initialise() {
 	Tiff::defineApplicationTag<FieldInfo.size(), FieldInfo>();
 }
 
-void Protocol<DenseMask>::write(const Tiff& tif, const Serialisable& dense_mask, const IdentifierType identifier) {
+void Implementation<DenseMask>::write(
+	const Tiff& tif,
+	const Serialisable& dense_mask,
+	const IdentifierType identifier,
+	const WriteInfo& write_info
+) {
 	Buffer::Tile<PixelType> tile_buffer;
-	::write(tif, dense_mask, identifier, tile_buffer);
+	::write(tif, tile_buffer, dense_mask, identifier, write_info);
 }
 
-void Protocol<DenseMask>::write(
-	const Tiff& tif, const span<const Serialisable* const> dense_mask, const span<const IdentifierType> identifier) {
+void Implementation<DenseMask>::write(
+	const Tiff& tif,
+	const span<const Serialisable* const> dense_mask,
+	const span<const IdentifierType> identifier,
+	const WriteInfo& write_info
+) {
 	Buffer::Tile<PixelType> tile_buffer;
 	for_each(zip(dense_mask, identifier), [&](const auto mask_id) {
 		const auto [mask, id] = mask_id;
-		::write(tif, *mask, id, tile_buffer);
+		::write(tif, tile_buffer, *mask, id, write_info);
 		tif.writeDirectory();
 	});
 }
