@@ -24,9 +24,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 ### Compiler Flag ###
 #####################
 if(MSVC)
-	add_compile_options(/W4 /arch:AVX2 /MP)
+	add_compile_options(/W4 /MP)
 else()
-	add_compile_options(-Wall -mavx2 -mfma)
+	add_compile_options(-Wall)
 endif()
 add_compile_options(
 	$<$<CXX_COMPILER_ID:Clang>:-Wno-missing-field-initializers>

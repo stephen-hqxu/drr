@@ -1,6 +1,6 @@
 [submodule "std-ranges-concat"]
 	path = External/cpp_papers
-	url = git@github.com:huixie90/cpp_papers.git
+	url = https://github.com/huixie90/cpp_papers.git
 	branch = main
 	ignore = all
 	shallow = true
