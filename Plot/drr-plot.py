@@ -16,13 +16,13 @@ if __name__ == "__main__":
 		allow_abbrev = False
 	)
 	group_plot_engine: Final = parser.add_subparsers(
-		title = "plot-engine",
+		title = "plot engine",
 		description = "A collection of engines is implemented, with each engine specialised for the creation of plots for a specific category of data.",
 		dest = "plot_engine",
 		required = True
 	)
 
-	for module in ("Masked", "Profiler"):
+	for module in ("Masked", "Profiler", "Split"):
 		engine = import_module(module)
 		engine.addArgument(group_plot_engine.add_parser(module.lower(),
 			description = engine.__doc__

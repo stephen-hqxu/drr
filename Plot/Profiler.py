@@ -94,17 +94,19 @@ def _plotResult(result: _Result, title: str, custom: str, figsize: tuple[int, in
 
 def addArgument(cmd: ArgumentParser) -> None:
 	cmd.add_argument("profiler_result_dir",
+		type = Path,
 		help = "Directory that contains results created and written by the splatting profiler.",
 		metavar = "RESULT-DIR"
 	)
 	cmd.add_argument("profiler_plot_output",
+		type = Path,
 		help = "The tarball where all generated plots are packed.",
 		metavar = "PLOT-OUTPUT"
 	)
 
 def main(arg: Namespace) -> None:
-	result_dir: Final = Path(arg.profiler_result_dir)
-	plot_output: Final = Path(arg.profiler_plot_output)
+	result_dir: Final[Path] = arg.profiler_result_dir
+	plot_output: Final[Path] = arg.profiler_plot_output
 
 	content: Final = pd.read_csv(result_dir / "Content.csv", index_col = "job id", dtype = {
 		"job id" : np.uint32

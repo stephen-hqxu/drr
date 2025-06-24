@@ -18,6 +18,7 @@ from tifffile import TiffFile
 import numpy as np
 from numpy.typing import NDArray
 
+from ArgumentGroup import ImageFormat
 import Quantisation
 
 _DEFAULT_COMPUTE_DTYPE: Final = np.float32
@@ -59,31 +60,24 @@ def _readImageFromFile(filename: Path) -> _ImageReadResult:
 def addArgument(cmd: ArgumentParser) -> None:
 	cmd.add_argument("-F",
 		nargs = "+",
+		type = Path,
 		required = True,
 		help = "It is possible to specify features for each region in either a collection of images or a single image with multiple layers.",
 		metavar = "FEATURE",
 		dest = "masked_feature"
 	)
 	cmd.add_argument("masked_mask",
+		type = Path,
 		help = "Dense region feature mask computed by the region feature splatter.",
 		metavar = "MASK"
 	)
 	cmd.add_argument("masked_splat_output",
+		type = Path,
 		help = "The masks are employed to splat each region feature, subsequently aggregating them to generate outputs which are packed into a tarball.",
 		metavar = "SPLAT-OUTPUT"
 	)
 
-	cmd.add_argument("--extension",
-		default = "png",
-		help = "Filename extension is specified for each of the generated splat outputs.",
-		metavar = "EXTENSION",
-		dest = "masked_extension"
-	)
-	cmd.add_argument("--output-dtype",
-		help = "Specify the output element data type. The aforementioned conclusion is derived from the input feature in the absence of specification.",
-		metavar = "OUTPUT-DTYPE",
-		dest = "masked_output_dtype"
-	)
+	ImageFormat.inject(cmd)
 	cmd.add_argument("--rescale",
 		action = "store_true",
 		help = "Rescale the output in such a manner that its values encompass the entire range of its data type.",
@@ -91,11 +85,11 @@ def addArgument(cmd: ArgumentParser) -> None:
 	)
 
 def main(arg: Namespace) -> None:
-	feature: Final = tuple(map(Path, arg.masked_feature))
-	mask: Final = Path(arg.masked_mask)
-	splat_output: Final = Path(arg.masked_splat_output)
-	extension: Final[str] = arg.masked_extension
-	dtype: Final[np.dtype[Any] | None] = None if arg.masked_output_dtype is None else np.dtype(arg.masked_output_dtype)
+	feature: Final[list[Path]] = arg.masked_feature
+	mask: Final[Path] = arg.masked_mask
+	splat_output: Final[Path] = arg.masked_splat_output
+	image_format_arg: Final[ImageFormat.Argument] = ImageFormat.extract(arg)
+	fmt, dtype = image_format_arg
 	rescale: Final[bool] = arg.masked_rescaled
 
 	feature_read: Final = tuple[_ImageReadResult, ...](map(_readImageFromFile, feature))
@@ -131,11 +125,11 @@ def main(arg: Namespace) -> None:
 			np.unstack(splat_array_quantised, axis = 0)
 		):
 			binary = BytesIO()
-			Image.fromarray(splat).save(binary, format = extension)
+			Image.fromarray(splat).save(binary, format = fmt)
 			binary.seek(0)
 
 			info = tar.tarinfo()
-			info.name = str((Path(splat_output.stem) / f"Identifier-{identifier}").with_suffix(f".{extension}"))
+			info.name = str((Path(splat_output.stem) / f"Identifier-{identifier}").with_suffix(f".{image_format_arg.Extension}"))
 			info.size = binary.getbuffer().nbytes
 			info.mtime = time()
 			info.type = tarfile.REGTYPE
