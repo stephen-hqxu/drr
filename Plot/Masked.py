@@ -4,6 +4,8 @@ To establish a foundation for further analysis, users have the capacity to suppl
 from argparse import ArgumentParser, Namespace
 from time import time
 
+from concurrent.futures import ProcessPoolExecutor
+
 from io import BytesIO
 from pathlib import Path
 import tarfile
@@ -18,7 +20,7 @@ from tifffile import TiffFile
 import numpy as np
 from numpy.typing import NDArray
 
-from ArgumentGroup import ImageFormat
+from ArgumentGroup import ImageFormat, MultiProcess
 import Quantisation
 
 _DEFAULT_COMPUTE_DTYPE: Final = np.float32
@@ -83,6 +85,7 @@ def addArgument(cmd: ArgumentParser) -> None:
 		help = "Rescale the output in such a manner that its values encompass the entire range of its data type.",
 		dest = "masked_rescaled"
 	)
+	MultiProcess.inject(cmd)
 
 def main(arg: Namespace) -> None:
 	feature: Final[list[Path]] = arg.masked_feature
@@ -91,8 +94,10 @@ def main(arg: Namespace) -> None:
 	image_format_arg: Final[ImageFormat.Argument] = ImageFormat.extract(arg)
 	fmt, dtype = image_format_arg
 	rescale: Final[bool] = arg.masked_rescaled
+	process, = MultiProcess.extract(arg)
 
-	feature_read: Final = tuple[_ImageReadResult, ...](map(_readImageFromFile, feature))
+	with ProcessPoolExecutor(max_workers = process) as executor:
+		feature_read: Final = tuple[_ImageReadResult, ...](executor.map(_readImageFromFile, feature))
 	feature_array: Final[NDArray[_DEFAULT_COMPUTE_DTYPE]] = np.swapaxes(
 		np.concatenate(tuple(map(itemgetter(0), feature_read)), axis = 0), 0, 1)
 	feature_dtype: Final = np.result_type(*map(itemgetter(1), feature_read))
