@@ -10,10 +10,11 @@ from io import BytesIO
 from pathlib import Path
 import tarfile
 
+from operator import methodcaller
 from typing import Any, Final, NamedTuple
 
 from PIL import Image
-import tifffile
+from tifffile import TiffFile
 
 import numpy as np
 from numpy.typing import NDArray
@@ -96,7 +97,10 @@ def main(arg: Namespace) -> None:
 	with ProcessPoolExecutor(max_workers = process) as executor:
 		future_image_buffer: Final[list[list[_ImageSplitFuture]]] = []
 		for mask_filename in mask:
-			mask_array: NDArray[np.uint16] = tifffile.imread(mask_filename, mode = "r")
+			tif = TiffFile(mask_filename, mode = "r")
+			# [directory, depth, height, width, sample] where *sample* is always 1.
+			mask_array: NDArray[np.uint16] = np.squeeze(
+				np.concatenate(tuple(map(methodcaller("asarray", squeeze = False), tif.pages))), axis = 4)
 			assert mask_array.dtype == np.uint16
 
 			future_image_buffer.append(_splitMask(executor, mask_array, image_format_arg))
